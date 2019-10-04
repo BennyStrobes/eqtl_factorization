@@ -251,7 +251,6 @@ def add_genotype_values_to_data_structure(variants, sample_names, gtex_genotype_
 	used_variants = {}
 	# loop through chromosomes
 	for chrom_num in range(1,23):
-		print(chrom_num)
 		genotype_file = gtex_genotype_dir + 'GTEx_Analysis_2017-06-05_v8_WholeGenomeSeq_838Indiv_chr' + str(chrom_num) + '_dosage_MAF_05.txt'
 		head_count = 0
 		# Stream genotype file for this chromosome
@@ -301,7 +300,6 @@ def get_variants_we_have_genotype_data_for( gtex_genotype_dir):
 	used_variants = {}
 	# loop through chromosomes
 	for chrom_num in range(1,23):
-		print(chrom_num)
 		genotype_file = gtex_genotype_dir + 'GTEx_Analysis_2017-06-05_v8_WholeGenomeSeq_838Indiv_chr' + str(chrom_num) + '_dosage_MAF_05.txt'
 		head_count = 0
 		# Stream genotype file for this chromosome

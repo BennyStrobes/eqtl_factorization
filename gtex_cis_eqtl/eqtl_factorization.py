@@ -15,6 +15,12 @@ import statsmodels.api as sm
 from sklearn import linear_model
 from joblib import Parallel, delayed
 import multiprocessing
+import pystan
+
+
+# Load in pystan optimizizer
+UPDATE_V = pystan.StanModel(file = "update_v.stan")
+UPDATE_U = pystan.StanModel(file = "update_u.stan")
 
 
 
@@ -425,29 +431,36 @@ def initialize_sample_loading_matrix_with_kmeans(num_samples, num_latent_factor,
 		U[sample_index, kmeans_assignment] = 1.0
 	return U
 
-def update_factor_matrix_one_test(test_number, Y, G, U, Z, penalty_vector):
+def update_factor_matrix_one_test(test_number, Y, G, U, Z, lasso_param):
 	# Get slice of data corresponding to this test
 	y_test = Y[:, test_number]
 	g_test = G[:, test_number]
 	# Get U scaled by genotype for this test
 	U_scaled = U*g_test[:,None]
-	U_scaled_w_intercept = np.hstack((np.ones((U_scaled.shape[0],1)), U_scaled))
+
+
+
+	data = dict(N=len(y_test), y=y_test, X=U_scaled, K=U_scaled.shape[1], scale_beta=1.0/(2.0*lasso_param))
+	op = UPDATE_V.optimizing(data=data, verbose=False, iter=5000)
+
+	param_vec = np.hstack((op['sigma'], op['alpha'], op['beta']))
+
+	#U_scaled_w_intercept = np.hstack((np.ones((U_scaled.shape[0],1)), U_scaled))
 	# Fit model
-	model = sm.MixedLM(y_test, U_scaled_w_intercept, Z)
-	pdb.set_trace()
-	if penalty_vector[-1] != 0.0:
-		result = model.fit_regularized(method='l1', alpha=penalty_vector)
-		params = result.fe_params
+	#model = sm.MixedLM(y_test, U_scaled_w_intercept, Z)
+	#if penalty_vector[-1] != 0.0:
+	#	result = model.fit_regularized(method='l1', alpha=penalty_vector)
+	#	params = result.fe_params
 		#clf = linear_model.Lasso(alpha=penalty_vector[-1],positive=True, fit_intercept=True)
 		#clf.fit(U_scaled, y_test)
 		#params = np.hstack((clf.intercept_, clf.coef_))
-	else:
-		pdb.set_trace()
-		model = sm.OLS(y_test, U_scaled_w_intercept)
-		result = model.fit()
-		params = result.params
+	#else:
+	#	pdb.set_trace()
+	#	model = sm.OLS(y_test, U_scaled_w_intercept)
+	#	result = model.fit()
+	#	params = result.params
 	#return result.fe_params
-	return params
+	return param_vec
 
 def update_factor_matrix_with_genotype_intercept_one_test(test_number, Y, G, U, Z, penalty_vector):
 	# Get slice of data corresponding to this test
@@ -469,23 +482,24 @@ def update_factor_matrix_with_genotype_intercept_one_test(test_number, Y, G, U, 
 	return result.params
 
 # Update factor matrix (V) with linear mixed model
-def update_factor_matrix(Y, G, U, Z, num_samples, num_tests, num_latent_factor, lasso_param, genotype_intercept):
+def update_factor_matrix(Y, G, U, Z, num_samples, num_tests, num_latent_factor, lasso_param):
 	num_cores = multiprocessing.cpu_count()
 	#print(num_cores)
 	#V_arr = Parallel(n_jobs=num_cores)(delayed(update_factor_matrix_one_test)(test_number, Y, G, U, Z) for test_number in range(num_tests))
+	genotype_intercept = 'False'
 	if genotype_intercept == 'False':
-		penalty_vector = np.ones(num_latent_factor + 1)*lasso_param
-		penalty_vector[0] = 0.0
 		V_arr = []
 		for test_number in range(num_tests):
 			print(test_number)
-			V_arr.append(update_factor_matrix_one_test(test_number, Y, G, U, Z, penalty_vector))
+			V_arr.append(update_factor_matrix_one_test(test_number, Y, G, U, Z, lasso_param))
 		#V_arr = Parallel(n_jobs=num_cores)(delayed(update_factor_matrix_one_test)(test_number, Y, G, U, Z, penalty_vector) for test_number in range(num_tests))
 		# Convert back to matrix
 		V_full = np.transpose(np.asmatrix(V_arr))
-		intercept = np.squeeze(np.asarray(V_full[0,:]))
-		intercept_mat = (np.ones((num_samples,1))*np.asmatrix(intercept))
-		V = np.asarray(V_full[1:,:])
+		sigma = np.squeeze(np.asarray(V_full[0,:]))
+		intercept = np.squeeze(np.asarray(V_full[1,:]))
+		#intercept_mat = (np.ones((num_samples,1))*np.asmatrix(intercept))
+		V = np.asarray(V_full[2:,:])
+	'''
 	elif genotype_intercept == 'True':
 		penalty_vector = np.ones(num_latent_factor + 2)*lasso_param
 		penalty_vector[0] = 0.0
@@ -513,8 +527,9 @@ def update_factor_matrix(Y, G, U, Z, num_samples, num_tests, num_latent_factor, 
 		V = np.asarray(V_full[2:,:])
 		effect_size = np.squeeze(np.asarray(V_full[1,:]))
 		intercept_mat = intercept_mat + np.dot(G, np.diag(effect_size))
-	else:
-		print('Assumption error: genotype intercept of this form not implemented')
+	'''
+	#else:
+	#	print('Assumption error: genotype intercept of this form not implemented')
 	#np.savetxt('temp_V.txt', V, fmt="%s", delimiter='\t')
 	'''
 	# Initialize factor matrix (V)
@@ -526,31 +541,37 @@ def update_factor_matrix(Y, G, U, Z, num_samples, num_tests, num_latent_factor, 
 		pdb.set_trace()
 		V[test_number] = update_factor_matrix_one_test(test_number, Y, G, U, Z)
 	'''
-	return V, np.asarray(intercept_mat)
+	return V, np.asarray(intercept), np.asarray(sigma)
 
-def update_loading_matrix_one_sample(sample_num, Y, G, V, Z, intercept, lasso_param):
+def update_loading_matrix_one_sample(sample_num, Y, G, V, Z, intercept, sigma, lasso_param):
 	# Get slice of data corresponding to this sample
-	y_test = Y[sample_num, :] - intercept[sample_num,:]
+	y_test = Y[sample_num, :] - intercept
 	g_test = G[sample_num, :]
 	# Get V scaled by genotype for this sample
 	V_scaled = np.transpose(V)*g_test[:,None]
-	clf = linear_model.Lasso(alpha=lasso_param,positive=True, fit_intercept=False)
-	clf.fit(V_scaled, y_test)
-	return clf.coef_
+
+	pdb.set_trace()
+
+	data = dict(N=len(y_test), y=y_test, X=V_scaled, K=V_scaled.shape[1], scale_beta=1.0/(2.0*lasso_param), sigma=sigma)
+	op = UPDATE_U.optimizing(data=data, verbose=False, iter=5000)
+	
+	#clf = linear_model.Lasso(alpha=lasso_param,positive=True, fit_intercept=False)
+	#clf.fit(V_scaled, y_test)
+	return np.asarray(op['beta'])
 
 # Update loading matrix (U) with l1 penalized linear model
-def update_loading_matrix(Y, G, V, Z, intercept, num_samples, num_tests, num_latent_factor, lasso_param):
+def update_loading_matrix(Y, G, V, Z, intercept, sigma, num_samples, num_tests, num_latent_factor, lasso_param):
 	# Serial version
 	U = np.zeros((num_samples, num_latent_factor))
 	for sample_num in range(num_samples):
-		U[sample_num,:] = update_loading_matrix_one_sample(sample_num, Y, G, V, Z, intercept, lasso_param)
+		U[sample_num,:] = update_loading_matrix_one_sample(sample_num, Y, G, V, Z, intercept, sigma, lasso_param)
 	return U
 
 
 #######################
 # Part 1: Train eqtl factorization model
 ########################
-def train_eqtl_factorization_model_em_version(sample_overlap_file, expression_file, genotype_file, num_latent_factor, lasso_param_u, lasso_param_v, genotype_intercept, initialization, output_root):
+def train_eqtl_factorization_model_em_version(sample_overlap_file, expression_file, genotype_file, num_latent_factor, lasso_param_u, lasso_param_v, initialization, output_root):
 	# Load in expression data (dimension: num_samplesXnum_tests)
 	Y = np.transpose(np.loadtxt(expression_file, delimiter='\t'))
 	# Load in genotype data (dimension: num_samplesXnum_tests)
@@ -575,16 +596,16 @@ def train_eqtl_factorization_model_em_version(sample_overlap_file, expression_fi
 	#####################################
 	# Start iterative optimization process
 	######################################
-	num_iter = 1000
+	num_iter = 70
 	for itera in range(num_iter):
 		print('Iteration ' + str(itera))
 		# Update factor matrix (V) with linear mixed model
 		old_V = V
-		V, intercept = update_factor_matrix(Y, G, U, Z, num_samples, num_tests, num_latent_factor, lasso_param_v, genotype_intercept)		
+		V, intercept, sigma = update_factor_matrix(Y, G, U, Z, num_samples, num_tests, num_latent_factor, lasso_param_v)		
 		#V2 = np.loadtxt('temp_V.txt')
 		# Update loading matrix (U) with l1 penalized linear model
 		old_U = U
-		U = update_loading_matrix(Y, G, V, Z, intercept, num_samples, num_tests, num_latent_factor, lasso_param_u)
+		U = update_loading_matrix(Y, G, V, Z, intercept, sigma, num_samples, num_tests, num_latent_factor, lasso_param_u)
 		frob_norm = np.linalg.norm(U - old_U)
 		print('L2 norm: ' + str(frob_norm))
 	# Save matrices to output
@@ -613,87 +634,12 @@ file_stem = sys.argv[7]
 output_dir = sys.argv[8]
 lasso_param_u = float(sys.argv[9])
 lasso_param_v = float(sys.argv[10])
-genotype_intercept = sys.argv[11]
-initialization = sys.argv[12]
+initialization = sys.argv[11]
 
 
 #initialization = 'random' # kmeans, random
 #genotype_intercept = 'True_penalized' # 'True', 'False', 'True_penalized'
-output_root = output_dir + file_stem + '_em_model_lasso_U_' + str(lasso_param_u) + '_lasso_V_' + str(lasso_param_v) + '_initialization_' + initialization + '_genotype_intercept_' + genotype_intercept + '_v2'
+output_root = output_dir + file_stem + '_em_model_lasso_U_' + str(lasso_param_u) + '_lasso_V_' + str(lasso_param_v) + '_initialization_' + initialization
 print(output_root)
-train_eqtl_factorization_model_em_version(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, lasso_param_u, lasso_param_v, genotype_intercept, initialization, output_root)
-
-
-#initialization = 'random'
-
-#lasso_param_u = .01
-#lasso_param_v = .01
-#initialization = 'kmeans' # kmeans, random
-#genotype_intercept = 'True_penalized' # 'True', 'False', 'True_penalized'
-#output_root = output_dir + file_stem + '_em_model_lasso_U_' + str(lasso_param_u) + '_lasso_V_' + str(lasso_param_v) + '_initialization_' + initialization + '_genotype_intercept_' + genotype_intercept
-#print(output_root)
-#train_eqtl_factorization_model_em_version(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, lasso_param_u, lasso_param_v, genotype_intercept, initialization, output_root)
-
-
-#initialization = 'random' # kmeans, random
-#genotype_intercept = 'True_penalized' # 'True', 'False', 'True_penalized'
-#output_root = output_dir + file_stem + '_em_model_lasso_U_' + str(lasso_param_u) + '_lasso_V_' + str(lasso_param_v) + '_initialization_' + initialization + '2_genotype_intercept_' + genotype_intercept
-#rint(output_root)
-#train_eqtl_factorization_model_em_version(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, lasso_param_u, lasso_param_v, genotype_intercept, initialization, output_root)
-
-
-#######################
-# Part 1: Train eqtl factorization model
-########################
-#sparsity_parameter = 10.0
-#output_root = output_dir + file_stem 
-#train_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, sparsity_parameter, output_root)
-
-
-#######################
-# Part 1: Train eqtl factorization model
-########################
-'''
-
-sparsity_parameter = 10.0
-output_root = output_dir + file_stem +'_v_gamma_' + str(sparsity_parameter)
-n_iter=160
-train_eqtl_factorization_model_v2(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, sparsity_parameter, output_root, n_iter)
-
-
-#######################
-# Part 1: Train eqtl factorization model
-########################
-sparsity_parameter = 10.0
-output_root = output_dir + file_stem +'_v_gamma_' + str(sparsity_parameter)
-n_iter=800
-train_eqtl_factorization_model_v2(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, sparsity_parameter, output_root, n_iter)
-
-
-#######################
-# Part 1: Train eqtl factorization model
-########################
-sparsity_parameter = 100.0
-output_root = output_dir + file_stem +'_v_gamma_' + str(sparsity_parameter)
-n_iter=800
-train_eqtl_factorization_model_v2(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, sparsity_parameter, output_root, n_iter)
-'''
-
-#######################
-# Part 1: Train eqtl factorization model
-########################
-
-#######################
-# Part 1: Train eqtl factorization model
-########################
-
-#sparsity_parameter = 5.0
-#output_root = output_dir + file_stem +'_v_half_normal_' + str(sparsity_parameter)
-#n_iter=200
-#train_eqtl_factorization_model_v4(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, sparsity_parameter, output_root, n_iter)
-
-#sparsity_parameter = 0.1
-#output_root = output_dir + file_stem +'_v_half_normal_' + str(sparsity_parameter)
-#n_iter=800
-#train_eqtl_factorization_model_v4(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, sparsity_parameter, output_root, n_iter)
+train_eqtl_factorization_model_em_version(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, lasso_param_u, lasso_param_v, initialization, output_root)
 
