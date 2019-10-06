@@ -3,9 +3,9 @@
 #from __future__ import print_function
 #from edward.models import Gamma, Poisson, Normal, PointMass, \
 #    TransformedDistribution
-#from edward.models import PointMass, Empirical, HalfNormal
-#import edward as ed
-#import tensorflow as tf
+from edward.models import PointMass, HalfNormal, Normal, Bernoulli
+import edward as ed
+import tensorflow as tf
 import numpy as np 
 import os
 import sys
@@ -15,12 +15,12 @@ import statsmodels.api as sm
 from sklearn import linear_model
 from joblib import Parallel, delayed
 import multiprocessing
-import pystan
+#import pystan
 
 
 # Load in pystan optimizizer
-UPDATE_V = pystan.StanModel(file = "update_v.stan")
-UPDATE_U = pystan.StanModel(file = "update_u.stan")
+#UPDATE_V = pystan.StanModel(file = "update_v.stan")
+#UPDATE_U = pystan.StanModel(file = "update_u.stan")
 
 
 
@@ -81,7 +81,7 @@ def gamma_q(obj_shape, name=None):
 #######################
 # Part 1: Train eqtl factorization model
 ########################
-def train_eqtl_factorization_model(sample_overlap_file, expression_file, genotype_file, num_latent_factors, sparsity_parameter, output_root):
+def train_eqtl_factorization_model(sample_overlap_file, expression_file, genotype_file, num_latent_factors, sparsity_parameter_u, sparsity_parameter_v, output_root):
 	# Load in expression data
 	Y = np.transpose(np.loadtxt(expression_file, delimiter='\t'))
 	# Load in genotype data
@@ -92,30 +92,35 @@ def train_eqtl_factorization_model(sample_overlap_file, expression_file, genotyp
 	num_samples = Y.shape[0]
 	num_tests = Y.shape[1]
 
-	
 	###############################
 	## MODEL
-	# Y ~ 1 + (UXV)G (1|individual) 
+	# Y ~ 1 + (UXV)G 
 	###############################
 	# Set up placeholders for the data inputs.
-	ind_ph = tf.placeholder(tf.int32, [num_samples, 1])
+	#ind_ph = tf.placeholder(tf.int32, [num_samples, 1])
 	# Set up placeholders for the data inputs.
 	genotype = tf.placeholder(tf.float32, [num_samples, num_tests])
 	# Set up fixed effects (intercept term)
 	mu = tf.get_variable("mu", [num_tests])
 	# Set up standard deviation of random effects term
-	sigma_ind = tf.sqrt(tf.exp(tf.get_variable("sigma_ind", [num_tests])))
+	#sigma_ind = tf.sqrt(tf.exp(tf.get_variable("sigma_ind", [num_tests])))
 	# Set up standard deviation of residuals term
 	sigma_resid = tf.sqrt(tf.exp(tf.get_variable("sigma_resid", [num_tests])))
 	# Set up random effects
-	eta_ind = Normal(loc=tf.zeros([num_individuals, num_tests]), scale= tf.matmul(tf.ones([num_individuals,num_tests]),tf.matrix_diag(sigma_ind)))
+	# eta_ind = Normal(loc=tf.zeros([num_individuals, num_tests]), scale= tf.matmul(tf.ones([num_individuals,num_tests]),tf.matrix_diag(sigma_ind)))
 
 	# higher values of sparsity parameter result in a more sparse solution
 	#U = tf.nn.softplus(tf.get_variable("U", [num_samples, num_latent_factors]))
 	#U = tf.get_variable("U", [num_samples, num_latent_factors])
-	V = tf.get_variable("V", [num_latent_factors, num_tests])
+	V = Normal(loc=0.0, scale=1.0/(2.0*sparsity_parameter_v), sample_shape=[num_latent_factors, num_tests])
+	#U = HalfNormal(scale=1.0/(2.0*sparsity_parameter_u), sample_shape=[num_samples, num_latent_factors])
+
+	U_mask = Bernoulli(logits=0.0, sample_shape=[num_samples, num_latent_factors])
+	U_raw = HalfNormal(scale=1.0/(2.0*sparsity_parameter_u), sample_shape=[num_samples, num_latent_factors])
+	U = tf.to_float(U_mask) * U_raw
+
 	#U = Normal(loc=0.0, scale=1.0, sample_shape=[num_samples, num_latent_factors])
-	U = Gamma(concentration=1.0, rate=sparsity_parameter, sample_shape=[num_samples, num_latent_factors])
+	#U = Gamma(concentration=1.0, rate=sparsity_parameter, sample_shape=[num_samples, num_latent_factors])
   	#V = Normal(loc=0.0, scale=1.0, sample_shape=[num_latent_factors, num_tests])
   	#U = ed.to_simplex(tf.get_variable("U", [num_samples, num_latent_factors-1]))
 
@@ -123,37 +128,58 @@ def train_eqtl_factorization_model(sample_overlap_file, expression_file, genotyp
   	#V2 = tf.get_variable("V2", [1, num_tests])
 	
 	#yhat = (tf.multiply(genotype, tf.matmul(U, V)) + tf.multiply(genotype, tf.matmul(U2, V2)) + tf.gather_nd(eta_ind, ind_ph) + tf.matmul(tf.ones([num_samples, num_tests]), tf.matrix_diag(mu)))
-	yhat = (tf.multiply(genotype, tf.matmul(U, V)) + tf.gather_nd(eta_ind, ind_ph) + tf.matmul(tf.ones([num_samples, num_tests]), tf.matrix_diag(mu)))
-
+	#yhat = (tf.multiply(genotype, tf.matmul(U, V)) + tf.gather_nd(eta_ind, ind_ph) + tf.matmul(tf.ones([num_samples, num_tests]), tf.matrix_diag(mu)))
+	yhat = (tf.multiply(genotype, tf.matmul(U, V)) + tf.matmul(tf.ones([num_samples, num_tests]), tf.matrix_diag(mu)))
 	y = Normal(loc=yhat, scale=tf.matmul(tf.ones([num_samples, num_tests]), tf.matrix_diag(sigma_resid)))
 
 	###############################
 	## Inference set up
 	###############################
-	q_ind_s = Normal(loc=tf.get_variable("q_ind_s/loc", [num_individuals, num_tests]),scale=tf.nn.softplus(tf.get_variable("q_ind_s/scale", [num_individuals, num_tests])))
-	qU = lognormal_q(U.shape)
-	#qU = gamma_q(U.shape)
-	#qU = Exponential(rate=tf.nn.softplus(tf.Variable(tf.random_normal([D, N]))))
-	#qU = Normal(loc=tf.get_variable("qU/loc", [num_samples, num_latent_factors]),
-     #         scale=tf.nn.softplus(
-      #            tf.get_variable("qU/scale", [num_samples, num_latent_factors])))
-  	#qV = Normal(loc=tf.get_variable("qV/loc", [num_latent_factors, num_tests]),
-     #         scale=tf.nn.softplus(
-      #            tf.get_variable("qV/scale", [num_latent_factors, num_tests])))
-
-	latent_vars = {eta_ind: q_ind_s, U: qU}
-
-	data = {y: Y, ind_ph: Z, genotype: G}
-
-	inference = ed.KLqp(latent_vars, data)
-	tf.global_variables_initializer().run()
-	inference.run(n_iter=400)
+	#q_ind_s = Normal(loc=tf.get_variable("q_ind_s/loc", [num_individuals, num_tests]),scale=tf.nn.softplus(tf.get_variable("q_ind_s/scale", [num_individuals, num_tests])))
 	
+	#qU = PointMass(tf.nn.softplus(tf.get_variable("qU",[num_samples,num_latent_factors])))
+	qU = PointMass(tf.nn.softplus(tf.Variable(tf.random_normal([num_samples, num_latent_factors]))))
+	qU_mask = PointMass(tf.Variable(tf.zeros([num_samples, num_latent_factors])))
+	#qU = PointMass(tf.nn.softplus(tf.Variable(tf.zeros([num_samples,num_latent_factors]))))
+
+  	qV = Normal(loc=tf.get_variable("qV/loc", [num_latent_factors, num_tests]),scale=tf.nn.softplus(tf.get_variable("qV/scale", [num_latent_factors, num_tests])))
+
+	#latent_vars = {eta_ind: q_ind_s, U: qU}
+
+	#data = {y: Y, ind_ph: Z, genotype: G}
+
+	#inference = ed.KLqp(latent_vars, data)
+	#tf.global_variables_initializer().run()
+	#inference.run(n_iter=400)
+	n_iter = 10
+	inference_e = ed.KLqp({V:qV}, data={y:Y, genotype: G, U_raw:qU, U_mask:qU_mask})
+
+	inference_m = ed.MAP({U_raw:qU, U_mask:qU_mask},data={y:Y, genotype: G, V: qV})
+
+	inference_e.initialize()
+	num_m_steps_per_iter = 1
+	inference_m.initialize(n_iter=n_iter*num_m_steps_per_iter, optimizer="rmsprop")
+	tf.global_variables_initializer().run()
+	loss = np.empty(n_iter*num_m_steps_per_iter, dtype=np.float32)
+	
+	counter = 0
+	for i in range(n_iter):
+		info_dict_e = inference_e.update()
+		for j in range(num_m_steps_per_iter):
+			#print(j)
+			info_dict_m = inference_m.update()
+			loss[counter] = info_dict_m["loss"]
+			#print(loss[counter])
+			counter = counter + 1
+		inference_m.print_progress(info_dict_m)
+
+	pdb.set_trace()
 	#########################
 	# Save data to output
 	#########################
 	output_file = output_root + '_qU_mean.txt'
-	qU_mean = np.exp(qU.distribution.loc.eval())
+	#qU_mean = np.exp(qU.distribution.loc.eval())
+	qU_mean = qU.mean().eval()
 	np.savetxt(output_file,qU_mean, fmt="%s",delimiter='\t')
 
 	#output_file = output_root + '_qU_sd.txt'
@@ -161,20 +187,13 @@ def train_eqtl_factorization_model(sample_overlap_file, expression_file, genotyp
 	#np.savetxt(output_file, qU_sd, fmt="%s",delimiter='\t')
 
 	output_file = output_root + '_V.txt'
-	np.savetxt(output_file, V.eval(), fmt="%s",delimiter='\t')
-
-	output_file = output_root + '_re_mean.txt'
-	np.savetxt(output_file, q_ind_s.mean().eval(), fmt="%s",delimiter='\t')
+	np.savetxt(output_file, qV.mean().eval(), fmt="%s",delimiter='\t')
 
 	output_file = output_root + '_mu.txt'
 	np.savetxt(output_file, mu.eval(), fmt="%s",delimiter='\n')
-	
-	output_file = output_root + '_sigma_ind.txt'
-	np.savetxt(output_file, sigma_ind.eval(), fmt="%s",delimiter='\n')
 
 	output_file = output_root + '_sigma_resid.txt'
 	np.savetxt(output_file, sigma_resid.eval(), fmt="%s",delimiter='\n')
-
 
 
 #######################
@@ -639,7 +658,7 @@ initialization = sys.argv[11]
 
 #initialization = 'random' # kmeans, random
 #genotype_intercept = 'True_penalized' # 'True', 'False', 'True_penalized'
-output_root = output_dir + file_stem + '_em_model_lasso_U_' + str(lasso_param_u) + '_lasso_V_' + str(lasso_param_v) + '_initialization_' + initialization
+output_root = output_dir + file_stem + '_edward_model_lasso_U_' + str(lasso_param_u) + '_lasso_V_' + str(lasso_param_v) + '_initialization_' + initialization
 print(output_root)
-train_eqtl_factorization_model_em_version(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, lasso_param_u, lasso_param_v, initialization, output_root)
+train_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, lasso_param_u, lasso_param_v, output_root)
 

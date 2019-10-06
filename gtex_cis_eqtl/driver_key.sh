@@ -73,23 +73,22 @@ file_stem="eqtl_factorization_on_4_tissue_gtex_data_"$num_latent_factors"_factor
 #lasso_param_us=( "0.0001" "0.001" "0.01" "0.1" "1")
 #asso_param_vs=( "0.0" "0.0001" "0.001" "0.01" "0.1" "1")
 initializations=("random")
-lasso_param_us=( "0.0001" "0.001" "0.01" "0.1" "1" "10" "100")
-lasso_param_vs=( "0.0001" "0.001" "0.01" "0.1" "1")
+lasso_params=( "0.1")
 ################################
 # Loop through covariate methods
-for lasso_param_u in "${lasso_param_us[@]}"; do
+for lasso_param in "${lasso_params[@]}"; do
 	# for lasso_param_v in "${lasso_param_vs[@]}"; do
 		for initialization in "${initializations[@]}"; do
-			sh eqtl_factorization.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $lasso_param_u $lasso_param_u $initialization 
+			sh eqtl_factorization.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $lasso_param $lasso_param $initialization 
 		done
 	# done
 done
 
 
 
+
 if false; then
 python initialization_analysis.py $expression_training_file $genotype_training_file $num_latent_factors $eqtl_results_dir $processed_data_dir"sample_tissue_names.txt"
 fi
-if false; then
 Rscript visualize_eqtl_factorization.R $processed_data_dir $eqtl_results_dir $visualization_dir
-fi
+

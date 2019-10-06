@@ -129,7 +129,7 @@ visualization_dir <- args[3]
 num_factors=3
 tissue_file <- paste0(processed_data_dir, "sample_tissue_names.txt")
 
-lasso_param_us = c("100.0")
+lasso_param_us = c("0.1")
 
 lasso_param_vs = c("0.0001")
 
@@ -137,17 +137,17 @@ for (lasso_param_u_iter in 1:length(lasso_param_us)) {
 	for (lasso_param_v_iter in 1:length(lasso_param_vs)) {
 		lasso_param_u <- lasso_param_us[lasso_param_u_iter]
 		lasso_param_v <- lasso_param_us[lasso_param_u_iter]
-		loading_file <- paste0(eqtl_results_dir, "eqtl_factorization_on_4_tissue_gtex_data_", num_factors, "_factors_em_model_lasso_U_", lasso_param_u, "_lasso_V_",lasso_param_v, "_initialization_random_U.txt")
+		loading_file <- paste0(eqtl_results_dir, "eqtl_factorization_on_4_tissue_gtex_data_", num_factors, "_factors_edward_model_lasso_U_", lasso_param_u, "_lasso_V_",lasso_param_v, "_initialization_random_qU_mean.txt")
 
 		######################
 		# Make box plot for each tissue, showing loading distributions
-		output_file <- paste0(visualization_dir,"eqtl_factorization_", num_factors, "_factors_em_model_lasso_U_", lasso_param_u, "_lasso_V_",lasso_param_v, "_initialization_random_loading_boxplot for each tissue2.pdf")
+		output_file <- paste0(visualization_dir,"eqtl_factorization_", num_factors, "_factors_edward_model_lasso_U_", lasso_param_u, "_lasso_V_",lasso_param_v, "_initialization_random_loading_boxplot for each tissue2.pdf")
 		boxplot <- make_loading_boxplot_plot(tissue_file, loading_file)
 		ggsave(boxplot, file=output_file, width=12.2, height=5.5, units="in")
 
 		######################
 		# Make scatter plot where each sample is a point, x and y axis are factor loadings, and points are colored by their tissue type
-		output_file <- paste0(visualization_dir, "eqtl_factorization_", num_factors, "_factors_em_model_lasso_U_", lasso_param_u, "_lasso_V_",lasso_param_v, "_initialization_random_loading_scatter_colored_by_tissue_type2.pdf")
+		output_file <- paste0(visualization_dir, "eqtl_factorization_", num_factors, "_factors_edward_model_lasso_U_", lasso_param_u, "_lasso_V_",lasso_param_v, "_initialization_random_loading_scatter_colored_by_tissue_type2.pdf")
 		scatter <- make_loading_scatter_plot(tissue_file, loading_file)
 		ggsave(scatter, file=output_file, width=7.2, height=5.5, units="in")
 
