@@ -61,7 +61,7 @@ fi
 #########################
 # Run eqtl factorization model
 #########################
-tissue_subset_name="tissues_subset_20_"
+tissue_subset_name="tissues_subset_4_"
 
 # eqtl factorization input files (generated in 'simulate_eqtl_factorization_data.py')
 sample_overlap_file=$processed_data_dir$tissue_subset_name"individual_id.txt"

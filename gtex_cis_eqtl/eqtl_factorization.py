@@ -49,6 +49,9 @@ def update_factor_matrix_one_test(test_number, Y, G, U, Z, lasso_param):
 	# Get U scaled by genotype for this test
 	U_scaled = U*g_test[:,None]
 
+	#X = np.hstack((U, U_scaled))
+	# Get U for intercept terms
+
 	# Fit linear regression model
 	if lasso_param == 0:
 		reg = LinearRegression().fit(U_scaled,y_test)
@@ -59,6 +62,11 @@ def update_factor_matrix_one_test(test_number, Y, G, U, Z, lasso_param):
 		clf.fit(U_scaled, y_test)
 		# Get params of fitted model
 		params = np.hstack((clf.intercept_, clf.coef_))
+	# Fit lasso model
+	#clf = linear_model.Lasso(alpha=lasso_param, fit_intercept=False)
+	#clf.fit(X, y_test)
+	#params = np.hstack((clf.intercept_, clf.coef_))
+	#pdb.set_trace()
 
 	return params
 
@@ -107,7 +115,7 @@ def update_loading_matrix(Y, G, V, Z, intercept, num_samples, num_tests, num_lat
 		U[sample_num,:] = update_loading_matrix_one_sample(sample_num, Y, G, V, Z, intercept, lasso_param)
 	return U
 
-def initialize_sample_loading_with_residual_clustering(Y, G, Z, num_latent_factor):
+def initialize_sample_loading_with_residual_clustering(Y, G, Z, num_latent_factor, output_root):
 	# Get dimensions of the matrix
 	num_tests = Y.shape[1]
 	num_samples = Y.shape[0]
@@ -134,16 +142,26 @@ def initialize_sample_loading_with_residual_clustering(Y, G, Z, num_latent_facto
 
 		#corry = np.corrcoef(np.squeeze(np.asarray(pred_test)), lmm_pred_test)
 		#print(corry)
-		resid_matrix[:, test_number] = np.abs(resid_test)
-	#kmeans = KMeans(n_clusters=num_latent_factor, random_state=0).fit(np.abs(resid_matrix))
-	GMM = GaussianMixture(n_components=num_latent_factor).fit(resid_matrix)
-	probs = GMM.predict_proba(resid_matrix) + .2
-	return probs
+		resid_matrix[:, test_number] = resid_test
+	# Fit kmeans model
+	kmeans = KMeans(n_clusters=num_latent_factor, random_state=0).fit(np.abs(resid_matrix))
+	U_init = np.zeros((num_samples, num_latent_factor))
+	for sample_num, label in enumerate(kmeans.labels_):
+		U_init[sample_num, label] = 1.0
+	# Add small constant to each entry
+	U_init = U_init + .1
 
-def subtract_mean_from_each_column_of_matrix(G):
+	np.savetxt(output_root + '_U_init.txt', U_init, fmt="%s", delimiter='\t')
+	np.savetxt(output_root + '_lm_residuals.txt', resid_matrix, fmt="%s", delimiter='\t')
+	# Old code for GMM instead of KMEANS (Used kmeans because of computational efficiency)
+	#GMM = GaussianMixture(n_components=num_latent_factor).fit(np.abs(resid_matrix))
+	#U_init2 = GMM.predict_proba(resid_matrix) + .1
+	return U_init
+
+def standardize_each_column_of_matrix(G):
 	num_cols = G.shape[1]
 	for col_num in range(num_cols):
-		G[:,col_num] = G[:,col_num] - np.mean(G[:,col_num])
+		G[:,col_num] = (G[:,col_num] - np.mean(G[:,col_num]))/np.std(G[:,col_num])
 	return G
 
 #######################
@@ -169,7 +187,7 @@ def train_eqtl_factorization_model_em_version(sample_overlap_file, expression_fi
 	elif initialization == 'fixed':
 		U = np.zeros((num_samples, num_latent_factor)) + .1
 	elif initialization == 'residual_clustering':
-		U = initialize_sample_loading_with_residual_clustering(Y, G, Z, num_latent_factor)
+		U = initialize_sample_loading_with_residual_clustering(Y, G, Z, num_latent_factor, output_root)
 	else:
 		print('ASSUMPTION ERROR: Initialization not implemented')
 	print('Initialization complete.')
@@ -177,15 +195,13 @@ def train_eqtl_factorization_model_em_version(sample_overlap_file, expression_fi
 	# Start iterative optimization process
 	######################################
 	# Standardize
-	G = subtract_mean_from_each_column_of_matrix(G)
-	num_iter = 50
+	G = standardize_each_column_of_matrix(G)
+	num_iter = 1
 	for itera in range(num_iter):
 		print('Iteration ' + str(itera))
 		# Update factor matrix (V) with linear mixed model
 		old_V = V
 		V, intercept = update_factor_matrix(Y, G, U, Z, num_samples, num_tests, num_latent_factor, lasso_param_v)		
-		print(intercept)
-		#V2 = np.loadtxt('temp_V.txt')
 		# Update loading matrix (U) with l1 penalized linear model
 		old_U = U
 		U = update_loading_matrix(Y, G, V, Z, intercept, num_samples, num_tests, num_latent_factor, lasso_param_u)
