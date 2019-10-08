@@ -157,35 +157,36 @@ eqtl_results_dir <- args[2]
 visualization_dir <- args[3]
 
 
-num_factors=4
-tissue_file <- paste0(processed_data_dir, "tissues_subset_4_sample_names.txt")
+num_factors=20
+tissue_file <- paste0(processed_data_dir, "tissues_subset_20_sample_names.txt")
 tissue_names <- get_tissue_names(tissue_file)
 
 lasso_param_us = c("0.0001", "0.001", "0.01","0.1")
 
 initializations = c("fixed", "random", "residual_clustering")
 
-lasso_param_us = c("0.001")
+lasso_param_us = c("0.01")
 
-initializations = c("residual_clustering")
+initializations = c("random")
 for (lasso_param_u_iter in 1:length(lasso_param_us)) {
 	for (initialization_iter in 1:length(initializations)) {
 		lasso_param_u <- lasso_param_us[lasso_param_u_iter]
 		lasso_param_v <-  lasso_param_us[lasso_param_u_iter]
 		initialization <- initializations[initialization_iter]
-		loading_file <- paste0(eqtl_results_dir, "eqtl_factorization_tissues_subset_4_gtex_data_", num_factors, "_factors_em_model_lasso_U_", lasso_param_u, "_lasso_V_",lasso_param_v, "_initialization_", initialization, "_U.txt")
+		loading_file <- paste0(eqtl_results_dir, "eqtl_factorization_tissues_subset_20_gtex_data_", num_factors, "_factors_em_model_lasso_U_", lasso_param_u, "_lasso_V_",lasso_param_v, "_initialization_", initialization, "_U.txt")
 
 		######################
 		# Make box plot for each tissue, showing loading distributions
 		output_file <- paste0(visualization_dir,"eqtl_factorization_", num_factors, "_factors_em_model_lasso_U_", lasso_param_u, "_lasso_V_",lasso_param_v, "_initialization_", initialization, "_loading_boxplot.pdf")
 		boxplot <- make_loading_boxplot_plot(tissue_names, loading_file)
 		ggsave(boxplot, file=output_file, width=12.2, height=5.5, units="in")
-
+		if (FALSE) {
 		######################
 		# Make scatter plot where each sample is a point, x and y axis are factor loadings, and points are colored by their tissue type
 		output_file <- paste0(visualization_dir, "eqtl_factorization_", num_factors, "_factors_em_model_lasso_U_", lasso_param_u, "_lasso_V_",lasso_param_v, "_initialization_", initialization, "_loading_scatter.pdf")
 		scatter <- make_loading_scatter_plot(tissue_names, loading_file)
 		ggsave(scatter, file=output_file, width=7.2, height=5.5, units="in")
+		}
 	}
 
 }

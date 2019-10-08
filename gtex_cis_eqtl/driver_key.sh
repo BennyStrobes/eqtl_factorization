@@ -61,7 +61,7 @@ fi
 #########################
 # Run eqtl factorization model
 #########################
-tissue_subset_name="tissues_subset_4_"
+tissue_subset_name="tissues_subset_20_"
 
 # eqtl factorization input files (generated in 'simulate_eqtl_factorization_data.py')
 sample_overlap_file=$processed_data_dir$tissue_subset_name"individual_id.txt"
@@ -72,18 +72,14 @@ genotype_training_file=$processed_data_dir$tissue_subset_name"genotype.txt"
 expression_testing_file=$processed_data_dir$tissue_subset_name"expr.txt"
 genotype_testing_file=$processed_data_dir$tissue_subset_name"genotype.txt"
 
-num_latent_factors="4"
-file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors"
-
-
 
 ################################
 # Run eqtl factorization over a number of parameters
 #lasso_param_us=( "0.0001" "0.001" "0.01" "0.1" "1")
 #asso_param_vs=( "0.0" "0.0001" "0.001" "0.01" "0.1" "1")
-initializations=("residual_clustering")
+initializations=("residual_clustering" "random1" "random2", "random3")
 lasso_param_us=( "0.001"  )
-num_latent_factor_arr=( "4")
+num_latent_factor_arr=("4" "8" "12" "16" "20")
 ################################
 # Loop through covariate methods
 for lasso_param_u in "${lasso_param_us[@]}"; do
@@ -91,8 +87,7 @@ for lasso_param_u in "${lasso_param_us[@]}"; do
 			for num_latent_factors in "${num_latent_factor_arr[@]}"; do
 				file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors"
 				lasso_param_v=$lasso_param_u
-				echo $num_latent_factors
-				sh eqtl_factorization.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $lasso_param_u $lasso_param_v $initialization 
+				sbatch eqtl_factorization.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $lasso_param_u $lasso_param_v $initialization 
 			done
 		done
 done

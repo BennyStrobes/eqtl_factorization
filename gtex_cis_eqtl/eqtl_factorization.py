@@ -115,6 +115,12 @@ def update_loading_matrix(Y, G, V, Z, intercept, num_samples, num_tests, num_lat
 		U[sample_num,:] = update_loading_matrix_one_sample(sample_num, Y, G, V, Z, intercept, lasso_param)
 	return U
 
+def compute_rmse(resid_matrix):
+	return np.sqrt(np.mean(np.square(resid_matrix)))
+
+def compute_mse(resid_matrix):
+	return np.mean(np.square(resid_matrix))
+
 def initialize_sample_loading_with_residual_clustering(Y, G, Z, num_latent_factor, output_root):
 	# Get dimensions of the matrix
 	num_tests = Y.shape[1]
@@ -156,6 +162,12 @@ def initialize_sample_loading_with_residual_clustering(Y, G, Z, num_latent_facto
 	# Old code for GMM instead of KMEANS (Used kmeans because of computational efficiency)
 	#GMM = GaussianMixture(n_components=num_latent_factor).fit(np.abs(resid_matrix))
 	#U_init2 = GMM.predict_proba(resid_matrix) + .1
+
+	# Compute RMSE on training data
+	mse = compute_mse(resid_matrix)
+	print('LM MSE: ' + str(mse))
+	np.savetxt(output_root + '_lm_mse.txt', [mse], fmt="%s", delimiter='\t')
+
 	return U_init
 
 def standardize_each_column_of_matrix(G):
@@ -163,6 +175,10 @@ def standardize_each_column_of_matrix(G):
 	for col_num in range(num_cols):
 		G[:,col_num] = (G[:,col_num] - np.mean(G[:,col_num]))/np.std(G[:,col_num])
 	return G
+
+def make_eqtl_factorization_predictions(G, U, V, intercept):
+	pred_y = np.dot(U,V)*G - intercept
+	return pred_y
 
 #######################
 # Part 1: Train eqtl factorization model
@@ -182,7 +198,7 @@ def train_eqtl_factorization_model_em_version(sample_overlap_file, expression_fi
 	intercept = np.zeros((num_samples,num_tests))
 	if initialization == 'kmeans':
 		U = initialize_sample_loading_matrix_with_kmeans(num_samples, num_latent_factor, Y)
-	elif initialization == 'random':
+	elif initialization.startswith('random'):
 		U = np.random.random(size=(num_samples, num_latent_factor))
 	elif initialization == 'fixed':
 		U = np.zeros((num_samples, num_latent_factor)) + .1
@@ -196,7 +212,8 @@ def train_eqtl_factorization_model_em_version(sample_overlap_file, expression_fi
 	######################################
 	# Standardize
 	G = standardize_each_column_of_matrix(G)
-	num_iter = 1
+	num_iter = 400
+	mse_list = []
 	for itera in range(num_iter):
 		print('Iteration ' + str(itera))
 		# Update factor matrix (V) with linear mixed model
@@ -207,9 +224,15 @@ def train_eqtl_factorization_model_em_version(sample_overlap_file, expression_fi
 		U = update_loading_matrix(Y, G, V, Z, intercept, num_samples, num_tests, num_latent_factor, lasso_param_u)
 		frob_norm = np.linalg.norm(U - old_U)
 		print('L2 norm: ' + str(frob_norm))
+		# Make predictions
+		Y_hat = make_eqtl_factorization_predictions(G, U, V, intercept)
+		mse = compute_mse(Y_hat - Y)
+		mse_list.append(mse)
+		print('eQTL Factorization MSE: ' + str(mse))
 	# Save matrices to output
 	np.savetxt(output_root + '_U.txt', U, fmt="%s", delimiter='\t')
 	np.savetxt(output_root + '_V.txt', V, fmt="%s", delimiter='\t')
+	np.savetxt(output_root + '_eqtl_factorization_mse.txt', np.asarray(mse_list), fmt="%s", delimiter='\n')
 
 
 ######################
