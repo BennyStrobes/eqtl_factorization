@@ -49,11 +49,16 @@ def update_factor_matrix_one_test(test_number, Y, G, U, Z, lasso_param):
 	# Get U scaled by genotype for this test
 	U_scaled = U*g_test[:,None]
 
+	# Fit linear regression model
+	if lasso_param == 0:
+		reg = LinearRegression().fit(U_scaled,y_test)
+		params = np.hstack((reg.intercept_, reg.coef_))
 	# Fit lasso model
-	clf = linear_model.Lasso(alpha=lasso_param, fit_intercept=True)
-	clf.fit(U_scaled, y_test)
-	# Get params of fitted model
-	params = np.hstack((clf.intercept_, clf.coef_))
+	else:
+		clf = linear_model.Lasso(alpha=lasso_param, fit_intercept=True)
+		clf.fit(U_scaled, y_test)
+		# Get params of fitted model
+		params = np.hstack((clf.intercept_, clf.coef_))
 
 	return params
 
@@ -79,11 +84,19 @@ def update_loading_matrix_one_sample(sample_num, Y, G, V, Z, intercept, lasso_pa
 	# Get slice of data corresponding to this sample
 	y_test = Y[sample_num, :] - intercept
 	g_test = G[sample_num, :]
+
 	# Get V scaled by genotype for this sample
 	V_scaled = np.transpose(V)*g_test[:,None]
 
-	clf = linear_model.Lasso(alpha=lasso_param,positive=True, fit_intercept=False)
-	clf.fit(V_scaled, y_test)
+	if lasso_param == 0:
+		# Mimick being close to zero
+		clf = linear_model.Lasso(alpha=0.0000000000001,positive=True, fit_intercept=False)
+		clf.fit(V_scaled, y_test)
+	# Fit Lasso model
+	else:
+		clf = linear_model.Lasso(alpha=lasso_param,positive=True, fit_intercept=False)
+		#clf = linear_model.Lasso(alpha=lasso_param, fit_intercept=False)
+		clf.fit(V_scaled, y_test)
 	return np.asarray(clf.coef_)
 
 # Update loading matrix (U) with l1 penalized linear model
@@ -108,6 +121,7 @@ def initialize_sample_loading_with_residual_clustering(Y, G, Z, num_latent_facto
 		g_test = G[:, test_number]
 		# Fit linear model (eQTL) across samples
 		reg = LinearRegression().fit(g_test.reshape(-1,1), y_test.reshape(-1,1))
+
 		# Calculate residuals according to predicted model
 		pred_test = reg.predict(g_test.reshape(-1,1))
 		resid_test = np.squeeze(np.asarray(pred_test)) - y_test
@@ -123,8 +137,14 @@ def initialize_sample_loading_with_residual_clustering(Y, G, Z, num_latent_facto
 		resid_matrix[:, test_number] = np.abs(resid_test)
 	#kmeans = KMeans(n_clusters=num_latent_factor, random_state=0).fit(np.abs(resid_matrix))
 	GMM = GaussianMixture(n_components=num_latent_factor).fit(resid_matrix)
-	return GMM.predict_proba(resid_matrix)
+	probs = GMM.predict_proba(resid_matrix) + .2
+	return probs
 
+def subtract_mean_from_each_column_of_matrix(G):
+	num_cols = G.shape[1]
+	for col_num in range(num_cols):
+		G[:,col_num] = G[:,col_num] - np.mean(G[:,col_num])
+	return G
 
 #######################
 # Part 1: Train eqtl factorization model
@@ -145,7 +165,7 @@ def train_eqtl_factorization_model_em_version(sample_overlap_file, expression_fi
 	if initialization == 'kmeans':
 		U = initialize_sample_loading_matrix_with_kmeans(num_samples, num_latent_factor, Y)
 	elif initialization == 'random':
-		U = np.random.random(size=(num_samples, num_latent_factor))
+		U = np.random.random(size=(num_samples, num_latent_factor)) - .5
 	elif initialization == 'fixed':
 		U = np.zeros((num_samples, num_latent_factor)) + .1
 	elif initialization == 'residual_clustering':
@@ -156,12 +176,15 @@ def train_eqtl_factorization_model_em_version(sample_overlap_file, expression_fi
 	#####################################
 	# Start iterative optimization process
 	######################################
-	num_iter = 400
+	# Standardize
+	G = subtract_mean_from_each_column_of_matrix(G)
+	num_iter = 50
 	for itera in range(num_iter):
 		print('Iteration ' + str(itera))
 		# Update factor matrix (V) with linear mixed model
 		old_V = V
 		V, intercept = update_factor_matrix(Y, G, U, Z, num_samples, num_tests, num_latent_factor, lasso_param_v)		
+		print(intercept)
 		#V2 = np.loadtxt('temp_V.txt')
 		# Update loading matrix (U) with l1 penalized linear model
 		old_U = U

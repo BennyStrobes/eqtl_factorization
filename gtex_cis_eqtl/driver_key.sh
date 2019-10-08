@@ -34,26 +34,46 @@ gtex_covariate_dir="/work-zfs/abattle4/lab_data/GTEx_v8/ciseQTL/GTEx_Analysis_v8
 gtex_genotype_dir="/work-zfs/abattle4/lab_data/GTEx_v8_trans_eqtl_data_processed_by_brian/processed_genotypes/"
 gtex_egene_dir="/work-zfs/abattle4/lab_data/GTEx_v8/ciseQTL/GTEx_Analysis_v8_eQTL/"
 
-tissues_file=$input_data_dir"tissues_small_2.txt"
-if false; then
-python preprocess_gtex_data_for_eqtl_factorization.py $tissues_file $gtex_expression_dir $gtex_tpm_dir $gtex_covariate_dir $gtex_genotype_dir $gtex_egene_dir $processed_data_dir
-fi
 
+if false; then
+## 4 tissues case
+tissues_file=$input_data_dir"tissues_subset_4.txt"
+output_dir=$processed_data_dir"tissues_subset_4_"
+python preprocess_gtex_data_for_eqtl_factorization.py $tissues_file $gtex_expression_dir $gtex_tpm_dir $gtex_covariate_dir $gtex_genotype_dir $gtex_egene_dir $output_dir
+
+## 7 tissues case
+tissues_file=$input_data_dir"tissues_subset_7.txt"
+output_dir=$processed_data_dir"tissues_subset_7_"
+python preprocess_gtex_data_for_eqtl_factorization.py $tissues_file $gtex_expression_dir $gtex_tpm_dir $gtex_covariate_dir $gtex_genotype_dir $gtex_egene_dir $output_dir
+
+
+## 10 tissues case
+tissues_file=$input_data_dir"tissues_subset_10.txt"
+output_dir=$processed_data_dir"tissues_subset_10_"
+python preprocess_gtex_data_for_eqtl_factorization.py $tissues_file $gtex_expression_dir $gtex_tpm_dir $gtex_covariate_dir $gtex_genotype_dir $gtex_egene_dir $output_dir
+
+## 20 tissues case
+tissues_file=$input_data_dir"tissues_subset_20.txt"
+output_dir=$processed_data_dir"tissues_subset_20_"
+python preprocess_gtex_data_for_eqtl_factorization.py $tissues_file $gtex_expression_dir $gtex_tpm_dir $gtex_covariate_dir $gtex_genotype_dir $gtex_egene_dir $output_dir
+fi
 
 #########################
 # Run eqtl factorization model
 #########################
-# eqtl factorization input files (generated in 'simulate_eqtl_factorization_data.py')
-sample_overlap_file=$processed_data_dir"individual_id.txt"
-# TRAINING
-expression_training_file=$processed_data_dir"expr.txt"
-genotype_training_file=$processed_data_dir"genotype.txt"
-# TESTING
-expression_testing_file=$processed_data_dir"expr.txt"
-genotype_testing_file=$processed_data_dir"genotype.txt"
+tissue_subset_name="tissues_subset_20_"
 
-num_latent_factors="3"
-file_stem="eqtl_factorization_on_4_tissue_gtex_data_"$num_latent_factors"_factors"
+# eqtl factorization input files (generated in 'simulate_eqtl_factorization_data.py')
+sample_overlap_file=$processed_data_dir$tissue_subset_name"individual_id.txt"
+# TRAINING
+expression_training_file=$processed_data_dir$tissue_subset_name"expr.txt"
+genotype_training_file=$processed_data_dir$tissue_subset_name"genotype.txt"
+# TESTING
+expression_testing_file=$processed_data_dir$tissue_subset_name"expr.txt"
+genotype_testing_file=$processed_data_dir$tissue_subset_name"genotype.txt"
+
+num_latent_factors="4"
+file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors"
 
 
 
@@ -62,17 +82,27 @@ file_stem="eqtl_factorization_on_4_tissue_gtex_data_"$num_latent_factors"_factor
 #lasso_param_us=( "0.0001" "0.001" "0.01" "0.1" "1")
 #asso_param_vs=( "0.0" "0.0001" "0.001" "0.01" "0.1" "1")
 initializations=("residual_clustering")
-lasso_param_us=( "0.0001" "0.001" "0.01" "0.1" "1" "10" "100")
-lasso_param_vs=( "0.0001" "0.001" "0.01" "0.1" "1")
+lasso_param_us=( "0.001" "0.01" )
+num_latent_factor_arr=( "6" "8" "10" "12" "14" "16" "18" "20")
+if false; then
 ################################
 # Loop through covariate methods
 for lasso_param_u in "${lasso_param_us[@]}"; do
 	# for lasso_param_v in "${lasso_param_vs[@]}"; do
 		for initialization in "${initializations[@]}"; do
-			sbatch eqtl_factorization.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $lasso_param_u $lasso_param_u $initialization 
+			for num_latent_factors in "${num_latent_factor_arr[@]}"; do
+				file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors"
+
+				lasso_param_v=$lasso_param_u
+				echo $num_latent_factors
+					sbatch eqtl_factorization.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $lasso_param_u $lasso_param_v $initialization 
+			done
 		done
 	# done
 done
+fi
+
+
 
 
 
@@ -82,3 +112,4 @@ fi
 if false; then
 Rscript visualize_eqtl_factorization.R $processed_data_dir $eqtl_results_dir $visualization_dir
 fi
+
