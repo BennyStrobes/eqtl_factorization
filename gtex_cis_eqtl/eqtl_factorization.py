@@ -165,7 +165,7 @@ def train_eqtl_factorization_model_em_version(sample_overlap_file, expression_fi
 	if initialization == 'kmeans':
 		U = initialize_sample_loading_matrix_with_kmeans(num_samples, num_latent_factor, Y)
 	elif initialization == 'random':
-		U = np.random.random(size=(num_samples, num_latent_factor)) - .5
+		U = np.random.random(size=(num_samples, num_latent_factor))
 	elif initialization == 'fixed':
 		U = np.zeros((num_samples, num_latent_factor)) + .1
 	elif initialization == 'residual_clustering':
