@@ -49,9 +49,9 @@ def update_factor_matrix_one_test(test_number, Y, G, U, Z, lasso_param):
 	# Get U scaled by genotype for this test
 	U_scaled = U*g_test[:,None]
 
-	#X = np.hstack((U, U_scaled))
+	X = np.hstack((U, U_scaled))
 	# Get U for intercept terms
-
+	'''
 	# Fit linear regression model
 	if lasso_param == 0:
 		reg = LinearRegression().fit(U_scaled,y_test)
@@ -62,13 +62,19 @@ def update_factor_matrix_one_test(test_number, Y, G, U, Z, lasso_param):
 		clf.fit(U_scaled, y_test)
 		# Get params of fitted model
 		params = np.hstack((clf.intercept_, clf.coef_))
+	'''
 	# Fit lasso model
+	num_features = U.shape[1]
+	regularization_vector = np.zeros(2*num_features)
+	regularization_vector[num_features:] = regularization_vector[num_features:] + lasso_param
+	model_fit = sm.OLS(y_test, X).fit_regularized(alpha = regularization_vector, L1_wt=1.0)
+
 	#clf = linear_model.Lasso(alpha=lasso_param, fit_intercept=False)
 	#clf.fit(X, y_test)
 	#params = np.hstack((clf.intercept_, clf.coef_))
 	#pdb.set_trace()
 
-	return params
+	return model_fit.params
 
 # Update factor matrix (V) with linear mixed model
 def update_factor_matrix(Y, G, U, Z, num_samples, num_tests, num_latent_factor, lasso_param):
@@ -79,14 +85,15 @@ def update_factor_matrix(Y, G, U, Z, num_samples, num_tests, num_latent_factor, 
 	if genotype_intercept == 'False':
 		V_arr = []
 		for test_number in range(num_tests):
+			print(test_number)
 			V_arr.append(update_factor_matrix_one_test(test_number, Y, G, U, Z, lasso_param))
 		#V_arr = Parallel(n_jobs=num_cores)(delayed(update_factor_matrix_one_test)(test_number, Y, G, U, Z, penalty_vector) for test_number in range(num_tests))
 		# Convert back to matrix
-		V_full = np.transpose(np.asmatrix(V_arr))
-		intercept = np.squeeze(np.asarray(V_full[0,:]))
+		V = np.transpose(np.asmatrix(V_arr))
+		#intercept = np.squeeze(np.asarray(V_full[0,:]))
 		#intercept_mat = (np.ones((num_samples,1))*np.asmatrix(intercept))
-		V = np.asarray(V_full[1:,:])
-	return V, np.asarray(intercept)
+		#V = np.asarray(V_full[1:,:])
+	return V
 
 def update_loading_matrix_one_sample(sample_num, Y, G, V, Z, intercept, lasso_param):
 	# Get slice of data corresponding to this sample
@@ -178,7 +185,7 @@ def train_eqtl_factorization_model_em_version(sample_overlap_file, expression_fi
 	num_samples = Y.shape[0]
 	num_tests = Y.shape[1]
 	# Initialize U with K-means and initialize V to zeros
-	V = np.zeros((num_latent_factor, num_tests))
+	V = np.zeros((num_latent_factor*2, num_tests))
 	intercept = np.zeros((num_samples,num_tests))
 	if initialization == 'kmeans':
 		U = initialize_sample_loading_matrix_with_kmeans(num_samples, num_latent_factor, Y)
@@ -201,7 +208,8 @@ def train_eqtl_factorization_model_em_version(sample_overlap_file, expression_fi
 		print('Iteration ' + str(itera))
 		# Update factor matrix (V) with linear mixed model
 		old_V = V
-		V, intercept = update_factor_matrix(Y, G, U, Z, num_samples, num_tests, num_latent_factor, lasso_param_v)		
+		V = update_factor_matrix(Y, G, U, Z, num_samples, num_tests, num_latent_factor, lasso_param_v)	
+		pdb.set_trace()	
 		# Update loading matrix (U) with l1 penalized linear model
 		old_U = U
 		U = update_loading_matrix(Y, G, V, Z, intercept, num_samples, num_tests, num_latent_factor, lasso_param_u)

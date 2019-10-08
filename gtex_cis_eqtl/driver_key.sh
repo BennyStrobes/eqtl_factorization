@@ -81,7 +81,7 @@ file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factor
 # Run eqtl factorization over a number of parameters
 #lasso_param_us=( "0.0001" "0.001" "0.01" "0.1" "1")
 #asso_param_vs=( "0.0" "0.0001" "0.001" "0.01" "0.1" "1")
-initializations=("residual_clustering")
+initializations=("random")
 lasso_param_us=( "0.001"  )
 num_latent_factor_arr=( "4")
 ################################
