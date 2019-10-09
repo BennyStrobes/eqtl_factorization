@@ -36,6 +36,10 @@ gtex_egene_dir="/work-zfs/abattle4/lab_data/GTEx_v8/ciseQTL/GTEx_Analysis_v8_eQT
 gtex_tissue_colors_file="/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/gtex_cis_eqtl/input_data/gtex_colors.txt"
 
 
+#########################
+# Preprocess data
+#########################
+
 if false; then
 ## 4 tissues case
 tissues_file=$input_data_dir"tissues_subset_4.txt"
