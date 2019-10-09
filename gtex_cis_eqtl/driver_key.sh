@@ -33,6 +33,7 @@ gtex_tpm_dir="/work-zfs/abattle4/lab_data/GTEx_v8/processed/rna_seq_by_tissue/ge
 gtex_covariate_dir="/work-zfs/abattle4/lab_data/GTEx_v8/ciseQTL/GTEx_Analysis_v8_eQTL_covariates/"
 gtex_genotype_dir="/work-zfs/abattle4/lab_data/GTEx_v8_trans_eqtl_data_processed_by_brian/processed_genotypes/"
 gtex_egene_dir="/work-zfs/abattle4/lab_data/GTEx_v8/ciseQTL/GTEx_Analysis_v8_eQTL/"
+gtex_tissue_colors_file="/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/gtex_cis_eqtl/input_data/gtex_colors.txt"
 
 
 if false; then
@@ -77,11 +78,12 @@ genotype_testing_file=$processed_data_dir$tissue_subset_name"genotype.txt"
 # Run eqtl factorization over a number of parameters
 #lasso_param_us=( "0.0001" "0.001" "0.01" "0.1" "1")
 #asso_param_vs=( "0.0" "0.0001" "0.001" "0.01" "0.1" "1")
-initializations=("residual_clustering" "random1" "random2", "random3")
+initializations=("residual_clustering" "random1" "random2" "random3")
 lasso_param_us=( "0.001"  )
 num_latent_factor_arr=("4" "8" "12" "16" "20")
 ################################
 # Loop through covariate methods
+if false; then
 for lasso_param_u in "${lasso_param_us[@]}"; do
 		for initialization in "${initializations[@]}"; do
 			for num_latent_factors in "${num_latent_factor_arr[@]}"; do
@@ -91,8 +93,7 @@ for lasso_param_u in "${lasso_param_us[@]}"; do
 			done
 		done
 done
-
-
+fi
 
 
 
@@ -100,7 +101,6 @@ done
 if false; then
 python initialization_analysis.py $expression_training_file $genotype_training_file $num_latent_factors $eqtl_results_dir $processed_data_dir"sample_tissue_names.txt"
 fi
-if false; then
-Rscript visualize_eqtl_factorization.R $processed_data_dir $eqtl_results_dir $visualization_dir
-fi
+Rscript visualize_eqtl_factorization.R $processed_data_dir $eqtl_results_dir $visualization_dir $gtex_tissue_colors_file
+
 
