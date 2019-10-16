@@ -6,6 +6,7 @@ import pdb
 import gzip
 import random
 import pandas as pd
+import rnaseqnorm
 
 
 def get_tissues(file_name):
@@ -20,22 +21,6 @@ def get_tissues(file_name):
 	f.close()
 	return arr, arr2
 
-def regress_out_covariates_for_one_gene(expression, covariate_mat):
-	# initialize residual expression vec
-	residual_expression = np.zeros(len(expression))
-	for i,ele in enumerate(expression):
-		residual_expression[i] = ele
-	# initialize linear model
-	model = linear_model.LinearRegression(fit_intercept=True) 
-	# fit model
-	modelfit = model.fit(np.transpose(covariate_mat),np.transpose(np.asmatrix(expression)))
-	beta = modelfit.coef_
-	# Regress out each coefficient
-	for i,val in enumerate(beta[0]):
-		residual_expression = residual_expression - val*covariate_mat[i,:]
-	residual_expression = (residual_expression - np.mean(residual_expression))/np.std(residual_expression)
-	#residual_expression = residual_expression - modelfit.intercept_[0]
-	return residual_expression
 
 
 def regress_out_covariates(expression_input_file, covariate_file, expression_output_file):
@@ -50,7 +35,6 @@ def regress_out_covariates(expression_input_file, covariate_file, expression_out
 	expression_samples = expression_raw[1:,0]
 	gene_ids = expression_raw[0,1:]
 	expr_mat = expression_raw[1:,1:].astype(float)
-	
 	# Simple error checking
 	if np.array_equal(expression_samples, covariate_samples) == False:
 		print('assumption error!')
@@ -63,10 +47,17 @@ def regress_out_covariates(expression_input_file, covariate_file, expression_out
 	t = open(expression_output_file, 'w')
 	t.write('Gene_id\t' + '\t'.join(expression_samples) + '\n')
 
+
+	model = linear_model.LinearRegression(fit_intercept=True) 
+	modelfit = model.fit(np.transpose(covariate_mat),expr_mat)
+	pred = modelfit.predict(np.transpose(covariate_mat))
+
+	resid = expr_mat - pred
 	for gene_number in range(num_genes):
-		residual_expression = regress_out_covariates_for_one_gene(expr_mat[:,gene_number], covariate_mat)
+		# print(np.std(resid[:,gene_number]))
+		#residual_expression = regress_out_covariates_for_one_gene(expr_mat[:,gene_number], covariate_mat)
 		gene_id = gene_ids[gene_number]
-		t.write(gene_id + '\t' + '\t'.join(residual_expression.astype(str)) + '\n')
+		t.write(gene_id + '\t' + '\t'.join(resid[:,gene_number].astype(str)) + '\n')
 	t.close()
 	'''
 	# Open expression input and output files
@@ -127,7 +118,7 @@ def get_sample_names(tissues, gtex_expression_dir, sample_name_file):
 # Extract a dictionary for genes that maps from each genes in tests to an initialized array of length== length(sample_names)
 def extract_tests(tissues, gtex_egene_dir, num_samples, genes_tested_in_all_tissues, valid_variants):
 	#num_tests_per_tissue = int(round(25000.0/len(tissues)))
-	num_tests_per_tissue = 1250
+	num_tests_per_tissue = 1000
 	# Initailize output objects
 	tests = []
 	variants = {}
@@ -245,6 +236,37 @@ def add_expression_values_to_data_structure(expr_file, sample_to_index, genes):
 			genes[ensamble_id][sample_to_index[sample_name]] = expr
 	f.close()
 	return genes
+
+# Fill in 'genes' dictionary with expression values from each tissue
+def add_expression_values_to_data_structure_t(expr_file, sample_to_index, genes):
+	aa = np.loadtxt(expr_file,dtype=str,delimiter='\t')
+	np.savetxt('temp.txt', np.transpose(aa), fmt="%s", delimiter='\t')
+	f = open('temp.txt')
+	# to identify header
+	head_count = 0
+	# Stream file
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		# header
+		if head_count == 0:
+			head_count = head_count + 1
+			# Creating mapping from index to sample name
+			mapping = {}
+			for i, indi_id in enumerate(data[1:]):
+				mapping[i] = indi_id
+			continue
+		ensamble_id = data[0]
+		# Only consider lines where ensamble_id is in genes dictionary
+		if ensamble_id not in genes:
+			continue
+		expr_vec = np.asarray(data[1:]).astype(float)
+		for index, expr in enumerate(expr_vec):
+			sample_name = mapping[index] 
+			genes[ensamble_id][sample_to_index[sample_name]] = expr
+	f.close()
+	return genes
+
 
 # Fill in 'variants' dictionary with genotype values
 def add_genotype_values_to_data_structure(variants, sample_names, gtex_genotype_dir):
@@ -418,12 +440,13 @@ def generate_tpm_expression_matrix(tissues, tissues_alt, ordered_sample_names, g
 		f.close()
 	# Remove genes with zero expression across all samples
 	filtered_tpm_matrix, filtered_orderd_genes = remove_genes_with_zero_expression(tpm_matrix, ordered_genes)
+	log_filtered_tpm_matrix = np.log2(filtered_tpm_matrix + 1.0)
 	# Print to output file
 	t = open(output_file, 'w')
 	# print header
 	t.write('GeneId\t' + '\t'.join(filtered_orderd_genes) + '\n')
 	for sample_num, sample_name in enumerate(ordered_sample_names):
-		tpm_expr = filtered_tpm_matrix[sample_num,:].astype(str)
+		tpm_expr = log_filtered_tpm_matrix[sample_num,:].astype(str)
 		t.write(sample_name + '\t' + '\t'.join(tpm_expr) + '\n')
 	t.close()
 
@@ -435,21 +458,35 @@ def standardize_expression(tpm_expression_matrix_file, standardized_tpm_expressi
 	genes = tpm_full[0,1:]
 	# Quantile normalize the samples
 	df = pd.DataFrame(np.transpose(tpm))
-	rank_mean = df.stack().groupby(df.rank(method='first').stack().astype(int)).mean()
-	temp_out = df.rank(method='min').stack().astype(int).map(rank_mean).unstack()
+	#rank_mean = df.stack().groupby(df.rank(method='first').stack().astype(int)).mean()
+	#temp_out = df.rank(method='min').stack().astype(int).map(rank_mean).unstack()
+	#tpm_quantile_normalized = np.transpose(np.asarray(temp_out))
+	temp_out = rnaseqnorm.normalize_quantiles(df)
+	#norm_df = rnaseqnorm.inverse_normal_transform(temp_out)
+	#tpm_quantile_normalized = np.transpose(np.asarray(norm_df))
+
+	###
 	tpm_quantile_normalized = np.transpose(np.asarray(temp_out))
+	###
+
 	# Standardize the genes
 	num_genes = tpm_quantile_normalized.shape[1]
 	num_samples = tpm_quantile_normalized.shape[0]
+
+	####
 	standardized_tpm = np.zeros((num_samples, num_genes))
 	for gene_num in range(num_genes):
 		standardized_tpm[:,gene_num] = (tpm_quantile_normalized[:, gene_num] - np.mean(tpm_quantile_normalized[:, gene_num]))/np.std(tpm_quantile_normalized[:, gene_num])
+	####
 	# Print to output file
 	t = open(standardized_tpm_expression_matrix_file, 'w')
 	# print header
 	t.write('GeneId\t' + '\t'.join(genes) + '\n')
 	for sample_num, sample_name in enumerate(samples):
+		#expr = tpm_quantile_normalized[sample_num, :].astype(str)
+		###
 		expr = standardized_tpm[sample_num, :].astype(str)
+		###
 		t.write(sample_name + '\t' + '\t'.join(expr) + '\n')
 	t.close()
 
@@ -459,6 +496,7 @@ def extract_covariates(expr_file, output_file, num_expression_pcs):
 	expr = expr_full[1:,1:].astype(float)
 	samples = expr_full[1:,0]
 	genes = expr_full[0,1:]
+
 	# Compute gene expression pcs on expression data
 	uuu, sss, vh = np.linalg.svd(np.transpose(expr))
 	expr_pc_loadings = np.transpose(vh)[:,:num_expression_pcs]
@@ -485,6 +523,8 @@ def get_genes_we_have_expression_data_for(file_name):
 			continue
 		genes[data[0]] = 1
 	return genes
+
+
 
 tissues_file = sys.argv[1]
 gtex_expression_dir = sys.argv[2]
@@ -514,6 +554,10 @@ generate_tpm_expression_matrix(tissues, tissues_alt, sample_names, genes_tested_
 standardized_tpm_expression_matrix_file = processed_data_dir + 'cross_tissue_tpm_standardized.txt'
 standardize_expression(tpm_expression_matrix_file, standardized_tpm_expression_matrix_file)
 
+
+
+
+
 # Extract covariates (expression pcs)
 num_expression_pcs = 50
 covariate_file = processed_data_dir + 'covariates.txt'
@@ -535,16 +579,21 @@ valid_variants = get_variants_we_have_genotype_data_for(gtex_genotype_dir)
 # Extract a dictionary for variants that maps from each variant in tests to an initialized array of length== length(sample_names)
 # Extract a dictionary for genes that maps from each genes in tests to an initialized array of length== length(sample_names)
 tests, variants, genes = extract_tests(tissues, gtex_egene_dir, len(sample_names), valid_genes, valid_variants)
+genes_uncorrected = genes.copy()
+
 
 # Print test names to output file
 test_name_file = processed_data_dir + 'test_names.txt'
 print_test_names(tests, test_name_file)
 
-# Fill in 'variants' dictionary with genotype values
-variants = add_genotype_values_to_data_structure(variants, sample_names, gtex_genotype_dir)
 
 # Fill in 'genes' dictionary with expression values from each tissue
 genes = add_expression_values_to_data_structure(residual_standardized_tpm_expression_matrix_file, sample_to_index, genes)
+
+
+# Fill in 'variants' dictionary with genotype values
+variants = add_genotype_values_to_data_structure(variants, sample_names, gtex_genotype_dir)
+
 
 print_big_matrix(processed_data_dir + 'expr.txt', tests, genes, 0)
 
@@ -553,7 +602,9 @@ print_big_matrix(processed_data_dir + 'genotype.txt', tests, variants, 1)
 
 
 
-
+# Do the same for un-corrected gene expression
+genes_uncorrected = add_expression_values_to_data_structure_t(standardized_tpm_expression_matrix_file, sample_to_index, genes_uncorrected)
+print_big_matrix(processed_data_dir + 'expr_uncorrected.txt', tests, genes_uncorrected, 0)
 
 
 

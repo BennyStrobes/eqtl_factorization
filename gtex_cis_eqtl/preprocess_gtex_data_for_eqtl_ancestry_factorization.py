@@ -6,6 +6,8 @@ import pdb
 import gzip
 import random
 import pandas as pd
+import rnaseqnorm
+
 
 
 def get_tissues(file_name):
@@ -20,24 +22,6 @@ def get_tissues(file_name):
 	f.close()
 	return arr, arr2
 
-def regress_out_covariates_for_one_gene(expression, covariate_mat):
-	# initialize residual expression vec
-	residual_expression = np.zeros(len(expression))
-	for i,ele in enumerate(expression):
-		residual_expression[i] = ele
-	# initialize linear model
-	model = linear_model.LinearRegression(fit_intercept=True) 
-	# fit model
-	modelfit = model.fit(np.transpose(covariate_mat),np.transpose(np.asmatrix(expression)))
-	beta = modelfit.coef_
-	# Regress out each coefficient
-	for i,val in enumerate(beta[0]):
-		residual_expression = residual_expression - val*covariate_mat[i,:]
-	residual_expression = (residual_expression - np.mean(residual_expression))/np.std(residual_expression)
-	#residual_expression = residual_expression - modelfit.intercept_[0]
-	return residual_expression
-
-
 def regress_out_covariates(expression_input_file, covariate_file, expression_output_file):
 	# Load in covariates
 	covariate_raw = np.transpose(np.loadtxt(covariate_file, dtype=str, delimiter='\t'))
@@ -50,7 +34,6 @@ def regress_out_covariates(expression_input_file, covariate_file, expression_out
 	expression_samples = expression_raw[1:,0]
 	gene_ids = expression_raw[0,1:]
 	expr_mat = expression_raw[1:,1:].astype(float)
-	
 	# Simple error checking
 	if np.array_equal(expression_samples, covariate_samples) == False:
 		print('assumption error!')
@@ -63,35 +46,17 @@ def regress_out_covariates(expression_input_file, covariate_file, expression_out
 	t = open(expression_output_file, 'w')
 	t.write('Gene_id\t' + '\t'.join(expression_samples) + '\n')
 
+
+	model = linear_model.LinearRegression(fit_intercept=True) 
+	modelfit = model.fit(np.transpose(covariate_mat),expr_mat)
+	pred = modelfit.predict(np.transpose(covariate_mat))
+
+	resid = expr_mat - pred
 	for gene_number in range(num_genes):
-		residual_expression = regress_out_covariates_for_one_gene(expr_mat[:,gene_number], covariate_mat)
 		gene_id = gene_ids[gene_number]
-		t.write(gene_id + '\t' + '\t'.join(residual_expression.astype(str)) + '\n')
+		t.write(gene_id + '\t' + '\t'.join(resid[:,gene_number].astype(str)) + '\n')
 	t.close()
-	'''
-	# Open expression input and output files
-	f = gzip.open(expression_input_file)
-	t = open(expression_output_file, 'w')
-	# Stream input file line by line
-	head_count = 0  # to identify header line
-	for line in f:
-		line = line.rstrip()
-		data = line.split()
-		if head_count == 0:
-			head_count = head_count + 1
-			# check to make sure expression samples are in the same order as covariate sampels
-			if np.array_equal(data[4:],covariate_samples) == False:
-				print('Assumption error: samples not alligned')
-			# Print header to output file
-			t.write('\t'.join(data[3:]) + '\n')
-			continue
-		gene_id = data[3]
-		expression = np.asarray(data[4:]).astype(float)
-		residual_expression = regress_out_covariates_for_one_gene(expression, covariate_mat)
-		t.write(gene_id + '\t' + '\t'.join(residual_expression.astype(str)) + '\n')
-	f.close()
-	t.close()
-	'''
+
 
 def get_sample_names(tissue, gtex_expression_dir, sample_name_file, sample_overlap_file, gtex_individual_information_file):
 	dicti = {}
@@ -426,14 +391,17 @@ def generate_tpm_expression_matrix(tissue, tissue_alt, ordered_sample_names, gen
 	f.close()
 	# Remove genes with zero expression across all samples
 	filtered_tpm_matrix, filtered_orderd_genes = remove_genes_with_zero_expression(tpm_matrix, ordered_genes)
+	log_filtered_tpm_matrix = np.log2(filtered_tpm_matrix + 1.0)
 	# Print to output file
 	t = open(output_file, 'w')
 	# print header
 	t.write('GeneId\t' + '\t'.join(filtered_orderd_genes) + '\n')
 	for sample_num, sample_name in enumerate(ordered_sample_names):
-		tpm_expr = filtered_tpm_matrix[sample_num,:].astype(str)
+		tpm_expr = log_filtered_tpm_matrix[sample_num,:].astype(str)
 		t.write(sample_name + '\t' + '\t'.join(tpm_expr) + '\n')
 	t.close()
+
+
 
 
 def standardize_expression(tpm_expression_matrix_file, standardized_tpm_expression_matrix_file):
@@ -443,21 +411,35 @@ def standardize_expression(tpm_expression_matrix_file, standardized_tpm_expressi
 	genes = tpm_full[0,1:]
 	# Quantile normalize the samples
 	df = pd.DataFrame(np.transpose(tpm))
-	rank_mean = df.stack().groupby(df.rank(method='first').stack().astype(int)).mean()
-	temp_out = df.rank(method='min').stack().astype(int).map(rank_mean).unstack()
+	#rank_mean = df.stack().groupby(df.rank(method='first').stack().astype(int)).mean()
+	#temp_out = df.rank(method='min').stack().astype(int).map(rank_mean).unstack()
+	#tpm_quantile_normalized = np.transpose(np.asarray(temp_out))
+	temp_out = rnaseqnorm.normalize_quantiles(df)
+	#norm_df = rnaseqnorm.inverse_normal_transform(temp_out)
+	#tpm_quantile_normalized = np.transpose(np.asarray(norm_df))
+
+	###
 	tpm_quantile_normalized = np.transpose(np.asarray(temp_out))
+	###
+
 	# Standardize the genes
 	num_genes = tpm_quantile_normalized.shape[1]
 	num_samples = tpm_quantile_normalized.shape[0]
+
+	####
 	standardized_tpm = np.zeros((num_samples, num_genes))
 	for gene_num in range(num_genes):
 		standardized_tpm[:,gene_num] = (tpm_quantile_normalized[:, gene_num] - np.mean(tpm_quantile_normalized[:, gene_num]))/np.std(tpm_quantile_normalized[:, gene_num])
+	####
 	# Print to output file
 	t = open(standardized_tpm_expression_matrix_file, 'w')
 	# print header
 	t.write('GeneId\t' + '\t'.join(genes) + '\n')
 	for sample_num, sample_name in enumerate(samples):
+		#expr = tpm_quantile_normalized[sample_num, :].astype(str)
+		###
 		expr = standardized_tpm[sample_num, :].astype(str)
+		###
 		t.write(sample_name + '\t' + '\t'.join(expr) + '\n')
 	t.close()
 
@@ -494,6 +476,38 @@ def get_genes_we_have_expression_data_for(file_name):
 		genes[data[0]] = 1
 	return genes
 
+
+# Fill in 'genes' dictionary with expression values from each tissue
+def add_expression_values_to_data_structure_t(expr_file, sample_to_index, genes):
+	aa = np.loadtxt(expr_file,dtype=str,delimiter='\t')
+	np.savetxt('temp.txt', np.transpose(aa), fmt="%s", delimiter='\t')
+	f = open('temp.txt')
+	# to identify header
+	head_count = 0
+	# Stream file
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		# header
+		if head_count == 0:
+			head_count = head_count + 1
+			# Creating mapping from index to sample name
+			mapping = {}
+			for i, indi_id in enumerate(data[1:]):
+				mapping[i] = indi_id
+			continue
+		ensamble_id = data[0]
+		# Only consider lines where ensamble_id is in genes dictionary
+		if ensamble_id not in genes:
+			continue
+		expr_vec = np.asarray(data[1:]).astype(float)
+		for index, expr in enumerate(expr_vec):
+			sample_name = mapping[index] 
+			genes[ensamble_id][sample_to_index[sample_name]] = expr
+	f.close()
+	return genes
+
+
 tissues_file = sys.argv[1]
 gtex_expression_dir = sys.argv[2]
 gtex_tpm_dir = sys.argv[3]
@@ -508,7 +522,7 @@ processed_data_dir = sys.argv[8]
 tissues, tissues_alt = get_tissues(tissues_file)
 
 
-for i, tissue in enumerate(tissues[:2]):
+for i, tissue in enumerate(tissues[:20]):
 	print(tissue)
 
 	tissue_alt = tissues_alt[i]
@@ -553,6 +567,8 @@ for i, tissue in enumerate(tissues[:2]):
 	# Extract a dictionary for variants that maps from each variant in tests to an initialized array of length== length(sample_names)
 	# Extract a dictionary for genes that maps from each genes in tests to an initialized array of length== length(sample_names)
 	tests, variants, genes = extract_tests(tissue, gtex_egene_dir, len(sample_names), valid_genes, valid_variants)
+	genes_uncorrected = genes.copy()
+
 
 	# Print test names to output file
 	test_name_file = output_dir + 'test_names.txt'
@@ -569,8 +585,9 @@ for i, tissue in enumerate(tissues[:2]):
 	print_big_matrix(output_dir + 'genotype.txt', tests, variants, 1)
 
 
-
-
+	# Do the same for un-corrected gene expression
+	genes_uncorrected = add_expression_values_to_data_structure_t(standardized_tpm_expression_matrix_file, sample_to_index, genes_uncorrected)
+	print_big_matrix(processed_data_dir + 'expr_uncorrected.txt', tests, genes_uncorrected, 0)
 
 
 

@@ -31,9 +31,8 @@ gtex_individual_information_file="/work-zfs/abattle4/lab_data/GTEx_v8/sample_ann
 # Preprocess data
 #########################
 tissues_file=$input_data_dir"gtex_v8_tissues.txt"
-if false; then
 python preprocess_gtex_data_for_eqtl_ancestry_factorization.py $tissues_file $gtex_expression_dir $gtex_tpm_dir $gtex_covariate_dir $gtex_genotype_dir $gtex_egene_dir $gtex_individual_information_file $processed_data_dir
-fi
+
 
 
 ################################
@@ -50,7 +49,7 @@ for tissue_name in "${tissue_name_arr[@]}"; do
 		for initialization in "${initializations[@]}"; do
 			for num_latent_factors in "${num_latent_factor_arr[@]}"; do
 				
-				file_stem="eqtl_ancestry_factorization_"$tissue_name_"gtex_data_"$num_latent_factors"_factors"
+				file_stem="eqtl_ancestry_factorization_"$tissue_name"_gtex_data_"$num_latent_factors"_factors"
 				lasso_param_v=$lasso_param_u
 
 				sample_overlap_file=$processed_data_dir$tissue_name"_sample_overlap.txt"
@@ -66,4 +65,8 @@ for tissue_name in "${tissue_name_arr[@]}"; do
 		done
 	done
 done
+fi
+
+if false; then
+Rscript visualize_eqtl_ancestry_factorization.R $processed_data_dir $eqtl_results_dir $visualization_dir $gtex_tissue_colors_file
 fi

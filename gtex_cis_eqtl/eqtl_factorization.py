@@ -53,15 +53,10 @@ def update_factor_matrix_one_test(test_number, Y, G, U, Z, lasso_param):
 	# Get U for intercept terms
 
 	# Fit linear regression model
-	if lasso_param == 0:
-		reg = LinearRegression().fit(U_scaled,y_test)
-		params = np.hstack((reg.intercept_, reg.coef_))
-	# Fit lasso model
-	else:
-		clf = linear_model.Lasso(alpha=lasso_param, fit_intercept=True)
-		clf.fit(U_scaled, y_test)
-		# Get params of fitted model
-		params = np.hstack((clf.intercept_, clf.coef_))
+	clf = linear_model.Lasso(alpha=lasso_param, fit_intercept=False)
+	clf.fit(U_scaled, y_test)
+	# Get params of fitted model
+	params = np.hstack((0.0, clf.coef_))
 	# Fit lasso model
 	#clf = linear_model.Lasso(alpha=lasso_param, fit_intercept=False)
 	#clf.fit(X, y_test)
@@ -86,6 +81,7 @@ def update_factor_matrix(Y, G, U, Z, num_samples, num_tests, num_latent_factor, 
 		intercept = np.squeeze(np.asarray(V_full[0,:]))
 		#intercept_mat = (np.ones((num_samples,1))*np.asmatrix(intercept))
 		V = np.asarray(V_full[1:,:])
+		pdb.set_trace()
 	return V, np.asarray(intercept)
 
 def update_loading_matrix_one_sample(sample_num, Y, G, V, Z, intercept, lasso_param):
