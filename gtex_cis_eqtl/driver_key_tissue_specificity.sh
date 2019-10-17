@@ -80,6 +80,7 @@ lasso_param_us=( "0.001"  )
 num_latent_factor_arr=("4")
 ################################
 # Loop through covariate methods
+if false; then
 for lasso_param_u in "${lasso_param_us[@]}"; do
 		for initialization in "${initializations[@]}"; do
 			for num_latent_factors in "${num_latent_factor_arr[@]}"; do
@@ -89,15 +90,13 @@ for lasso_param_u in "${lasso_param_us[@]}"; do
 			done
 		done
 done
-
-
+fi
 
 
 
 if false; then
 python initialization_analysis.py $expression_training_file $genotype_training_file $num_latent_factors $eqtl_results_dir $processed_data_dir"sample_tissue_names.txt"
 fi
-if false; then 
 Rscript visualize_eqtl_factorization.R $processed_data_dir $eqtl_results_dir $visualization_dir $gtex_tissue_colors_file
-fi
+
 

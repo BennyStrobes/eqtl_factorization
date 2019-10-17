@@ -4,12 +4,15 @@
 #from edward.models import Gamma, Poisson, Normal, PointMass, \
 #    TransformedDistribution
 #from edward.models import PointMass, Empirical, HalfNormal
-#import edward as ed
-#import tensorflow as tf
-import numpy as np 
+import edward as ed
+import tensorflow as tf
+from edward.models import PointMass, Normal
+import numpy as np
 import os
 import sys
 import pdb
+import math
+import edward_model
 from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
 import statsmodels.api as sm
@@ -26,7 +29,7 @@ def load_in_sample_overlap_data(sample_overlap_file):
 	temp = []
 	for line in f:
 		line = line.rstrip()
-		Z.append(line)
+		Z.append([int(line)])
 		temp.append(int(line))
 	f.close()
 	num_individuals = max(temp) + 1
@@ -42,6 +45,7 @@ def initialize_sample_loading_matrix_with_kmeans(num_samples, num_latent_factor,
 		U[sample_index, kmeans_assignment] = 1.0
 	return U
 
+
 def update_factor_matrix_one_test(test_number, Y, G, U, Z, lasso_param):
 	# Get slice of data corresponding to this test
 	y_test = Y[:, test_number]
@@ -53,10 +57,10 @@ def update_factor_matrix_one_test(test_number, Y, G, U, Z, lasso_param):
 	# Get U for intercept terms
 
 	# Fit linear regression model
-	clf = linear_model.Lasso(alpha=lasso_param, fit_intercept=False)
+	clf = linear_model.Lasso(alpha=lasso_param, fit_intercept=True)
 	clf.fit(U_scaled, y_test)
 	# Get params of fitted model
-	params = np.hstack((0.0, clf.coef_))
+	params = np.hstack((clf.intercept_, clf.coef_))
 	# Fit lasso model
 	#clf = linear_model.Lasso(alpha=lasso_param, fit_intercept=False)
 	#clf.fit(X, y_test)
@@ -81,12 +85,84 @@ def update_factor_matrix(Y, G, U, Z, num_samples, num_tests, num_latent_factor, 
 		intercept = np.squeeze(np.asarray(V_full[0,:]))
 		#intercept_mat = (np.ones((num_samples,1))*np.asmatrix(intercept))
 		V = np.asarray(V_full[1:,:])
-		pdb.set_trace()
 	return V, np.asarray(intercept)
 
-def update_loading_matrix_one_sample(sample_num, Y, G, V, Z, intercept, lasso_param):
+
+def update_factor_matrix_edward(Y, G, U, Z, num_samples, num_tests, num_latent_factor, lasso_param_v):
+	tf.reset_default_graph()
+	sess = tf.InteractiveSession()
+	resid_sd = 1.0
+	beta_sd = math.sqrt((resid_sd*resid_sd)/(lasso_param_v*num_samples))
+	# Get number of individuals
+	num_individuals = len(np.unique(Z))
+
+	# Set up placeholders for the data inputs.
+	ind_ph = tf.placeholder(tf.int32, [num_samples, 1])
+	# Set up placeholders for the data inputs.
+	genotype = tf.placeholder(tf.float32, [num_samples, num_tests])
+	loading = tf.placeholder(tf.float32, [num_samples, num_latent_factor])
+
+	# Set up fixed effects (intercept term)
+	mu = tf.get_variable("mu", [num_tests])
+	# Set up standard deviation of random effects term
+	sigma_ind = tf.sqrt(tf.exp(tf.get_variable("sigma_ind", [num_tests])))
+	# Set up standard deviation of residuals term
+	#sigma_resid = tf.sqrt(tf.exp(tf.get_variable("sigma_resid", [num_tests])))
+	# Set up random effects
+	eta_ind = Normal(loc=tf.zeros([num_individuals, num_tests]), scale= tf.matmul(tf.ones([num_individuals,num_tests]),tf.matrix_diag(sigma_ind)))
+
+
+	V = Normal(loc=0.0, scale=beta_sd, sample_shape=[num_latent_factor, num_tests])
+
+	yhat = (tf.multiply(genotype, tf.matmul(loading, V)) + tf.gather_nd(eta_ind, ind_ph) + tf.matmul(tf.ones([num_samples, num_tests]), tf.matrix_diag(mu)))
+
+	#y = Normal(loc=yhat, scale=tf.matmul(tf.ones([num_samples, num_tests]), tf.matrix_diag(sigma_resid)))
+	y = Normal(loc=yhat, scale=resid_sd*tf.ones([num_samples, num_tests]))
+	###############################
+	## Inference set up
+	###############################
+	q_ind_s = Normal(loc=tf.get_variable("q_ind_s/loc", [num_individuals, num_tests]),scale=tf.nn.softplus(tf.get_variable("q_ind_s/scale", [num_individuals, num_tests])))
+
+	qV = PointMass(tf.get_variable("qV",[num_latent_factor,num_tests]))
+
+
+	inference_e = ed.KLqp({eta_ind:q_ind_s}, data={y:Y, ind_ph: Z, genotype: G, loading:U, V:qV})
+
+	inference_m = ed.MAP({V:qV},data={y:Y, ind_ph: Z, genotype: G, eta_ind:q_ind_s, loading:U})
+	n_iter=80
+	inference_e.initialize()
+	num_m_steps_per_iter = 1
+	optimizer = tf.train.AdamOptimizer(0.01, epsilon=1.0)
+	inference_m.initialize(n_iter=n_iter*num_m_steps_per_iter, optimizer=optimizer)
+	tf.global_variables_initializer().run()
+	loss = np.empty(n_iter*num_m_steps_per_iter, dtype=np.float32)
+	
+	counter = 0
+	for i in range(n_iter):
+		info_dict_e = inference_e.update()
+		for j in range(num_m_steps_per_iter):
+			#print(j)
+			info_dict_m = inference_m.update()
+			loss[counter] = info_dict_m["loss"]
+			#print(loss[counter])
+			counter = counter + 1
+		inference_m.print_progress(info_dict_m)
+	# Get parameters to pass on
+	random_effects_mean = tf.gather_nd(q_ind_s.loc.eval(), Z).eval()
+	random_effects_sd = tf.gather_nd(q_ind_s.scale.eval(), Z).eval()
+	test_intercept = mu.eval()
+	# residual_sd = sigma_resid.eval()
+
+
+	new_V = qV.eval()
+
+	intercept = test_intercept + random_effects_mean
+	variance = (np.square(random_effects_sd) + np.square(resid_sd))
+	return new_V, intercept, variance
+
+def update_loading_matrix_one_sample(sample_num, Y, G, V, Z, mu, weights, lasso_param):
 	# Get slice of data corresponding to this sample
-	y_test = Y[sample_num, :] - intercept
+	y_test = Y[sample_num, :] - mu
 	g_test = G[sample_num, :]
 
 	# Get V scaled by genotype for this sample
@@ -98,17 +174,20 @@ def update_loading_matrix_one_sample(sample_num, Y, G, V, Z, intercept, lasso_pa
 		clf.fit(V_scaled, y_test)
 	# Fit Lasso model
 	else:
-		clf = linear_model.Lasso(alpha=lasso_param,positive=True, fit_intercept=False)
+		model = sm.WLS(y_test, V_scaled, weights=weights)
+		fit = model.fit_regularized(method='elastic_net', alpha=lasso_param, L1_wt=1.0)
+		#reg = LinearRegression().fit(V_scaled, y_test, sample_weight=weights)
+		#clf = linear_model.Ridge(alpha=lasso_param,positive=True, fit_intercept=False)
 		#clf = linear_model.Lasso(alpha=lasso_param, fit_intercept=False)
-		clf.fit(V_scaled, y_test)
-	return np.asarray(clf.coef_)
+		#clf.fit(V_scaled, y_test)
+	return np.asarray(fit.params)
 
 # Update loading matrix (U) with l1 penalized linear model
-def update_loading_matrix(Y, G, V, Z, intercept, num_samples, num_tests, num_latent_factor, lasso_param):
+def update_loading_matrix(Y, G, V, Z, intercept, variance, num_samples, num_tests, num_latent_factor, lasso_param):
 	# Serial version
 	U = np.zeros((num_samples, num_latent_factor))
 	for sample_num in range(num_samples):
-		U[sample_num,:] = update_loading_matrix_one_sample(sample_num, Y, G, V, Z, intercept, lasso_param)
+		U[sample_num,:] = update_loading_matrix_one_sample(sample_num, Y, G, V, Z, intercept[sample_num, :], 1.0/variance[sample_num,:], lasso_param)
 	return U
 
 def compute_rmse(resid_matrix):
@@ -208,27 +287,29 @@ def train_eqtl_factorization_model_em_version(sample_overlap_file, expression_fi
 	######################################
 	# Standardize
 	G = standardize_each_column_of_matrix(G)
-	num_iter = 400
+	num_iter = 100
 	mse_list = []
 	for itera in range(num_iter):
 		print('Iteration ' + str(itera))
 		# Update factor matrix (V) with linear mixed model
 		old_V = V
-		V, intercept = update_factor_matrix(Y, G, U, Z, num_samples, num_tests, num_latent_factor, lasso_param_v)		
+		#V, intercept = update_factor_matrix(Y, G, U, Z, num_samples, num_tests, num_latent_factor, lasso_param_v)
+		V, intercept, variance = update_factor_matrix_edward(Y, G, U, Z, num_samples, num_tests, num_latent_factor, lasso_param_v)
 		# Update loading matrix (U) with l1 penalized linear model
 		old_U = U
-		U = update_loading_matrix(Y, G, V, Z, intercept, num_samples, num_tests, num_latent_factor, lasso_param_u)
+		U = update_loading_matrix(Y, G, V, Z, intercept, variance, num_samples, num_tests, num_latent_factor, lasso_param_u)
 		frob_norm = np.linalg.norm(U - old_U)
 		print('L2 norm: ' + str(frob_norm))
+		print(U)
 		# Make predictions
-		Y_hat = make_eqtl_factorization_predictions(G, U, V, intercept)
-		mse = compute_mse(Y_hat - Y)
-		mse_list.append(mse)
-		print('eQTL Factorization MSE: ' + str(mse))
+		#Y_hat = make_eqtl_factorization_predictions(G, U, V, intercept)
+		#mse = compute_mse(Y_hat - Y)
+		#mse_list.append(mse)
+		#print('eQTL Factorization MSE: ' + str(mse))
 	# Save matrices to output
 	np.savetxt(output_root + '_U.txt', U, fmt="%s", delimiter='\t')
 	np.savetxt(output_root + '_V.txt', V, fmt="%s", delimiter='\t')
-	np.savetxt(output_root + '_eqtl_factorization_mse.txt', np.asarray(mse_list), fmt="%s", delimiter='\n')
+	#np.savetxt(output_root + '_eqtl_factorization_mse.txt', np.asarray(mse_list), fmt="%s", delimiter='\n')
 
 
 ######################

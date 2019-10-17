@@ -345,8 +345,8 @@ for (tiss_num in 1:length(tissue_colors$tissue_id)) {
 
 
 lasso_param_us = c("0.001")
-initializations = c("residual_clustering")
-num_factor_arr = c(3)
+initializations = c("random1")
+num_factor_arr = c(4)
 num_tissues = c(4)
 for (lasso_param_u_iter in 1:length(lasso_param_us)) {
 	for (initialization_iter in 1:length(initializations)) {
@@ -375,13 +375,13 @@ for (lasso_param_u_iter in 1:length(lasso_param_us)) {
 
 					expr_file <- paste0(processed_data_dir, "tissues_subset_", num_tissue, "_expr2.txt")
 					output_file <- paste0(visualization_dir,"eqtl_factorization_of_", num_tissue, "_tissues_with_", num_factors, "_factors_em_model_lasso_U_", lasso_param_u, "_lasso_V_",lasso_param_v, "_initialization_", initialization, "_abs_expr_clustering_heatmap.pdf")
-					heatmap <- make_abs_expr_clustering_heatmap(expr_file, tissue_names)
-					ggsave(heatmap, file=output_file, width=7.2, height=5.5, units="in")
+					#heatmap <- make_abs_expr_clustering_heatmap(expr_file, tissue_names)
+					#ggsave(heatmap, file=output_file, width=7.2, height=5.5, units="in")
 
 					expr_file <- paste0(processed_data_dir, "tissues_subset_", num_tissue, "_expr2.txt")
 					output_file <- paste0(visualization_dir,"eqtl_factorization_of_", num_tissue, "_tissues_with_", num_factors, "_factors_em_model_lasso_U_", lasso_param_u, "_lasso_V_",lasso_param_v, "_initialization_", initialization, "_expr_clustering_heatmap.pdf")
-					heatmap <- make_expr_clustering_heatmap(expr_file, tissue_names)
-					ggsave(heatmap, file=output_file, width=7.2, height=5.5, units="in")
+					#heatmap <- make_expr_clustering_heatmap(expr_file, tissue_names)
+					#ggsave(heatmap, file=output_file, width=7.2, height=5.5, units="in")
 
 
 				}
