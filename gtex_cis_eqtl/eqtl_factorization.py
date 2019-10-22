@@ -20,20 +20,24 @@ from sklearn import linear_model
 from sklearn.linear_model import LinearRegression
 from joblib import Parallel, delayed
 import multiprocessing
+import cvxpy as cp
+from scipy.optimize import minimize
 
 
 # Load in sample overlap data
 def load_in_sample_overlap_data(sample_overlap_file):
 	f = open(sample_overlap_file)
 	Z = []
+	Z1 = []
 	temp = []
 	for line in f:
 		line = line.rstrip()
 		Z.append([int(line)])
+		Z1.append(int(line))
 		temp.append(int(line))
 	f.close()
 	num_individuals = max(temp) + 1
-	return Z, int(num_individuals)
+	return Z, np.asarray(Z1), int(num_individuals)
 
 def initialize_sample_loading_matrix_with_kmeans(num_samples, num_latent_factor, Y):
 	# Sample loading matrix
@@ -91,8 +95,8 @@ def update_factor_matrix(Y, G, U, Z, num_samples, num_tests, num_latent_factor, 
 def update_factor_matrix_edward(Y, G, U, Z, num_samples, num_tests, num_latent_factor, lasso_param_v):
 	tf.reset_default_graph()
 	sess = tf.InteractiveSession()
-	resid_sd = 1.0
-	beta_sd = math.sqrt((resid_sd*resid_sd)/(lasso_param_v*num_samples))
+	#resid_sd = 1.0
+	beta_sd = math.sqrt((1.0)/(lasso_param_v*num_samples))
 	# Get number of individuals
 	num_individuals = len(np.unique(Z))
 
@@ -107,7 +111,7 @@ def update_factor_matrix_edward(Y, G, U, Z, num_samples, num_tests, num_latent_f
 	# Set up standard deviation of random effects term
 	sigma_ind = tf.sqrt(tf.exp(tf.get_variable("sigma_ind", [num_tests])))
 	# Set up standard deviation of residuals term
-	#sigma_resid = tf.sqrt(tf.exp(tf.get_variable("sigma_resid", [num_tests])))
+	sigma_resid = tf.sqrt(tf.exp(tf.get_variable("sigma_resid", [num_tests])))
 	# Set up random effects
 	eta_ind = Normal(loc=tf.zeros([num_individuals, num_tests]), scale= tf.matmul(tf.ones([num_individuals,num_tests]),tf.matrix_diag(sigma_ind)))
 
@@ -116,8 +120,8 @@ def update_factor_matrix_edward(Y, G, U, Z, num_samples, num_tests, num_latent_f
 
 	yhat = (tf.multiply(genotype, tf.matmul(loading, V)) + tf.gather_nd(eta_ind, ind_ph) + tf.matmul(tf.ones([num_samples, num_tests]), tf.matrix_diag(mu)))
 
-	#y = Normal(loc=yhat, scale=tf.matmul(tf.ones([num_samples, num_tests]), tf.matrix_diag(sigma_resid)))
-	y = Normal(loc=yhat, scale=resid_sd*tf.ones([num_samples, num_tests]))
+	y = Normal(loc=yhat, scale=tf.matmul(tf.ones([num_samples, num_tests]), tf.matrix_diag(sigma_resid)))
+	#y = Normal(loc=yhat, scale=resid_sd*tf.ones([num_samples, num_tests]))
 	###############################
 	## Inference set up
 	###############################
@@ -129,7 +133,7 @@ def update_factor_matrix_edward(Y, G, U, Z, num_samples, num_tests, num_latent_f
 	inference_e = ed.KLqp({eta_ind:q_ind_s}, data={y:Y, ind_ph: Z, genotype: G, loading:U, V:qV})
 
 	inference_m = ed.MAP({V:qV},data={y:Y, ind_ph: Z, genotype: G, eta_ind:q_ind_s, loading:U})
-	n_iter=80
+	n_iter=70
 	inference_e.initialize()
 	num_m_steps_per_iter = 1
 	optimizer = tf.train.AdamOptimizer(0.01, epsilon=1.0)
@@ -151,14 +155,14 @@ def update_factor_matrix_edward(Y, G, U, Z, num_samples, num_tests, num_latent_f
 	random_effects_mean = tf.gather_nd(q_ind_s.loc.eval(), Z).eval()
 	random_effects_sd = tf.gather_nd(q_ind_s.scale.eval(), Z).eval()
 	test_intercept = mu.eval()
-	# residual_sd = sigma_resid.eval()
-
+	residual_sd = sigma_resid.eval()
+	re_sd = sigma_ind.eval()
 
 	new_V = qV.eval()
 
-	intercept = test_intercept + random_effects_mean
-	variance = (np.square(random_effects_sd) + np.square(resid_sd))
-	return new_V, intercept, variance
+	#intercept = test_intercept + random_effects_mean
+	#variance = (np.square(random_effects_sd) + np.square(resid_sd))
+	return new_V, residual_sd, re_sd, test_intercept
 
 def update_loading_matrix_one_sample(sample_num, Y, G, V, Z, mu, weights, lasso_param):
 	# Get slice of data corresponding to this sample
@@ -182,12 +186,112 @@ def update_loading_matrix_one_sample(sample_num, Y, G, V, Z, mu, weights, lasso_
 		#clf.fit(V_scaled, y_test)
 	return np.asarray(fit.params)
 
+# Get known covariance matrix for this individual
+def extract_precision_matrix_for_individual(residual_sd, re_sd, sample_indices, num_tests):
+	residual_variance = np.square(residual_sd)
+	re_variance = np.square(re_sd)
+	# Get number of samples this individual has
+	num_samples = len(sample_indices)
+	# Initialize covariance matrix
+	precision = np.zeros((num_samples*num_tests, num_samples*num_tests))
+	for test_number in range(num_tests):
+		starting_point = test_number*num_samples
+		ending_point = (test_number+1)*num_samples
+		cov = np.ones((num_samples,num_samples))*re_variance[test_number]
+		for pos in range(num_samples):
+			cov[pos,pos] = cov[pos,pos] + residual_variance[test_number]
+		precision[starting_point:ending_point,starting_point:ending_point] = np.linalg.inv(cov)
+	return precision
+
+# Get feature matrix
+def get_loading_feature_matrix_for_one_individual(sample_indices, num_tests, V_t, G):
+	# Num factors
+	num_latent_factors = V_t.shape[1]
+	# Get number of samples this individual has
+	num_samples = len(sample_indices)
+	# Get predictor vector (G) for this individual
+	g_ind = np.transpose(G[sample_indices,:]).reshape(-1)
+	# Initialize feature matrix
+	feat = np.zeros((num_tests*num_samples, num_latent_factors*num_samples))
+	for test_number in range(num_tests):
+		for sample_num in range(num_samples):
+			row_number = test_number*num_samples + sample_num
+			col_start = num_latent_factors*sample_num
+			col_end = (num_latent_factors)*(sample_num+1)
+			feat[row_number,col_start:col_end] = V_t[test_number,:]*g_ind[row_number]
+	return feat
+
+
+def loading_objective_fn(X, y, beta, lasso_param, precision, nn):
+	val = cp.quad_form(y - cp.matmul(X,beta), precision)
+	return val/float(nn) + lasso_param*cp.pnorm(beta, p=2)**2
+	#return val/nn + lasso_param*cp.norm1(beta)
+
+
+def loading_matrix_one_sample(individual, Z, Y_scaled, residual_sd, re_sd, num_tests, V_t, G, lasso_param):
+	# Get indixes of samples corresponding to this individual
+	sample_indices = np.where(Z == individual)[0]
+	# Get response vector (Y) for this individual
+	# Is ordered (test1, sample1), (test1, sample2), (test1, sampleI), ..., (testT,sampleI)
+	y_ind = np.transpose(Y_scaled[sample_indices,:]).reshape(-1)
+	# Get known precision matrix for this individual
+	precision = extract_precision_matrix_for_individual(residual_sd, re_sd, sample_indices, num_tests)
+	# Get feature matrix
+	X = get_loading_feature_matrix_for_one_individual(sample_indices, num_tests, V_t, G)
+	beta = cp.Variable(X.shape[1],nonneg=True)
+		#problem1 = cp.Problem(cp.Minimize(loading_objective_fn_correct(X, y_ind, beta, lasso_param, precision)))
+		#problem1.solve()
+	problem2 = cp.Problem(cp.Minimize(loading_objective_fn(X, y_ind, beta, lasso_param, precision, X.shape[0]/len(sample_indices))))
+	problem2.solve()
+
+	new_U = beta.value
+	return new_U
+
 # Update loading matrix (U) with l1 penalized linear model
-def update_loading_matrix(Y, G, V, Z, intercept, variance, num_samples, num_tests, num_latent_factor, lasso_param):
-	# Serial version
+def update_loading_matrix(Y, G, V, Z, intercept, residual_sd, re_sd, num_samples, num_tests, num_latent_factor, lasso_param):
+	# Initialize output matrix
 	U = np.zeros((num_samples, num_latent_factor))
-	for sample_num in range(num_samples):
-		U[sample_num,:] = update_loading_matrix_one_sample(sample_num, Y, G, V, Z, intercept[sample_num, :], 1.0/variance[sample_num,:], lasso_param)
+	# Scale Y by intercept
+	Y_scaled = Y - intercept
+	# Loop through individuals
+	individuals = np.unique(Z)
+	# Get transpose of V
+	V_t = np.transpose(V)
+
+	U_indi = []
+
+	for individual in individuals:
+		#print(individual)
+		# Get indixes of samples corresponding to this individual
+		sample_indices = np.where(Z == individual)[0]
+		# Get response vector (Y) for this individual
+		# Is ordered (test1, sample1), (test1, sample2), (test1, sampleI), ..., (testT,sampleI)
+		y_ind = np.transpose(Y_scaled[sample_indices,:]).reshape(-1)
+		# Get known precision matrix for this individual
+		precision = extract_precision_matrix_for_individual(residual_sd, re_sd, sample_indices, num_tests)
+		# Get feature matrix
+		X = get_loading_feature_matrix_for_one_individual(sample_indices, num_tests, V_t, G)
+
+		#beta = cp.Variable(X.shape[1],nonneg=True)
+		#beta = cp.Variable(X.shape[1])
+		num_samples_per_test = X.shape[0]
+		#problem1 = cp.Problem(cp.Minimize(loading_objective_fn_correct(X, y_ind, beta, lasso_param, precision)))
+		#problem1.solve()
+		#problem2 = cp.Problem(cp.Minimize(loading_objective_fn(X, y_ind, beta, lasso_param, precision, X.shape[0])))
+		#problem2.solve()
+
+		#new_U = beta.value
+
+		new_U = np.matmul(np.matmul(np.matmul(np.linalg.inv(np.matmul(np.matmul(X.T, precision), X) + np.eye(X.shape[1])*lasso_param*num_samples_per_test), X.T),precision), y_ind)
+
+		
+		for i, index in enumerate(sample_indices):
+			col_start = num_latent_factor*i
+			col_end = num_latent_factor*(i+1)
+			U[index,:] = new_U[col_start:col_end]
+		#pdb.set_trace()
+		# Update model
+		#U[sample_num,:] = update_loading_matrix_one_sample(sample_num, Y, G, V, Z, intercept[sample_num, :], 1.0/variance[sample_num,:], lasso_param)
 	return U
 
 def compute_rmse(resid_matrix):
@@ -264,7 +368,7 @@ def train_eqtl_factorization_model_em_version(sample_overlap_file, expression_fi
 	# Load in genotype data (dimension: num_samplesXnum_tests)
 	G = np.transpose(np.loadtxt(genotype_file, delimiter='\t'))
 	# Load in sample overlap data
-	Z, num_individuals = load_in_sample_overlap_data(sample_overlap_file)
+	Z, Z2,  num_individuals = load_in_sample_overlap_data(sample_overlap_file)
 	# Get number of samples, number of tests, number of individuals
 	num_samples = Y.shape[0]
 	num_tests = Y.shape[1]
@@ -294,10 +398,10 @@ def train_eqtl_factorization_model_em_version(sample_overlap_file, expression_fi
 		# Update factor matrix (V) with linear mixed model
 		old_V = V
 		#V, intercept = update_factor_matrix(Y, G, U, Z, num_samples, num_tests, num_latent_factor, lasso_param_v)
-		V, intercept, variance = update_factor_matrix_edward(Y, G, U, Z, num_samples, num_tests, num_latent_factor, lasso_param_v)
+		V, residual_sd, re_sd, intercept = update_factor_matrix_edward(Y, G, U, Z, num_samples, num_tests, num_latent_factor, lasso_param_v)
 		# Update loading matrix (U) with l1 penalized linear model
 		old_U = U
-		U = update_loading_matrix(Y, G, V, Z, intercept, variance, num_samples, num_tests, num_latent_factor, lasso_param_u)
+		U = update_loading_matrix(Y, G, V, Z2, intercept, residual_sd, re_sd, num_samples, num_tests, num_latent_factor, lasso_param_u)
 		frob_norm = np.linalg.norm(U - old_U)
 		print('L2 norm: ' + str(frob_norm))
 		print(U)
