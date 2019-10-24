@@ -344,7 +344,7 @@ for (tiss_num in 1:length(tissue_colors$tissue_id)) {
 }
 
 
-lasso_param_us = c("0.001")
+lasso_param_us = c("0.01")
 initializations = c("random1")
 num_factor_arr = c(4)
 num_tissues = c(4)
