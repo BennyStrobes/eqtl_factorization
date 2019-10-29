@@ -31,16 +31,19 @@ gtex_individual_information_file="/work-zfs/abattle4/lab_data/GTEx_v8/sample_ann
 # Preprocess data
 #########################
 tissues_file=$input_data_dir"gtex_v8_tissues.txt"
+if false; then
 python preprocess_gtex_data_for_eqtl_ancestry_factorization.py $tissues_file $gtex_expression_dir $gtex_tpm_dir $gtex_covariate_dir $gtex_genotype_dir $gtex_egene_dir $gtex_individual_information_file $processed_data_dir
-
+fi
 
 
 ################################
 # Run eqtl factorization over a number of parameters
 tissue_name_arr=("Adipose_Subcutaneous")
-initializations=("residual_clustering" "random1" )
-lasso_param_us=( "0.001"  )
-num_latent_factor_arr=("2" "3" "4" "5" "6")
+initializations=("random")
+lasso_param_us=( "0.0001"  )
+num_latent_factor_arr=("2")
+seed="0"
+model_name="alm"
 ################################
 # Loop through covariate methods
 if false; then
@@ -48,8 +51,6 @@ for tissue_name in "${tissue_name_arr[@]}"; do
 	for lasso_param_u in "${lasso_param_us[@]}"; do
 		for initialization in "${initializations[@]}"; do
 			for num_latent_factors in "${num_latent_factor_arr[@]}"; do
-				
-				file_stem="eqtl_ancestry_factorization_"$tissue_name"_gtex_data_"$num_latent_factors"_factors"
 				lasso_param_v=$lasso_param_u
 
 				sample_overlap_file=$processed_data_dir$tissue_name"_sample_overlap.txt"
@@ -58,15 +59,12 @@ for tissue_name in "${tissue_name_arr[@]}"; do
 				
 				expression_testing_file=$processed_data_dir$tissue_name"_expr.txt"
 				genotype_testing_file=$processed_data_dir$tissue_name"_genotype.txt"
+				file_stem="eqtl_ancestry_factorization_"$tissue_name"gtex_data_"$num_latent_factors"_factors_"$model_name"_lasso_U_"$lasso_param_u"_lasso_V_"$lasso_param_v"_initialization_"$initialization"_"$seed
+				sh eqtl_factorization.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $lasso_param_u $lasso_param_v $initialization $seed $model_name
 
-
-				sh eqtl_factorization.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $lasso_param_u $lasso_param_v $initialization 
 			done
 		done
 	done
 done
 fi
-
-if false; then
 Rscript visualize_eqtl_ancestry_factorization.R $processed_data_dir $eqtl_results_dir $visualization_dir $gtex_tissue_colors_file
-fi

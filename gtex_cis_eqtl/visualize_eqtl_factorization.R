@@ -344,8 +344,8 @@ for (tiss_num in 1:length(tissue_colors$tissue_id)) {
 }
 
 
-lasso_param_us = c("0.01")
-initializations = c("random1")
+lasso_param_us = c("0.0001")
+initializations = c("random_0")
 num_factor_arr = c(4)
 num_tissues = c(4)
 for (lasso_param_u_iter in 1:length(lasso_param_us)) {
@@ -358,7 +358,7 @@ for (lasso_param_u_iter in 1:length(lasso_param_us)) {
 				initialization <- initializations[initialization_iter]
 				num_factors <- num_factor_arr[num_factor_iter]
 				num_tissue <- num_tissues[num_tissue_iter]
-				loading_file <- paste0(eqtl_results_dir, "eqtl_factorization_tissues_subset_", num_tissue, "_gtex_data_", num_factors, "_factors_em_model_lasso_U_", lasso_param_u, "_lasso_V_",lasso_param_v, "_initialization_", initialization, "_U.txt")
+				loading_file <- paste0(eqtl_results_dir, "eqtl_factorization_tissues_subset_", num_tissue, "_gtex_data_", num_factors, "_factors_alm_lasso_U_", lasso_param_u, "_lasso_V_",lasso_param_v, "_initialization_", initialization, "_U.txt")
 
 				tissue_file <- paste0(processed_data_dir, "tissues_subset_", num_tissue, "_sample_names.txt")
 				tissue_names <- get_tissue_names(tissue_file)
@@ -388,18 +388,18 @@ for (lasso_param_u_iter in 1:length(lasso_param_us)) {
 
 				######################
 				# Make box plot for each tissue, showing loading distributions
-				output_file <- paste0(visualization_dir,"eqtl_factorization_of_", num_tissue, "_tissues_with_", num_factors, "_factors_em_model_lasso_U_", lasso_param_u, "_lasso_V_",lasso_param_v, "_initialization_", initialization, "_loading_boxplot.pdf")
+				output_file <- paste0(visualization_dir,"eqtl_factorization_of_", num_tissue, "_tissues_with_", num_factors, "_factors_alm_lasso_U_", lasso_param_u, "_lasso_V_",lasso_param_v, "_initialization_", initialization, "_loading_boxplot.pdf")
 				boxplot <- make_loading_boxplot_plot(tissue_names, tissue_colors, loading_file)
 				ggsave(boxplot, file=output_file, width=12.2, height=5.5, units="in")
 				#####################
 				# Run Umap on loadings. Plot Umap loadings in scatter plot color by observed tissue type
-				output_file <- paste0(visualization_dir,"eqtl_factorization_of_", num_tissue, "_tissues_with_", num_factors, "_factors_em_model_lasso_U_", lasso_param_u, "_lasso_V_",lasso_param_v, "_initialization_", initialization, "_umap_loading_scatter.pdf")
+				output_file <- paste0(visualization_dir,"eqtl_factorization_of_", num_tissue, "_tissues_with_", num_factors, "_factors_alm_lasso_U_", lasso_param_u, "_lasso_V_",lasso_param_v, "_initialization_", initialization, "_umap_loading_scatter.pdf")
 				umap_scatter <- make_umap_loading_scatter_plot(tissue_names, tissue_colors, loading_file)
 				ggsave(umap_scatter, file=output_file, width=7.2, height=5.5, units="in")
 
 				######################
 				# Make scatter plot where each sample is a point, x and y axis are factor loadings, and points are colored by their tissue type
-				output_file <- paste0(visualization_dir, "eqtl_factorization_of_", num_tissue, "_tissues_with_", num_factors, "_factors_em_model_lasso_U_", lasso_param_u, "_lasso_V_",lasso_param_v, "_initialization_", initialization, "_loading_scatter.pdf")
+				output_file <- paste0(visualization_dir, "eqtl_factorization_of_", num_tissue, "_tissues_with_", num_factors, "_factors_alm_lasso_U_", lasso_param_u, "_lasso_V_",lasso_param_v, "_initialization_", initialization, "_loading_scatter.pdf")
 				scatter <- make_loading_scatter_plot(tissue_names,tissue_colors, loading_file)
 				ggsave(scatter, file=output_file, width=7.2, height=5.5, units="in")
 

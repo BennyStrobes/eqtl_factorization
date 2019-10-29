@@ -58,7 +58,7 @@ def regress_out_covariates(expression_input_file, covariate_file, expression_out
 	t.close()
 
 
-def get_sample_names(tissue, gtex_expression_dir, sample_name_file, sample_overlap_file, gtex_individual_information_file):
+def get_sample_names(tissue, gtex_expression_dir, sample_name_file, sample_overlap_file, gtex_individual_information_file, gtex_covariate_dir):
 	dicti = {}
 	f = open(gtex_individual_information_file)
 	head_count = 0
@@ -74,7 +74,24 @@ def get_sample_names(tissue, gtex_expression_dir, sample_name_file, sample_overl
 		age = data[3]
 		race = data[4]
 		ethnicity = data[5]
-		dicti[indi_id] = [cohort, sex, age, race, ethnicity]
+		dicti[indi_id] = [cohort, sex, age, race]
+	f.close()
+
+	covariate_file = gtex_covariate_dir + tissue + '.v8.covariates.txt'
+	f = open(covariate_file)
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		if head_count == 0:
+			head_count = head_count + 1
+			indi_idz = data[1:]
+			continue
+		if line.startswith('PC') == False:
+			continue
+		for i, cov_val in enumerate(data[1:]):
+			indi_id = indi_idz[i]
+			dicti[indi_id].append(cov_val)
 	f.close()
 
 	# Initialize arr
@@ -317,9 +334,15 @@ def print_big_matrix(output_file, tests, data_struct, index):
 	t.close()
 
 def print_covariate_file(covariates, output_covariate_file):
+	num_cov = len(covariates[0])
 	t = open(output_covariate_file, 'w')
-	t.write('cohort\tsex\tage\trace\tethnicity\n')
+	t.write('cohort\tsex\tage\trace')
+	for pc_num in range(num_cov-4):
+		t.write('\tgenotype_pc_' + str(pc_num))
+	t.write('\n')
 	for covariate in covariates:
+		if len(covariate) != num_cov:
+			print('assumption error!')
 		t.write('\t'.join(covariate) + '\n')
 	t.close()
 
@@ -415,21 +438,21 @@ def standardize_expression(tpm_expression_matrix_file, standardized_tpm_expressi
 	#temp_out = df.rank(method='min').stack().astype(int).map(rank_mean).unstack()
 	#tpm_quantile_normalized = np.transpose(np.asarray(temp_out))
 	temp_out = rnaseqnorm.normalize_quantiles(df)
-	#norm_df = rnaseqnorm.inverse_normal_transform(temp_out)
-	#tpm_quantile_normalized = np.transpose(np.asarray(norm_df))
+	norm_df = rnaseqnorm.inverse_normal_transform(temp_out)
+	standardized_tpm = np.transpose(np.asarray(norm_df))
 
 	###
-	tpm_quantile_normalized = np.transpose(np.asarray(temp_out))
+	#tpm_quantile_normalized = np.transpose(np.asarray(temp_out))
 	###
 
 	# Standardize the genes
-	num_genes = tpm_quantile_normalized.shape[1]
-	num_samples = tpm_quantile_normalized.shape[0]
+	#num_genes = tpm_quantile_normalized.shape[1]
+	#num_samples = tpm_quantile_normalized.shape[0]
 
 	####
-	standardized_tpm = np.zeros((num_samples, num_genes))
-	for gene_num in range(num_genes):
-		standardized_tpm[:,gene_num] = (tpm_quantile_normalized[:, gene_num] - np.mean(tpm_quantile_normalized[:, gene_num]))/np.std(tpm_quantile_normalized[:, gene_num])
+	#standardized_tpm = np.zeros((num_samples, num_genes))
+	#for gene_num in range(num_genes):
+	#	standardized_tpm[:,gene_num] = (tpm_quantile_normalized[:, gene_num] - np.mean(tpm_quantile_normalized[:, gene_num]))/np.std(tpm_quantile_normalized[:, gene_num])
 	####
 	# Print to output file
 	t = open(standardized_tpm_expression_matrix_file, 'w')
@@ -530,7 +553,7 @@ for i, tissue in enumerate(tissues[:20]):
 	# Extract file of sample names
 	sample_name_file = output_dir + 'sample_names.txt'
 	sample_overlap_file = output_dir + 'sample_overlap.txt'
-	sample_names, sample_to_index, covariates = get_sample_names(tissue, gtex_expression_dir, sample_name_file, sample_overlap_file, gtex_individual_information_file)
+	sample_names, sample_to_index, covariates = get_sample_names(tissue, gtex_expression_dir, sample_name_file, sample_overlap_file, gtex_individual_information_file, gtex_covariate_dir)
 
 	# Print individual level covariates to output file
 	print_covariate_file(covariates, output_dir + 'sample_covariates.txt')
@@ -588,7 +611,6 @@ for i, tissue in enumerate(tissues[:20]):
 	# Do the same for un-corrected gene expression
 	genes_uncorrected = add_expression_values_to_data_structure_t(standardized_tpm_expression_matrix_file, sample_to_index, genes_uncorrected)
 	print_big_matrix(processed_data_dir + 'expr_uncorrected.txt', tests, genes_uncorrected, 0)
-
 
 
 

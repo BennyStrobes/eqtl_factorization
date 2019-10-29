@@ -462,21 +462,21 @@ def standardize_expression(tpm_expression_matrix_file, standardized_tpm_expressi
 	#temp_out = df.rank(method='min').stack().astype(int).map(rank_mean).unstack()
 	#tpm_quantile_normalized = np.transpose(np.asarray(temp_out))
 	temp_out = rnaseqnorm.normalize_quantiles(df)
-	#norm_df = rnaseqnorm.inverse_normal_transform(temp_out)
-	#tpm_quantile_normalized = np.transpose(np.asarray(norm_df))
+	norm_df = rnaseqnorm.inverse_normal_transform(temp_out)
+	standardized_tpm = np.transpose(np.asarray(norm_df))
 
 	###
-	tpm_quantile_normalized = np.transpose(np.asarray(temp_out))
+	#tpm_quantile_normalized = np.transpose(np.asarray(temp_out))
 	###
 
 	# Standardize the genes
-	num_genes = tpm_quantile_normalized.shape[1]
-	num_samples = tpm_quantile_normalized.shape[0]
+	#num_genes = tpm_quantile_normalized.shape[1]
+	#num_samples = tpm_quantile_normalized.shape[0]
 
 	####
-	standardized_tpm = np.zeros((num_samples, num_genes))
-	for gene_num in range(num_genes):
-		standardized_tpm[:,gene_num] = (tpm_quantile_normalized[:, gene_num] - np.mean(tpm_quantile_normalized[:, gene_num]))/np.std(tpm_quantile_normalized[:, gene_num])
+	#standardized_tpm = np.zeros((num_samples, num_genes))
+	#for gene_num in range(num_genes):
+	#	standardized_tpm[:,gene_num] = (tpm_quantile_normalized[:, gene_num] - np.mean(tpm_quantile_normalized[:, gene_num]))/np.std(tpm_quantile_normalized[:, gene_num])
 	####
 	# Print to output file
 	t = open(standardized_tpm_expression_matrix_file, 'w')

@@ -39,10 +39,11 @@ gtex_tissue_colors_file="/work-zfs/abattle4/bstrober/single_cell_eqtl_factorizat
 #########################
 # Preprocess data
 #########################
-if false; then
 ## 4 tissues case
 tissues_file=$input_data_dir"tissues_subset_4.txt"
 output_dir=$processed_data_dir"tissues_subset_4_"
+if false; then
+
 python preprocess_gtex_data_for_eqtl_factorization.py $tissues_file $gtex_expression_dir $gtex_tpm_dir $gtex_covariate_dir $gtex_genotype_dir $gtex_egene_dir $output_dir
 
 ## 10 tissues case
@@ -74,29 +75,28 @@ genotype_testing_file=$processed_data_dir$tissue_subset_name"genotype.txt"
 ################################
 # Paramaters
 initialization="random"
-seed="1"
+seed="0"
+model_name="alm"  # can either be alm or almm (alternating least model or alternating linear mixed model)
 ################################
 # Run eqtl factorization over a number of parameters
-lasso_params=( "0.001"  )
+lasso_params=( "0.001" )
 num_latent_factor_arr=("4")
 ################################
 # Loop through covariate methods
+if false; then
 for lasso_param in "${lasso_params[@]}"; do
 	for num_latent_factors in "${num_latent_factor_arr[@]}"; do
-			file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors"
 			lasso_param_v=$lasso_param
 			lasso_param_u=$lasso_param
-			sh eqtl_factorization.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $lasso_param_u $lasso_param_v $initialization 
+			file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors_"$model_name"_lasso_U_"$lasso_param_u"_lasso_V_"$lasso_param_v"_initialization_"$initialization"_"$seed
+			sh eqtl_factorization.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $lasso_param_u $lasso_param_v $initialization $seed $model_name
 	done
 done
-
+fi
 
 
 
 if false; then
 python initialization_analysis.py $expression_training_file $genotype_training_file $num_latent_factors $eqtl_results_dir $processed_data_dir"sample_tissue_names.txt"
-fi
-if false; then
 Rscript visualize_eqtl_factorization.R $processed_data_dir $eqtl_results_dir $visualization_dir $gtex_tissue_colors_file
 fi
-
