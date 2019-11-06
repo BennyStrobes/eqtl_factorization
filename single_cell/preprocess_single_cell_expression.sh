@@ -9,5 +9,14 @@ meta_data_dir="$2"
 processed_expression_dir="$3"
 visualize_processed_expression_dir="$4"
 
+Rscript preprocess_single_cell_expression.R $raw_umi_count_dir $meta_data_dir $processed_expression_dir $visualize_processed_expression_dir "log"
+if false; then
+Rscript preprocess_single_cell_expression.R $raw_umi_count_dir $meta_data_dir $processed_expression_dir $visualize_processed_expression_dir "sctransform"
+fi
+if false; then
+Rscript preprocess_single_cell_expression.R $raw_umi_count_dir $meta_data_dir $processed_expression_dir $visualize_processed_expression_dir "log_with_covariates"
+fi
 
-Rscript preprocess_single_cell_expression.R $raw_umi_count_dir $meta_data_dir $processed_expression_dir $visualize_processed_expression_dir
+if false; then
+Rscript preprocess_single_cell_expression.R $raw_umi_count_dir $meta_data_dir $processed_expression_dir $visualize_processed_expression_dir "sctransform_with_covariates"
+fi
