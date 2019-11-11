@@ -122,6 +122,35 @@ make_histogram_of_genes_expression_across_genes <- function(expr) {
 	return(combined)
 }
 
+#########################
+# Filter genes to:
+# 1. protein_coding
+# 2. gene_status=='KNOWN'
+# 3. Autosomal
+##########################
+filter_genes <- function(raw_umi_counts, gene_annotation_file) {
+	# Load in gene annotation file
+	gene_anno <- read.table(gene_annotation_file,header=TRUE,sep='\t')
+	# Get indices of gene annotation file that pass our filters
+	filter =as.character(gene_anno$chr) != 'chrX' & as.character(gene_anno$chr) != 'chrY' & as.character(gene_anno$chr) != 'chrM' & as.character(gene_anno$gene_status) == "KNOWN" & as.character(gene_anno$gene_type) == "protein_coding"
+	# Get gene ids that pass our filter
+	genes_passed_filter <- gene_anno[filter,]$gene_name
+	# Get row indices of raw_umi_counts data that are genes that pass our filters
+	indices = rownames(raw_umi_counts) %in% as.character(genes_passed_filter)
+	return(raw_umi_counts[indices,])
+}
+
+#########################
+# Filter Individuals to those with disease_cov=="sle"
+##########################
+filter_to_individuals_with_sle <- function(umi_counts, meta_data) {
+	# Get indices of cells
+	indices <- as.character(meta_data$disease_cov) == "sle"
+
+
+
+}
+
 
 #########################
 # Load in command line args
@@ -132,9 +161,9 @@ meta_data_dir <- args[2]
 processed_expression_dir <- args[3]
 visualize_processed_expression_dir <- args[4]
 normalization_method <- args[5]
+gene_annotation_file <- args[6]
 
 
-if (FALSE) {
 #########################
 # Concatenate data across cell types
 ##########################
@@ -144,7 +173,6 @@ cell_classes <- c("B_cells", "CD14+_Monocytes", "CD4_T_cells", "CD8_T_cells", "D
 umi_count_file <- paste0(processed_expression_dir, "raw_umi_all_cells.rds")
 #concatenate_umi_counts_across_all_cells(raw_umi_count_dir, umi_count_file, cell_classes)
 umi_counts <- readRDS(umi_count_file)
-
 # Generate metadata file across all cells
 meta_data_file <- paste0(processed_expression_dir, "meta_data_all_cells.rds")
 #concatenate_meta_data_across_all_cells(meta_data_dir, meta_data_file, cell_classes, umi_counts)
@@ -155,12 +183,27 @@ meta_data <- readRDS(meta_data_file)
 # Parameters
 ##########################
 # Include features detected in at least this many cells. Will subset the counts matrix as well. To reintroduce excluded features, create a new object with a lower cutoff.
-min.cells = 3
+min.cells = 500
 # Include cells where at least this many features are detected.
-min.genes = 200
+min.genes = 400
 # Filter out cells with this amount of mitochondrial levels
 mito_thresh = 5
 
+
+#########################
+# Filter genes to:
+# 1. protein_coding
+# 2. gene_status=='KNOWN'
+# 3. Autosomal
+##########################
+#umi_counts = filter_genes(raw_umi_counts, gene_annotation_file)
+
+#########################
+# Filter Individuals to those with disease_cov=="sle"
+##########################
+indices <- as.character(meta_data$disease_cov) == "sle"
+umi_counts <- umi_counts[,indices]
+meta_data <- meta_data[indices,]
 
 
 #########################
@@ -176,7 +219,7 @@ ggsave(boxplot, file=output_file, width=7.2, height=5.5, units="in")
 # Generate Seurat Object
 ##########################
 expr_seurat <- CreateSeuratObject(counts = umi_counts, meta.data = meta_data, min.cells = min.cells, min.features = min.genes)
-
+print(dim(expr_seurat))
 expr_seurat[["percent.mt"]] <- PercentageFeatureSet(expr_seurat, pattern = "^MT-")
 
 
@@ -189,7 +232,7 @@ ggsave(p, file=paste0(visualize_processed_expression_dir, "nfeature_violin_plot.
 #########################
 # Further filter cells
 ##########################
-expr_seurat <- subset(expr_seurat, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < mito_thresh)
+expr_seurat <- subset(expr_seurat, subset = nFeature_RNA > 200 & nFeature_RNA < 2000 & percent.mt < mito_thresh)
 
 #########################
 # Make histogram showing number of expressed cells per gene
@@ -219,71 +262,54 @@ ggsave(hist, file=output_file, width=7.2, height=2.5, units="in")
 ##########################
 if (normalization_method == "log") {
 	expr_seurat <- NormalizeData(expr_seurat, normalization.method = "LogNormalize", scale.factor = 10000)
-
-	#########################
-	# Get highly variable features (genes)
-	##########################
 	expr_seurat <- FindVariableFeatures(expr_seurat, selection.method = "vst", nfeatures = 2000)
-
-	#########################
-	# Scale the data
-	##########################
 	all.genes <- rownames(expr_seurat)
 	expr_seurat <- ScaleData(expr_seurat, features = all.genes)
+	scaled_data <- expr_seurat[["RNA"]]@scale.data
 }
 if (normalization_method == "sctransform") {
 	options(future.globals.maxSize = 1000 * 1024^2)
 	expr_seurat <- SCTransform(expr_seurat, return.only.var.genes = FALSE, verbose = FALSE)
+	scaled_data <- expr_seurat[["SCT"]]@scale.data
 }
 if (normalization_method == "log_with_covariates") {
 	#options(future.globals.maxSize = 100000 * 1024^2)
 	expr_seurat <- NormalizeData(expr_seurat, normalization.method = "LogNormalize", scale.factor = 10000)
-
-	#########################
-	# Get highly variable features (genes)
-	##########################
 	expr_seurat <- FindVariableFeatures(expr_seurat, selection.method = "vst", nfeatures = 2000)
-
-	#########################
-	# Scale the data
-	##########################
 	all.genes <- rownames(expr_seurat)
 	#plan(strategy = "multicore", workers = 6)
 	expr_seurat <- ScaleData(expr_seurat, features = all.genes, vars.to.regress = c("batch", "percent.mt", "disease_cov", "pop_cov"))
+	scaled_data <- expr_seurat[["RNA"]]@scale.data
 }
 if (normalization_method == "sctransform_with_covariates") {
 	options(future.globals.maxSize = 1000 * 1024^2)
 	expr_seurat <- SCTransform(expr_seurat, return.only.var.genes = FALSE, verbose = FALSE, vars.to.regress = c("batch", "percent.mt", "disease_cov", "pop_cov"))
+	scaled_data <- expr_seurat[["SCT"]]@scale.data
 }
-
+#############################
+# Save scaled data to output
+#############################
 saveRDS(expr_seurat, paste0(processed_expression_dir, "seurat_", normalization_method, "_normalized_object.rds"))
-}
-
-expr_seurat <- readRDS(paste0(processed_expression_dir, "seurat_", normalization_method, "_normalized_object.rds"))
-output_file <-paste0(visualize_processed_expression_dir, normalization_method, "_expression_across_cells.pdf")
-hist_plot <- make_histogram_of_genes_expression_across_genes(expr_seurat[["RNA"]]@scale.data)
-ggsave(hist_plot, file=output_file, width=7.2, height=12, units="in")
 
 
 
-if (FALSE) {
+
 #########################
 # Run pca
 ##########################
 expr_seurat <- RunPCA(expr_seurat, features = VariableFeatures(object = expr_seurat))
 
-
 pca_cell_type <- DimPlot(expr_seurat, group.by="ct_cov", reduction = "pca", pt.size = .1)
 pca_batch <- DimPlot(expr_seurat, group.by="batch", reduction = "pca", pt.size = .1)
 pca_disease <- DimPlot(expr_seurat, group.by="disease_cov", reduction = "pca", pt.size = .1)
 pca_population <- DimPlot(expr_seurat, group.by="pop_cov", reduction = "pca", pt.size = .1)
-
 #pca_lib_size <- FeaturePlot(expr_seurat_no_regression, features="lib_size", reduction.use="pca")
 #pca_sparsity <- FeaturePlot(expr_seurat_no_regression, features="sparsity", reduction.use="pca")
 
 p <- CombinePlots(plots = list(pca_cell_type, pca_batch, pca_disease, pca_population), ncol=2)
-
 ggsave(p, file=paste0(visualize_processed_expression_dir, normalization_method, "_pca_plot.pdf"), width=13.2, height=7.2, units="in")
+
+
 
 #########################
 # Run UMAP
@@ -301,4 +327,39 @@ umap_sparsity <- FeaturePlot(expr_seurat, features="sparsity")
 
 p <- CombinePlots(plots = list(umap_cell_type, umap_batch, umap_disease, umap_population, umap_lib_size, umap_sparsity), ncol=2)
 ggsave(p, file=paste0(visualize_processed_expression_dir, normalization_method, "_umap_plot.pdf"), width=13.2, height=7.2, units="in")
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#####################################################
+# OLD
+#####################################################
+
+
+
+
+
+
+
+#############################
+# Save scaled data to output
+#############################
+#expr_seurat <- readRDS(paste0(processed_expression_dir, "seurat_", normalization_method, "_normalized_object.rds"))
+#output_file <-paste0(visualize_processed_expression_dir, normalization_method, "_expression_across_cells.pdf")
+#hist_plot <- make_histogram_of_genes_expression_across_genes(scaled_data)
+#ggsave(hist_plot, file=output_file, width=7.2, height=12, units="in")
+

@@ -12,7 +12,8 @@ raw_umi_count_dir="/work-zfs/abattle4/prashanthi/Single_cell_eQTL/data_for_ben/r
 # Directory containing meta data for each cell
 meta_data_dir="/work-zfs/abattle4/prashanthi/Single_cell_eQTL/data_for_ben/meta_data/per_cell/"
 
-
+# Gene annotation file (hg19)
+gene_annotation_file="/work-zfs/abattle4/lab_data/annotation/gencode.v19/gencode.v19.annotation.gene.txt"
 
 
 
@@ -31,4 +32,4 @@ visualize_processed_expression_dir=$output_root"visualize_processed_expression/"
 
 
 
-sh preprocess_single_cell_expression.sh $raw_umi_count_dir $meta_data_dir $processed_expression_dir $visualize_processed_expression_dir
+sh preprocess_single_cell_expression.sh $raw_umi_count_dir $meta_data_dir $processed_expression_dir $visualize_processed_expression_dir $gene_annotation_file
