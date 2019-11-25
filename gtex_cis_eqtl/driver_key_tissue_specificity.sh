@@ -76,14 +76,13 @@ genotype_testing_file=$processed_data_dir$tissue_subset_name"genotype.txt"
 # Paramaters
 initialization="random"
 seed="0"
-model_name="alm"  # can either be alm or almm (alternating least model or alternating linear mixed model)
+model_name="vi"  # can either be alm or almm (alternating least model or alternating linear mixed model)
 ################################
 # Run eqtl factorization over a number of parameters
 lasso_params=( "0.001" )
 num_latent_factor_arr=("4")
 ################################
 # Loop through covariate methods
-if false; then
 for lasso_param in "${lasso_params[@]}"; do
 	for num_latent_factors in "${num_latent_factor_arr[@]}"; do
 			lasso_param_v=$lasso_param
@@ -92,7 +91,7 @@ for lasso_param in "${lasso_params[@]}"; do
 			sh eqtl_factorization.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $lasso_param_u $lasso_param_v $initialization $seed $model_name
 	done
 done
-fi
+
 
 
 

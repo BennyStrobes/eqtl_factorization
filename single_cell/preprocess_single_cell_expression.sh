@@ -10,9 +10,41 @@ processed_expression_dir="$3"
 visualize_processed_expression_dir="$4"
 gene_annotation_file="$5"
 
-Rscript preprocess_single_cell_expression.R $raw_umi_count_dir $meta_data_dir $processed_expression_dir $visualize_processed_expression_dir "log" $gene_annotation_file
-Rscript preprocess_single_cell_expression.R $raw_umi_count_dir $meta_data_dir $processed_expression_dir $visualize_processed_expression_dir "sctransform" $gene_annotation_file
 if false; then
-Rscript preprocess_single_cell_expression.R $raw_umi_count_dir $meta_data_dir $processed_expression_dir $visualize_processed_expression_dir "log_with_covariates" $gene_annotation_file
+Rscript preprocess_single_cell_expression.R $raw_umi_count_dir $meta_data_dir $processed_expression_dir $visualize_processed_expression_dir "sctransform" $gene_annotation_file
 fi
+if false; then
 Rscript preprocess_single_cell_expression.R $raw_umi_count_dir $meta_data_dir $processed_expression_dir $visualize_processed_expression_dir "sctransform_with_covariates" $gene_annotation_file
+fi
+Rscript preprocess_single_cell_expression.R $raw_umi_count_dir $meta_data_dir $processed_expression_dir $visualize_processed_expression_dir "sctransform_with_covariates_and_individual" $gene_annotation_file
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+####################
+# OLD
+####################
+
+if false; then
+
+Rscript preprocess_single_cell_expression.R $raw_umi_count_dir $meta_data_dir $processed_expression_dir $visualize_processed_expression_dir "log" $gene_annotation_file
+Rscript preprocess_single_cell_expression.R $raw_umi_count_dir $meta_data_dir $processed_expression_dir $visualize_processed_expression_dir "log_with_covariates" $gene_annotation_file
+
+
+fi
