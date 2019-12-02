@@ -1,9 +1,9 @@
 args = commandArgs(trailingOnly=TRUE)
 library(reshape)
 library(grid)
-library(PRROC)
 library(cowplot)
 library(umap)
+library(ggplot2)
 library(RColorBrewer)
 options(bitmapType = 'cairo', device = 'pdf')
 
@@ -344,6 +344,33 @@ for (tiss_num in 1:length(tissue_colors$tissue_id)) {
 }
 
 
+
+num_tissue=4
+num_factors=4
+seed=0
+loading_file <- paste0(eqtl_results_dir, "eqtl_factorization_tissues_subset_", num_tissue, "_gtex_data_4_factors_vi_model_",seed,"_seed_U_S.txt")
+tissue_file <- paste0(processed_data_dir, "tissues_subset_", num_tissue, "_sample_names.txt")
+tissue_names <- get_tissue_names(tissue_file)
+
+######################
+# Make box plot for each tissue, showing loading distributions
+output_file <- paste0(visualization_dir,"eqtl_factorization_of_", num_tissue, "_tissues_with_", num_factors, "_factors_vi_model_",seed,"_seed_loading_boxplot.pdf")
+boxplot <- make_loading_boxplot_plot(tissue_names, tissue_colors, loading_file)
+ggsave(boxplot, file=output_file, width=12.2, height=5.5, units="in")
+#####################
+# Run Umap on loadings. Plot Umap loadings in scatter plot color by observed tissue type
+output_file <- paste0(visualization_dir,"eqtl_factorization_of_", num_tissue, "_tissues_with_", num_factors, "_factors_vi_model_", seed, "_seed_umap_loading_scatter.pdf")
+umap_scatter <- make_umap_loading_scatter_plot(tissue_names, tissue_colors, loading_file)
+ggsave(umap_scatter, file=output_file, width=7.2, height=5.5, units="in")
+
+######################
+# Make scatter plot where each sample is a point, x and y axis are factor loadings, and points are colored by their tissue type
+output_file <- paste0(visualization_dir, "eqtl_factorization_of_", num_tissue, "_tissues_with_", num_factors, "_factors_vi_model_", seed, "_seed_loading_scatter.pdf")
+scatter <- make_loading_scatter_plot(tissue_names,tissue_colors, loading_file)
+ggsave(scatter, file=output_file, width=7.2, height=5.5, units="in")
+
+
+if (FALSE) {
 lasso_param_us = c("0.0001")
 initializations = c("random_0")
 num_factor_arr = c(4)
@@ -432,3 +459,4 @@ output_file <- paste0(visualization_dir, "loading_boxplot for each tissue.pdf")
 #output_file <- paste0(visualization_dir, "loading_scatter_colored_by_tissue_type.pdf")
 #scatter <- make_loading_scatter_plot(tissue_file, loading_file)
 #ggsave(scatter, file=output_file, width=7.2, height=5.5, units="in")
+}
