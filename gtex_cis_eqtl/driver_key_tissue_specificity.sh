@@ -97,10 +97,30 @@ model_name="vi_shared_effect"
 model_name="vi"
 model_name="vi_ard_loadings_only"
 model_name="vi_no_ard"
+model_name="vi_theta_fixed"
+model_name="vi_shared_effect"
+
+
 num_latent_factors="4"
+seeds=("0" "1" "2")
+lambdas=(".1" "1" "10")
+bernoulli_probs=(".4" ".5" ".6")
+
+seeds=("0")
+bernoulli_probs=(".6")
+
+for seed in "${seeds[@]}"; do
+		for bernoulli_prob in "${bernoulli_probs[@]}"; do
+			echo "Seed: "$seed" / bernoulli prob:"$bernoulli_prob
+			file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors_"$model_name"_model_"$seed"_seed_"$bernoulli_prob"_bernoulli_prob"
+			sh eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name $bernoulli_prob
+
+		done
+done
+if false; then
 file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors_"$model_name"_model_"$seed"_seed"
 sh eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name
-
+fi
 
 
 

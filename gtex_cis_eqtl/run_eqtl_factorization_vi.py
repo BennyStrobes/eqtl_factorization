@@ -6,6 +6,7 @@ import eqtl_factorization_vi_shared_effect
 import eqtl_factorization_vi
 import eqtl_factorization_vi_ard_loadings_only
 import eqtl_factorization_vi_no_ard
+import eqtl_factorization_vi_theta_fixed
 
 
 
@@ -45,7 +46,7 @@ def subset_matrices(Y,G,Z):
 
 	return new_Y, new_G, new_Z
 
-def train_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name):
+def train_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, bernoulli_prob):
 	############################
 	# Load in data
 	############################
@@ -64,7 +65,7 @@ def train_eqtl_factorization_model(sample_overlap_file, expression_training_file
 
 	# RUN MODEL
 	if model_name == 'vi_shared_effect':
-		eqtl_vi = eqtl_factorization_vi_shared_effect.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-3, beta=1e-3, a=1, b=1, max_iter=10, delta_elbo_threshold=.01)
+		eqtl_vi = eqtl_factorization_vi_shared_effect.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1, beta=1, a=1, b=1, max_iter=600, delta_elbo_threshold=.01)
 		eqtl_vi.fit(G=G, Y=Y, z=Z)
 		np.savetxt(output_root + '_U.txt', eqtl_vi.U_mu, fmt="%s", delimiter='\t')
 		np.savetxt(output_root + '_U_S.txt', eqtl_vi.U_mu*eqtl_vi.S_U, fmt="%s", delimiter='\t')
@@ -89,13 +90,19 @@ def train_eqtl_factorization_model(sample_overlap_file, expression_training_file
 		np.savetxt(output_root + '_V.txt', eqtl_vi.V_mu, fmt="%s", delimiter='\t')
 		np.savetxt(output_root + '_elbo.txt', eqtl_vi.elbo, fmt="%s", delimiter='\t')
 	elif model_name == 'vi_no_ard':
-		eqtl_vi = eqtl_factorization_vi_no_ard.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-3, beta=1e-3, p_u=.1, lambda_u=1, lambda_v=10, max_iter=12000, delta_elbo_threshold=.01)
+		eqtl_vi = eqtl_factorization_vi_no_ard.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-3, beta=1e-3, p_u=bernoulli_prob, lambda_u=lasso_param, lambda_v=1, lambda_f=.0000001, max_iter=600, delta_elbo_threshold=.01)
 		eqtl_vi.fit(G=G, Y=Y, z=Z)
 		np.savetxt(output_root + '_U.txt', eqtl_vi.U_mu, fmt="%s", delimiter='\t')
 		np.savetxt(output_root + '_U_S.txt', eqtl_vi.U_mu*eqtl_vi.S_U, fmt="%s", delimiter='\t')
 		np.savetxt(output_root + '_V.txt', eqtl_vi.V_mu, fmt="%s", delimiter='\t')
 		np.savetxt(output_root + '_elbo.txt', eqtl_vi.elbo, fmt="%s", delimiter='\t')
-
+	elif model_name == 'vi_theta_fixed':
+		eqtl_vi = eqtl_factorization_vi_theta_fixed.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-3, beta=1e-3, p_u=bernoulli_prob, lambda_v=1, lambda_f=.0000001, max_iter=600, delta_elbo_threshold=.01)
+		eqtl_vi.fit(G=G, Y=Y, z=Z)
+		np.savetxt(output_root + '_U.txt', eqtl_vi.U_mu, fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_U_S.txt', eqtl_vi.U_mu*eqtl_vi.S_U, fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_V.txt', eqtl_vi.V_mu, fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_elbo.txt', eqtl_vi.elbo, fmt="%s", delimiter='\t')
 
 
 #######################
@@ -111,12 +118,13 @@ file_stem = sys.argv[7]
 eqtl_results_dir = sys.argv[8]
 seed = int(sys.argv[9])
 model_name = sys.argv[10]
+bernoulli_prob = float(sys.argv[11])
 
-np.random.seed(4)
+np.random.seed(seed)
 # What to save output files to
 output_root = eqtl_results_dir + file_stem 
 
 #########################
 # Train model
 #########################
-train_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name)
+train_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, bernoulli_prob)

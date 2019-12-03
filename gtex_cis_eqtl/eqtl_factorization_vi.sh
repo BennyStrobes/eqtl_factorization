@@ -17,5 +17,6 @@ file_stem="$7"
 eqtl_results_dir="$8"
 seed="$9"
 model_name="${10}"
+bernoulli_prob="${11}"
 
-python run_eqtl_factorization_vi.py $sample_overlap_file $expression_testing_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name
+python run_eqtl_factorization_vi.py $sample_overlap_file $expression_testing_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name $bernoulli_prob
