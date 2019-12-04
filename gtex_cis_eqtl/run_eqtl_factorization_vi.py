@@ -6,7 +6,9 @@ import eqtl_factorization_vi_shared_effect
 import eqtl_factorization_vi
 import eqtl_factorization_vi_ard_loadings_only
 import eqtl_factorization_vi_no_ard
+import eqtl_factorization_vi_no_ard_learn_bernoulli
 import eqtl_factorization_vi_theta_fixed
+import pickle
 
 
 
@@ -90,12 +92,19 @@ def train_eqtl_factorization_model(sample_overlap_file, expression_training_file
 		np.savetxt(output_root + '_V.txt', eqtl_vi.V_mu, fmt="%s", delimiter='\t')
 		np.savetxt(output_root + '_elbo.txt', eqtl_vi.elbo, fmt="%s", delimiter='\t')
 	elif model_name == 'vi_no_ard':
-		eqtl_vi = eqtl_factorization_vi_no_ard.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-3, beta=1e-3, p_u=bernoulli_prob, lambda_u=lasso_param, lambda_v=1, lambda_f=.0000001, max_iter=600, delta_elbo_threshold=.01)
+		eqtl_vi = eqtl_factorization_vi_no_ard.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-3, beta=1e-3, p_u=bernoulli_prob, lambda_u=1, lambda_v=1, lambda_f=.0000001, max_iter=600, delta_elbo_threshold=.01)
 		eqtl_vi.fit(G=G, Y=Y, z=Z)
 		np.savetxt(output_root + '_U.txt', eqtl_vi.U_mu, fmt="%s", delimiter='\t')
 		np.savetxt(output_root + '_U_S.txt', eqtl_vi.U_mu*eqtl_vi.S_U, fmt="%s", delimiter='\t')
 		np.savetxt(output_root + '_V.txt', eqtl_vi.V_mu, fmt="%s", delimiter='\t')
 		np.savetxt(output_root + '_elbo.txt', eqtl_vi.elbo, fmt="%s", delimiter='\t')
+	elif model_name == 'vi_no_ard_learn_bernoulli':
+		eqtl_vi = eqtl_factorization_vi_no_ard_learn_bernoulli.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-3, beta=1e-3, a=1, b=1, lambda_u=1, lambda_v=1, lambda_f=.0000001, max_iter=600, delta_elbo_threshold=.01)
+		eqtl_vi.fit(G=G, Y=Y, z=Z)
+		# Save the model
+		pickle.dump(eqtl_vi, open(output_root + '_model', 'wb'))
+		#model = pickle.load(open(file_name, 'rb'))
+
 	elif model_name == 'vi_theta_fixed':
 		eqtl_vi = eqtl_factorization_vi_theta_fixed.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-3, beta=1e-3, p_u=bernoulli_prob, lambda_v=1, lambda_f=.0000001, max_iter=600, delta_elbo_threshold=.01)
 		eqtl_vi.fit(G=G, Y=Y, z=Z)
