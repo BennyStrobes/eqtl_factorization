@@ -33,7 +33,9 @@ gtex_tpm_dir="/work-zfs/abattle4/lab_data/GTEx_v8/processed/rna_seq_by_tissue/ge
 gtex_covariate_dir="/work-zfs/abattle4/lab_data/GTEx_v8/ciseQTL/GTEx_Analysis_v8_eQTL_covariates/"
 gtex_genotype_dir="/work-zfs/abattle4/lab_data/GTEx_v8_trans_eqtl_data_processed_by_brian/processed_genotypes/"
 gtex_egene_dir="/work-zfs/abattle4/lab_data/GTEx_v8/ciseQTL/GTEx_Analysis_v8_eQTL/"
+gtex_eqtl_dir="/work-zfs/abattle4/lab_data/GTEx_v8/ciseQTL/GTEx_Analysis_v8_eQTL_all_associations/"
 gtex_tissue_colors_file="/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/gtex_cis_eqtl/input_data/gtex_colors.txt"
+gtex_individual_information_file="/work-zfs/abattle4/lab_data/GTEx_v8/sample_annotations/GTEx_Analysis_2017-06-05_v8_Annotations_SubjectPhenotypesDS.txt"
 
 
 #########################
@@ -42,19 +44,21 @@ gtex_tissue_colors_file="/work-zfs/abattle4/bstrober/single_cell_eqtl_factorizat
 ## 4 tissues case
 tissues_file=$input_data_dir"tissues_subset_4.txt"
 output_dir=$processed_data_dir"tissues_subset_4_"
+
 if false; then
 
-python preprocess_gtex_data_for_eqtl_factorization.py $tissues_file $gtex_expression_dir $gtex_tpm_dir $gtex_covariate_dir $gtex_genotype_dir $gtex_egene_dir $output_dir
+python preprocess_gtex_data_for_eqtl_factorization.py $tissues_file $gtex_expression_dir $gtex_tpm_dir $gtex_covariate_dir $gtex_genotype_dir $gtex_egene_dir $gtex_individual_information_file $gtex_eqtl_dir $output_dir
+
 
 ## 10 tissues case
 tissues_file=$input_data_dir"tissues_subset_10.txt"
 output_dir=$processed_data_dir"tissues_subset_10_"
-python preprocess_gtex_data_for_eqtl_factorization.py $tissues_file $gtex_expression_dir $gtex_tpm_dir $gtex_covariate_dir $gtex_genotype_dir $gtex_egene_dir $output_dir
+python preprocess_gtex_data_for_eqtl_factorization.py $tissues_file $gtex_expression_dir $gtex_tpm_dir $gtex_covariate_dir $gtex_genotype_dir $gtex_egene_dir $gtex_individual_information_file $gtex_eqtl_dir $output_dir
 
 ## 20 tissues case
 tissues_file=$input_data_dir"tissues_subset_20.txt"
 output_dir=$processed_data_dir"tissues_subset_20_"
-python preprocess_gtex_data_for_eqtl_factorization.py $tissues_file $gtex_expression_dir $gtex_tpm_dir $gtex_covariate_dir $gtex_genotype_dir $gtex_egene_dir $output_dir
+python preprocess_gtex_data_for_eqtl_factorization.py $tissues_file $gtex_expression_dir $gtex_tpm_dir $gtex_covariate_dir $gtex_genotype_dir $gtex_egene_dir $gtex_individual_information_file $gtex_eqtl_dir $output_dir
 fi
 
 #########################
@@ -74,59 +78,87 @@ genotype_testing_file=$processed_data_dir$tissue_subset_name"genotype.txt"
 
 ################################
 # Paramaters
-initialization="random"
-seed="0"
-model_name="alm"  # can either be alm or almm (alternating least model or alternating linear mixed model)
-################################
-# Run eqtl factorization over a number of parameters
-lasso_params=( "0.001" )
-num_latent_factor_arr=("4")
-################################
-# Loop through covariate methods
-if false; then
-for lasso_param in "${lasso_params[@]}"; do
-	for num_latent_factors in "${num_latent_factor_arr[@]}"; do
-			lasso_param_v=$lasso_param
-			lasso_param_u=$lasso_param
-			file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors_"$model_name"_lasso_U_"$lasso_param_u"_lasso_V_"$lasso_param_v"_initialization_"$initialization"_"$seed
-			sh eqtl_factorization.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $lasso_param_u $lasso_param_v $initialization $seed $model_name
-	done
-done
-fi
-model_name="vi_shared_effect"
+
 model_name="vi"
-model_name="vi_ard_loadings_only"
 model_name="vi_no_ard"
 model_name="vi_theta_fixed"
-model_name="vi_shared_effect"
 model_name="vi_no_ard"
 model_name="vi_no_ard_learn_bernoulli"
+model_name="vi_no_ard_learn_bernoulli_both_sides"
+model_name="vi_shared_effect"
+model_name="vi_shared_effect"
+model_name="vi_no_ard_learn_bernoulli_all_sides"
+model_name="vi_no_ard_learn_bernoulli_both_sides"
+model_name="vi_no_ard_learn_bernoulli"
+model_name="vi_shared_effect"
+model_name="vi_shared_effect_ard_only"
+model_name="vi_shared_effect_double_ard_only"
+model_name="vi_ard_loadings_only"
+model_name="vi_shared_effect"
+model_name="vi_shared_effect_factor_component_ard_only"
+model_name="vi_shared_effect_prior_on_loadings_only"
+model_name="vi_shared_effect_prior_on_loadings_only_special_init"
 
-
-num_latent_factors="14"
-seeds=("0" "1" "2")
-lambdas=(".1" "1" "10")
-bernoulli_probs=(".4" ".5" ".6")
-bernoulli_prob=".5"
-seeds=("1" "2" "3" "4" "5")
-
+num_latent_factors="15"
+random_effects="False"
+seeds=("0" "1" "2" "3" "4" "5")
+seeds=("0")
 for seed in "${seeds[@]}"; do
 	echo "Seed: "$seed
-	file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors_"$model_name"_model_"$seed"_seed"
-	if false; then
-	sbatch eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name $bernoulli_prob
-	fi
+	file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$seed"_seed"
+	sh eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name $random_effects
 done
-if false; then
-file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors_"$model_name"_model_"$seed"_seed"
-sh eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name
-fi
-
-
 
 
 if false; then
-python initialization_analysis.py $expression_training_file $genotype_training_file $num_latent_factors $eqtl_results_dir $processed_data_dir"sample_tissue_names.txt"
-
 Rscript visualize_eqtl_factorization.R $processed_data_dir $eqtl_results_dir $visualization_dir $gtex_tissue_colors_file
 fi
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+###################################
+# OLD ANALYSIS: NO LONGER USED
+###################################

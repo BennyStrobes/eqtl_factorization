@@ -84,7 +84,7 @@ def regress_out_covariates(expression_input_file, covariate_file, expression_out
 	t.close()
 	'''
 
-def get_sample_names(tissues, gtex_expression_dir, sample_name_file):
+def get_sample_names(tissues, gtex_expression_dir, sample_name_file, gtex_individual_information_file):
 	# Initialize arr
 	samples = []
 	# get samples in tisssue
@@ -111,7 +111,27 @@ def get_sample_names(tissues, gtex_expression_dir, sample_name_file):
 		t.write(sample + '\n')
 		sample_to_index[sample] = i
 	t.close()
-	return samples, sample_to_index
+	# Extract covariates for these samples
+	dicti = {}
+	f = open(gtex_individual_information_file)
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split('\t')
+		if head_count == 0:
+			head_count = head_count +1
+			continue
+		indi_id = data[0]
+		cohort = data[1]
+		sex = data[2]
+		age = data[3]
+		race = data[4]
+		ethnicity = data[5]
+		dicti[indi_id] = [cohort, sex, age, race]
+	f.close()
+
+
+	return samples, sample_to_index, dicti
 
 # Extract array of tests to use
 # Extract a dictionary for variants that maps from each variant in tests to an initialized array of length== length(sample_names)
@@ -490,7 +510,43 @@ def standardize_expression(tpm_expression_matrix_file, standardized_tpm_expressi
 		t.write(sample_name + '\t' + '\t'.join(expr) + '\n')
 	t.close()
 
-def extract_covariates(expr_file, output_file, num_expression_pcs):
+# First extract matrix of samples X genotype PCs
+def extract_genotype_pcs(gtex_covariate_dir, sample_names, tissues, num_genotype_pcs):
+	# Create dictionary of sample_name to genotype_PCs
+	dicti = {}
+	for sample_name in sample_names:
+		dicti[sample_name] = 0
+	for tissue in tissues:
+		covariate_file = gtex_covariate_dir + tissue + '.v8.covariates.txt'
+		cov_data = np.loadtxt(covariate_file, dtype=str,delimiter='\t')
+		covs = cov_data[1:,1:].astype(float)
+		cov_names = cov_data[1:,0]
+		ids = cov_data[0,1:]
+		for index, individual in enumerate(ids):
+			individual_name = individual + ':' + tissue
+			if individual_name in dicti:
+				dicti[individual_name] = covs[:5,index]
+	# Check
+	new_dicti = {}
+	for sample_name in dicti.keys():
+		indi = sample_name.split(':')[0]
+		pc_vec = dicti[sample_name]
+		if indi not in new_dicti:
+			new_dicti[indi] = pc_vec
+		else:
+			if np.array_equal(pc_vec, new_dicti[indi]) == False:
+				print('assumption eror')
+				pdb.set_trace()
+	genotype_pc_mat = np.zeros((len(sample_names), num_genotype_pcs))
+	for index, sample_name in enumerate(sample_names):
+		genotype_pc_mat[index,:] = dicti[sample_name]
+	return genotype_pc_mat
+
+
+def extract_covariates(expr_file, output_file, num_expression_pcs, gtex_covariate_dir, sample_names, tissues):
+	# First extract matrix of samples X genotype PCs
+	num_genotype_pcs = 5
+	genotype_pcs = extract_genotype_pcs(gtex_covariate_dir, sample_names, tissues, num_genotype_pcs)
 	# Load in expression data
 	expr_full = np.loadtxt(expr_file, dtype=str,delimiter='\t')
 	expr = expr_full[1:,1:].astype(float)
@@ -504,10 +560,13 @@ def extract_covariates(expr_file, output_file, num_expression_pcs):
 	pc_names = []
 	for pc_num in range(num_expression_pcs):
 		pc_names.append('PC' + str(pc_num))
+	for genotype_pc in range(num_genotype_pcs):
+		pc_names.append('genotype_PC' + str(genotype_pc))
 	t = open(output_file, 'w')
 	t.write('Sample_name\t' + '\t'.join(pc_names) + '\n')
 	for sample_num, sample_name in enumerate(samples):
-		t.write(sample_name + '\t' + '\t'.join(expr_pc_loadings[sample_num,:].astype(str)) + '\n')
+		t.write(sample_name + '\t' + '\t'.join(expr_pc_loadings[sample_num,:].astype(str)))
+		t.write('\t' + '\t'.join(genotype_pcs[sample_num,:].astype(str)) + '\n')
 	t.close()
 
 
@@ -524,6 +583,59 @@ def get_genes_we_have_expression_data_for(file_name):
 		genes[data[0]] = 1
 	return genes
 
+def print_sample_covariates(sample_names, individual_covariates, output_file):
+	t = open(output_file, 'w')
+	t.write('sample_id\tcohort\tsex\tage\trace\n')
+	for sample_name in sample_names:
+		individual_id = sample_name.split(':')[0]
+		t.write(sample_name + '\t' + '\t'.join(individual_covariates[individual_id]) + '\n')
+	t.close()
+
+
+def print_test_effect_sizes(tissues, gtex_eqtl_dir, test_name_file, test_effect_size_file):
+	# Extract test names
+	test_names = []
+	test_names_dicti = {}
+	f = open(test_name_file)
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		test_names.append(line)
+		test_names_dicti[line] = np.zeros(len(tissues)) - 400
+	f.close()
+	# For each tissue, fill in observed effect sizes
+	for tissue_index, tissue in enumerate(tissues):
+		print(tissue)
+		eqtl_file = gtex_eqtl_dir + tissue + '.allpairs.txt'
+		f = open(eqtl_file)
+		head_count = 0
+		for line in f:
+			line = line.rstrip()
+			data = line.split()
+			if head_count == 0:
+				head_count = head_count + 1
+				continue
+			ensamble_id = data[0]
+			variant_id = data[1]
+			line_test_name = ensamble_id + ':' + variant_id
+			if line_test_name not in test_names_dicti:
+				continue
+			if test_names_dicti[line_test_name][tissue_index] != -400:
+				print('assumption error!')
+			test_names_dicti[line_test_name][tissue_index] = float(data[7])
+		f.close()
+	t = open(test_effect_size_file, 'w')
+	t.write('\t'.join(tissues) + '\n')
+	for test_name in test_names:
+		effect_size_vec = test_names_dicti[test_name]
+		for index in range(len(tissues)):
+			if effect_size_vec[index] == -400:
+				print('assumption error!')
+				pdb.set_trace()
+		effect_size_vec = effect_size_vec.astype(str)
+		t.write('\t'.join(effect_size_vec) + '\n')
+	t.close()
+
 
 
 tissues_file = sys.argv[1]
@@ -532,17 +644,21 @@ gtex_tpm_dir = sys.argv[3]
 gtex_covariate_dir = sys.argv[4]
 gtex_genotype_dir = sys.argv[5]
 gtex_egene_dir = sys.argv[6]
-processed_data_dir = sys.argv[7]
-
+gtex_individual_information_file = sys.argv[7]
+gtex_eqtl_dir = sys.argv[8]
+processed_data_dir = sys.argv[9]
 tissues, tissues_alt = get_tissues(tissues_file)
 
 
+
+'''
 # Extract file of sample names
 sample_name_file = processed_data_dir + 'sample_names.txt'
-sample_names, sample_to_index = get_sample_names(tissues, gtex_expression_dir, sample_name_file)
+sample_names, sample_to_index, individual_covariates = get_sample_names(tissues, gtex_expression_dir, sample_name_file, gtex_individual_information_file)
 
-print_individual_id_file_and_tissue_file(sample_names, processed_data_dir + 'individual_id.txt', processed_data_dir + 'sample_tissue_names.txt')
+# print_individual_id_file_and_tissue_file(sample_names, processed_data_dir + 'individual_id.txt', processed_data_dir + 'sample_tissue_names.txt')
 
+print_sample_covariates(sample_names, individual_covariates, processed_data_dir + 'sample_covariates.txt')
 # We are going to limit analysis to genes tested in all tissues
 genes_tested_in_all_tissues = get_genes_tested_in_all_tissues(tissues, gtex_expression_dir)
 
@@ -561,7 +677,7 @@ standardize_expression(tpm_expression_matrix_file, standardized_tpm_expression_m
 # Extract covariates (expression pcs)
 num_expression_pcs = 50
 covariate_file = processed_data_dir + 'covariates.txt'
-extract_covariates(standardized_tpm_expression_matrix_file, covariate_file, num_expression_pcs)
+extract_covariates(standardized_tpm_expression_matrix_file, covariate_file, num_expression_pcs, gtex_covariate_dir, sample_names, tissues)
 
 # Regress out covariates
 residual_standardized_tpm_expression_matrix_file = processed_data_dir + 'residual_cross_tissue_tpm_standardized.txt'
@@ -583,7 +699,9 @@ genes_uncorrected = genes.copy()
 
 
 # Print test names to output file
+'''
 test_name_file = processed_data_dir + 'test_names.txt'
+'''
 print_test_names(tests, test_name_file)
 
 
@@ -606,12 +724,10 @@ print_big_matrix(processed_data_dir + 'genotype.txt', tests, variants, 1)
 genes_uncorrected = add_expression_values_to_data_structure_t(standardized_tpm_expression_matrix_file, sample_to_index, genes_uncorrected)
 print_big_matrix(processed_data_dir + 'expr_uncorrected.txt', tests, genes_uncorrected, 0)
 
+'''
+test_effect_size_file = processed_data_dir + 'test_effect_sizes.txt'
 
-
-
-
-
-
+print_test_effect_sizes(tissues, gtex_eqtl_dir, test_name_file, test_effect_size_file)
 
 
 
