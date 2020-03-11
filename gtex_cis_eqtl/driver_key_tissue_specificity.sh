@@ -98,17 +98,20 @@ model_name="vi_shared_effect"
 model_name="vi_shared_effect_factor_component_ard_only"
 model_name="vi_shared_effect_prior_on_loadings_only"
 model_name="vi_shared_effect_prior_on_loadings_only_special_init"
+model_name="vi_prior_on_loadings_only_special_init"
+
 
 num_latent_factors="15"
 random_effects="False"
-seeds=("0" "1" "2" "3" "4" "5")
-seeds=("0")
+seeds=("1" "2" "3" "4" "5")
+seeds=("1")
+if false; then
 for seed in "${seeds[@]}"; do
 	echo "Seed: "$seed
 	file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$seed"_seed"
 	sh eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name $random_effects
 done
-
+fi
 
 if false; then
 Rscript visualize_eqtl_factorization.R $processed_data_dir $eqtl_results_dir $visualization_dir $gtex_tissue_colors_file

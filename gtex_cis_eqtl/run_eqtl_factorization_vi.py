@@ -9,6 +9,7 @@ import eqtl_factorization_vi
 import eqtl_factorization_vi_shared_effect_factor_component_ard_only
 import eqtl_factorization_vi_shared_effect_prior_on_loadings_only
 import eqtl_factorization_vi_shared_effect_prior_on_loadings_only_special_init
+import eqtl_factorization_vi_prior_on_loadings_only_special_init
 import pickle
 
 
@@ -112,8 +113,18 @@ def train_eqtl_factorization_model(sample_overlap_file, expression_training_file
 		#shared_ve, factor_ve = eqtl_vi.compute_variance_explained_of_factors()
 		#factor_ordering = np.where(factor_ve > .001)[0]
 		#U_temp = (eqtl_vi.U_mu*eqtl_vi.S_U)[:,factor_ordering]
-		#V_temp = (eqtl_vi.V_mu*eqtl_vi.S_V)[factor_ordering,:]
+		#V_temp = (eqtl_vi.V_mu)[factor_ordering,:]
 		#np.savetxt(output_root + '_U_S.txt', (eqtl_vi.U_mu*eqtl_vi.S_U)[:,factor_ordering], fmt="%s", delimiter='\t')
+	elif model_name == 'vi_prior_on_loadings_only_special_init':
+		#eqtl_vi = eqtl_factorization_vi_prior_on_loadings_only_special_init.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-3, beta=1e-3, a=1, b=1, gamma_v=1.0, max_iter=1000, delta_elbo_threshold=.01)
+		#eqtl_vi.fit(G=G, Y=Y, z=Z)
+		#pickle.dump(eqtl_vi, open(output_root + '_model', 'wb'))
+		eqtl_vi = pickle.load(open(output_root + '_model', 'rb'))
+		factor_ve = eqtl_vi.compute_variance_explained_of_factors()
+		factor_ordering = np.where(factor_ve > .001)[0]
+		U_temp = (eqtl_vi.U_mu*eqtl_vi.S_U)[:,factor_ordering]
+		V_temp = (eqtl_vi.V_mu)[factor_ordering,:]
+		np.savetxt(output_root + '_U_S.txt', (eqtl_vi.U_mu*eqtl_vi.S_U)[:,factor_ordering], fmt="%s", delimiter='\t')
 	elif model_name == 'vi_shared_effect_ard_only':
 		eqtl_vi = eqtl_factorization_vi_shared_effect_ard_only.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-3, beta=1e-3, max_iter=600, delta_elbo_threshold=.01)
 		eqtl_vi.fit(G=G, Y=Y, z=Z)

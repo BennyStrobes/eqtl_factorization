@@ -542,12 +542,12 @@ for (tiss_num in 1:length(tissue_colors$tissue_id)) {
 ############################
 # Model Specification
 ############################
-model_name <- "vi_shared_effect"
+model_name <- "vi_prior_on_loadings_only_special_init"
 num_factors <- "15"
 num_tissues <- "4"
 random_effects_bool <- "False"
 model_stem <- paste0("eqtl_factorization_tissues_subset_", num_tissues, "_gtex_data_", num_factors, "_factors_", model_name, "_model_", random_effects_bool, "_re_")
-seed_number=0
+seed_number=1
 seed_model_stem <- paste0(model_stem, seed_number, "_seed_")
 loading_file <- paste0(eqtl_results_dir, seed_model_stem, "U_S.txt")
 
