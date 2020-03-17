@@ -51,9 +51,11 @@ make_loading_scatter_plot_for_fixed_dimensions_legend <- function(loadings, tiss
 	return(get_legend(plotter))
 }
 
-make_loading_scatter_plot <- function(tissues, tissue_colors, loading_file) {
+make_loading_scatter_plot <- function(tissues, sample_covariate_file, tissue_colors, loading_file) {
 	#tissues <- read.table(tissue_file, header=FALSE)
 	loadings <- read.table(loading_file, header=FALSE)
+	covariates <- read.table(sample_covariate_file, header=TRUE, sep="\t")
+	race_factor = factor(as.character(as.numeric(covariates$race==3)))
 	num_samples <- dim(loadings)[1]
 	num_factors <- dim(loadings)[2]
 	if (num_factors == 2) {
@@ -196,6 +198,35 @@ make_loading_boxplot_plot_by_race <- function(sample_covariate_file, loading_fil
 	return(boxplot)
 }
 
+make_loading_boxplot_plot_by_cm_proportion <- function(sample_covariate_file, loading_file) {
+	#tissues <- read.table(tissue_file, header=FALSE)
+	loadings <- read.table(loading_file, header=FALSE)
+	#df <- data.frame(loading_1=loadings$V1, loading_2=loadings$V2, tissue=factor(tissues$V1))
+	covariates <- read.table(sample_covariate_file, header=TRUE, sep="\t")
+
+	loading_vec <- c()
+	race_vec <- c()
+	factor_vec <- c()
+
+	num_factors <- dim(loadings)[2]
+
+	for (factor_number in 1:num_factors) {
+		loading_vec <- c(loading_vec, loadings[,factor_number])
+		race_vec <- c(race_vec, as.character(as.numeric(covariates$cm_cell_type_composition < .5)))
+		factor_vec <- c(factor_vec, rep(as.character(factor_number), length(covariates$cm_cell_type_composition)))
+	}
+
+
+	df <- data.frame(loading=loading_vec, race=factor(race_vec), latent_factor=factor(factor_vec, levels=as.character(1:num_factors)))
+
+	boxplot <- ggplot(df, aes(x=latent_factor, y=loading, fill=race)) + geom_boxplot(outlier.size = .1) +
+				gtex_v8_figure_theme() + 
+	        	labs(x="Latent factor", y = "Sample loading", fill="Known Cell type composition") +
+	        	theme(legend.position="bottom")
+
+	return(boxplot)
+}
+
 make_loading_boxplot_plot_by_sex <- function(sample_covariate_file, loading_file) {
 	#tissues <- read.table(tissue_file, header=FALSE)
 	loadings <- read.table(loading_file, header=FALSE)
@@ -319,8 +350,10 @@ make_loading_boxplot_plot_by_tissue <- function(tissues,tissue_colors, loading_f
 				gtex_v8_figure_theme() + 
 				scale_fill_manual(values=colors) + 
 	        	labs(x="Latent factor", y = "Sample loading", fill="Known tissue") +
-	        	guides(colour=guide_legend(nrow=4,byrow=TRUE, override.aes = list(size=2))) +
-	        	theme(legend.position="bottom")
+	        	theme(legend.position="bottom") +
+	        	guides(colour = guide_legend(override.aes = list(size=2))) +
+	           	guides(colour=guide_legend(nrow=4,byrow=TRUE, override.aes = list(size=2)))
+	   
 
 	return(boxplot)
 }
@@ -537,8 +570,48 @@ for (tiss_num in 1:length(tissue_colors$tissue_id)) {
 	}
 }
 
+############################
+# Model Specification
+############################
+model_name <- "eqtl_factorization_vi_spike_and_slab"
+num_factors <- "25"
+num_tissues <- "4"
+random_effects_bool <- "False"
+model_stem <- paste0("eqtl_factorization_tissues_subset_", num_tissues, "_gtex_data_", num_factors, "_factors_", model_name, "_model_", random_effects_bool, "_re_")
+seed_number=5
+seed_model_stem <- paste0(model_stem, seed_number, "_seed_")
+loading_file <- paste0(eqtl_results_dir, seed_model_stem, "U_S.txt")
+
+tissue_file <- paste0(processed_data_dir, "tissues_subset_", num_tissues, "_sample_names.txt")
+sample_covariate_file <- paste0(processed_data_dir, "tissues_subset_", num_tissues, "_sample_covariates.txt")
+effect_size_file <- paste0(processed_data_dir, "tissues_subset_", num_tissues, "_test_effect_sizes.txt")
+tissue_names <- get_tissue_names(tissue_file)
+
+######################
+# Make box plot for each Race, showing loading distributions
+output_file <- paste0(visualization_dir, seed_model_stem, "race_colored_loading_boxplot.pdf")
+boxplot <- make_loading_boxplot_plot_by_race(sample_covariate_file, loading_file)
+ggsave(boxplot, file=output_file, width=7.2, height=5.5, units="in")
+
+######################
+# Make box plot for each tissue, showing loading distributions
+output_file <- paste0(visualization_dir, seed_model_stem, "tissue_colored_loading_boxplot.pdf")
+boxplot <- make_loading_boxplot_plot_by_tissue(tissue_names, tissue_colors, loading_file)
+ggsave(boxplot, file=output_file, width=7.2, height=5.5, units="in")
+#####################
+# Run Umap on loadings. Plot Umap loadings in scatter plot color by observed tissue type
+output_file <- paste0(visualization_dir, seed_model_stem, "umap_loading_scatter.pdf")
+umap_scatter <- make_umap_loading_scatter_plot(tissue_names, tissue_colors, sample_covariate_file, loading_file)
+ggsave(umap_scatter, file=output_file, width=7.2*1.5, height=5.5*1.5, units="in")
+
+######################
+# Make scatter plot where each sample is a point, x and y axis are factor loadings, and points are colored by their tissue type
+output_file <- paste0(visualization_dir, seed_model_stem, "loading_scatter.pdf")
+scatter <- make_loading_scatter_plot(tissue_names,sample_covariate_file, tissue_colors, loading_file)
+ggsave(scatter, file=output_file, width=7.2, height=5.5, units="in")
 
 
+if (FALSE) {
 ############################
 # Model Specification
 ############################
@@ -584,6 +657,8 @@ ggsave(boxplot, file=output_file, width=7.2, height=5.5, units="in")
 output_file <- paste0(visualization_dir, seed_model_stem, "umap_loading_scatter.pdf")
 umap_scatter <- make_umap_loading_scatter_plot(tissue_names, tissue_colors, sample_covariate_file, loading_file)
 ggsave(umap_scatter, file=output_file, width=7.2*1.5, height=5.5*1.5, units="in")
+
+}
 
 
 

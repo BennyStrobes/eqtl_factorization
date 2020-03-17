@@ -84,7 +84,7 @@ def regress_out_covariates(expression_input_file, covariate_file, expression_out
 	t.close()
 	'''
 
-def get_sample_names(tissues, gtex_expression_dir, sample_name_file, gtex_individual_information_file):
+def get_sample_names(tissues, gtex_expression_dir, sample_name_file, gtex_individual_information_file, cell_type_decomposition_file):
 	# Initialize arr
 	samples = []
 	# get samples in tisssue
@@ -129,8 +129,27 @@ def get_sample_names(tissues, gtex_expression_dir, sample_name_file, gtex_indivi
 		ethnicity = data[5]
 		dicti[indi_id] = [cohort, sex, age, race]
 	f.close()
-
-
+	head_count = 0
+	f = open(cell_type_decomposition_file)
+	for line in f:
+		line = line.rstrip()
+		data = line.split(',')
+		# Skip header
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		cell_type_composition = data[4]
+		indi_id = data[0]
+		if indi_id not in dicti:
+			continue
+		dicti[indi_id].append(cell_type_composition)
+	f.close()
+	for indi_id in dicti.keys():
+		if len(dicti[indi_id]) == 4:
+			dicti[indi_id].append('NaN')
+		elif len(dicti[indi_id]) > 5:
+			print('too many')
+			pdb.set_trace()
 	return samples, sample_to_index, dicti
 
 # Extract array of tests to use
@@ -585,7 +604,7 @@ def get_genes_we_have_expression_data_for(file_name):
 
 def print_sample_covariates(sample_names, individual_covariates, output_file):
 	t = open(output_file, 'w')
-	t.write('sample_id\tcohort\tsex\tage\trace\n')
+	t.write('sample_id\tcohort\tsex\tage\trace\tcm_cell_type_composition\n')
 	for sample_name in sample_names:
 		individual_id = sample_name.split(':')[0]
 		t.write(sample_name + '\t' + '\t'.join(individual_covariates[individual_id]) + '\n')
@@ -646,20 +665,22 @@ gtex_genotype_dir = sys.argv[5]
 gtex_egene_dir = sys.argv[6]
 gtex_individual_information_file = sys.argv[7]
 gtex_eqtl_dir = sys.argv[8]
-processed_data_dir = sys.argv[9]
+cell_type_decomposition_file = sys.argv[9]
+processed_data_dir = sys.argv[10]
 tissues, tissues_alt = get_tissues(tissues_file)
 
 
 
-'''
 # Extract file of sample names
 sample_name_file = processed_data_dir + 'sample_names.txt'
-sample_names, sample_to_index, individual_covariates = get_sample_names(tissues, gtex_expression_dir, sample_name_file, gtex_individual_information_file)
+sample_names, sample_to_index, individual_covariates = get_sample_names(tissues, gtex_expression_dir, sample_name_file, gtex_individual_information_file, cell_type_decomposition_file)
 
-# print_individual_id_file_and_tissue_file(sample_names, processed_data_dir + 'individual_id.txt', processed_data_dir + 'sample_tissue_names.txt')
+print_individual_id_file_and_tissue_file(sample_names, processed_data_dir + 'individual_id.txt', processed_data_dir + 'sample_tissue_names.txt')
 
 print_sample_covariates(sample_names, individual_covariates, processed_data_dir + 'sample_covariates.txt')
 # We are going to limit analysis to genes tested in all tissues
+
+'''
 genes_tested_in_all_tissues = get_genes_tested_in_all_tissues(tissues, gtex_expression_dir)
 
 # Generate TPM expression matrix
@@ -699,9 +720,7 @@ genes_uncorrected = genes.copy()
 
 
 # Print test names to output file
-'''
 test_name_file = processed_data_dir + 'test_names.txt'
-'''
 print_test_names(tests, test_name_file)
 
 
@@ -724,7 +743,6 @@ print_big_matrix(processed_data_dir + 'genotype.txt', tests, variants, 1)
 genes_uncorrected = add_expression_values_to_data_structure_t(standardized_tpm_expression_matrix_file, sample_to_index, genes_uncorrected)
 print_big_matrix(processed_data_dir + 'expr_uncorrected.txt', tests, genes_uncorrected, 0)
 
-'''
 test_effect_size_file = processed_data_dir + 'test_effect_sizes.txt'
 
 print_test_effect_sizes(tissues, gtex_eqtl_dir, test_name_file, test_effect_size_file)
@@ -732,10 +750,7 @@ print_test_effect_sizes(tissues, gtex_eqtl_dir, test_name_file, test_effect_size
 
 
 
-
-
-
-
+'''
 
 
 ################################
