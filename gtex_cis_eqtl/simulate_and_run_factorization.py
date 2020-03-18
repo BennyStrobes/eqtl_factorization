@@ -115,7 +115,7 @@ def simulate_data_for_eqtl_factorization2(I, Ni, T, K):
 			S_U[n, component_num] = 1
 	theta_U = np.sum(S_U,axis=0)/(S_U.shape[0])
 
-	Y = G*np.dot(S_U, V_true) + G*np.dot(np.ones((N,1)),F_true)
+	Y = G*np.dot(S_U*U_true, V_true) + G*np.dot(np.ones((N,1)),F_true)
 	gene_residual_sdevs = np.sqrt(np.random.exponential(size=T))*10
 	for m in range(T):
 		Y[:,m] = Y[:, m] + np.random.normal(0, gene_residual_sdevs[m],size=N)
@@ -159,7 +159,7 @@ np.random.seed(8)
 I = 1000
 Ni = 1
 T = 1000
-K = 3
+K = 7
 alpha_0 = 1e-3
 beta_0 = 1e-3
 a_0 = 1
@@ -171,16 +171,7 @@ print(data['theta_U'])
 ##################
 # Fit eqtl factorization using home-built variational inference
 ##################
-eqtl_vi = eqtl_factorization_vi_spike_and_slab_no_gaussian_loading.EQTL_FACTORIZATION_VI(K=10, alpha=1e-3, beta=1e-3, a=1, b=1, max_iter=2000, gamma_v=1, delta_elbo_threshold=.01)
+eqtl_vi = eqtl_factorization_vi_spike_and_slab.EQTL_FACTORIZATION_VI(K=25, alpha=1e-3, beta=1e-3, a=1, b=1, max_iter=1000, gamma_v=1, delta_elbo_threshold=.01)
 eqtl_vi.fit(G=G, Y=Y, z=z)
 
-for k in range(K):
-	best_corr = 0
-	best_index = -1
-	for j in range(10):
-		corry = np.corrcoef(data['S_U'][:, k], eqtl_vi.S_U[:, j])[0,1]
-		if np.abs(corry) > best_corr:
-			best_corr = np.abs(corry)
-			best_index = j
-	print(str(k) + ' ' + str(best_index) + ' ' + str(best_corr))
 pdb.set_trace()
