@@ -63,65 +63,6 @@ python preprocess_gtex_data_for_eqtl_factorization.py $tissues_file $gtex_expres
 fi
 
 
-#########################
-# Run eqtl factorization model for 1 gtex tissues
-#########################
-tissue_subset_name="tissues_subset_1_Heart_Left_Ventricle_"
-
-# eqtl factorization input files (generated in 'simulate_eqtl_factorization_data.py')
-sample_overlap_file=$processed_data_dir$tissue_subset_name"individual_id.txt"
-# TRAINING
-expression_training_file=$processed_data_dir$tissue_subset_name"expr.txt"
-genotype_training_file=$processed_data_dir$tissue_subset_name"genotype.txt"
-# TESTING
-expression_testing_file=$processed_data_dir$tissue_subset_name"expr.txt"
-genotype_testing_file=$processed_data_dir$tissue_subset_name"genotype.txt"
-
-
-# Paramaters
-model_name="eqtl_factorization_vi_spike_and_slab"
-num_latent_factors="25"
-random_effects="False"
-seeds=("0" "1" "2" "3" "4" "5")
-seeds=("1")
-
-if false; then
-for seed in "${seeds[@]}"; do
-	echo "Seed: "$seed
-	file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$seed"_seed"
-	sh eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name $random_effects
-done
-fi
-
-
-
-#########################
-# Run eqtl factorization model for 4 gtex tissues
-#########################
-tissue_subset_name="tissues_subset_4_"
-
-# eqtl factorization input files (generated in 'simulate_eqtl_factorization_data.py')
-sample_overlap_file=$processed_data_dir$tissue_subset_name"individual_id.txt"
-# TRAINING
-expression_training_file=$processed_data_dir$tissue_subset_name"expr.txt"
-genotype_training_file=$processed_data_dir$tissue_subset_name"genotype.txt"
-# TESTING
-expression_testing_file=$processed_data_dir$tissue_subset_name"expr.txt"
-genotype_testing_file=$processed_data_dir$tissue_subset_name"genotype.txt"
-
-
-# Paramaters
-model_name="eqtl_factorization_vi_spike_and_slab"
-num_latent_factors="25"
-random_effects="False"
-seeds=("0" "1" "2" "3" "4" "5")
-if false; then
-for seed in "${seeds[@]}"; do
-	echo "Seed: "$seed
-	file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$seed"_seed"
-	sh eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name $random_effects
-done
-fi
 
 
 
@@ -129,7 +70,6 @@ fi
 # Run eqtl factorization model for 10 gtex tissues
 #########################
 tissue_subset_name="tissues_subset_10_"
-
 # eqtl factorization input files (generated in 'simulate_eqtl_factorization_data.py')
 sample_overlap_file=$processed_data_dir$tissue_subset_name"individual_id.txt"
 # TRAINING
@@ -144,24 +84,62 @@ genotype_testing_file=$processed_data_dir$tissue_subset_name"genotype.txt"
 model_name="eqtl_factorization_vi_spike_and_slab"
 num_latent_factors="30"
 random_effects="False"
+svi="True"
 seeds=("0" "1" "2" "3" "4" "5")
-seeds=("1")
-
+if false; then
 for seed in "${seeds[@]}"; do
 	echo "Seed: "$seed
-	file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors_"$model_name"_v_dont_reorder_model_"$random_effects"_re_"$seed"_seed"
-	if false; then
-	file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$seed"_seed"
-	fi
-	sh eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name $random_effects
+	file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed"
+	sbatch eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name $random_effects $svi
 done
+fi
+
+svi="False"
+seeds=("0" "1" "2" "3" "4" "5")
+if false; then
+for seed in "${seeds[@]}"; do
+	echo "Seed: "$seed
+	file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed"
+	sbatch eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name $random_effects $svi
+done
+fi
+
+#########################
+# Run eqtl factorization model for 20 gtex tissues
+#########################
+tissue_subset_name="tissues_subset_20_"
+# eqtl factorization input files (generated in 'simulate_eqtl_factorization_data.py')
+sample_overlap_file=$processed_data_dir$tissue_subset_name"individual_id.txt"
+# TRAINING
+expression_training_file=$processed_data_dir$tissue_subset_name"expr.txt"
+genotype_training_file=$processed_data_dir$tissue_subset_name"genotype.txt"
+# TESTING
+expression_testing_file=$processed_data_dir$tissue_subset_name"expr.txt"
+genotype_testing_file=$processed_data_dir$tissue_subset_name"genotype.txt"
+
+
+# Paramaters
+model_name="eqtl_factorization_vi_spike_and_slab"
+num_latent_factors="30"
+random_effects="False"
+svi="True"
+seeds=("0")
+for seed in "${seeds[@]}"; do
+	echo "Seed: "$seed
+	file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed"
+	sh eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name $random_effects $svi
+done
+
+
+
 
 
 #########################
 # Visualize results
 #########################
+if false; then
 Rscript visualize_eqtl_factorization.R $processed_data_dir $eqtl_results_dir $visualization_dir $gtex_tissue_colors_file
-
+fi
 
 
 

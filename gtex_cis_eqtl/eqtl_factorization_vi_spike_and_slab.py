@@ -151,7 +151,7 @@ def compute_kl_divergence_of_beta(a_prior, b_prior, theta_a, theta_b):
 	return kl_divergence
 
 class EQTL_FACTORIZATION_VI(object):
-	def __init__(self, K=25, alpha=1e-3, beta=1e-3, a=1, b=1, gamma_v=1.0, max_iter=1000, delta_elbo_threshold=1e-8, SVI=False, sample_batch_fraction=.5, learning_rate=.5, forgetting_rate=.25):
+	def __init__(self, K=25, alpha=1e-3, beta=1e-3, a=1, b=1, gamma_v=1.0, max_iter=1000, delta_elbo_threshold=1e-8, SVI=False, sample_batch_fraction=.3, learning_rate=.5, forgetting_rate=.25):
 		self.alpha_prior = alpha
 		self.beta_prior = beta
 		self.a_prior = a 
@@ -168,6 +168,7 @@ class EQTL_FACTORIZATION_VI(object):
 			self.forgetting_rate = forgetting_rate
 		elif SVI == False:
 			self.sample_batch_fraction = 1.0
+			self.step_size = 1.0
 	def fit(self, G, Y, z):
 		""" Fit the model.
 			Args:
@@ -182,19 +183,18 @@ class EQTL_FACTORIZATION_VI(object):
 		self.update_elbo()
 		# Loop through VI iterations
 		for vi_iter in range(self.max_iter):
+			# Update step size (If using SVI)
 			self.update_step_size()
-			print(self.step_size)
 			# Update parameter estimaters via coordinate ascent
-			#if (self.iter==0):
-			#	self.update_tau()
-			self.update_VU()
+			print('Step size: ' + str(self.step_size))
+			self.update_U()
+			self.update_V()
 			self.update_intercept()
 			self.update_F()
 			self.update_theta_U()
 			self.update_tau()
 			self.iter = self.iter + 1
-
-
+			# Remove irrelevent factors
 			if np.mod(vi_iter, 50) == 0 and vi_iter > 0:
 				# UPDATE remove irrelevent_factors TO BE IN TERMS OF *_FULL (ie re-learn theta_U on all data)
 				self.remove_irrelevent_factors()
@@ -202,7 +202,7 @@ class EQTL_FACTORIZATION_VI(object):
 			
 			# Compute ELBO after update
 			print('Variational Inference iteration: ' + str(vi_iter))
-			if np.mod(vi_iter, 10) == 0:
+			if np.mod(vi_iter, 20) == 0:
 				self.update_elbo()
 				current_elbo = self.elbo[len(self.elbo)-1]
 				delta_elbo = (current_elbo - self.elbo[len(self.elbo)-2])
@@ -257,7 +257,18 @@ class EQTL_FACTORIZATION_VI(object):
 		shared_pve = shared_effect/denominator
 		factor_pve = factor_effects/denominator
 		return shared_pve, factor_pve
-	def update_VU(self):
+	def update_V(self):
+		G_squared = np.square(self.G)
+		###################
+		# UPDATE V
+		###################
+		# Precompute quantities
+		U_S_expected_val = self.U_mu*self.S_U
+		U_S_squared_expected_val = (np.square(self.U_mu) + self.U_var)*self.S_U
+		for k in range(self.K):
+			self.update_V_k(k, U_S_expected_val, U_S_squared_expected_val[:,k], G_squared)
+
+	def update_U(self):
 		if self.SVI == True:
 			# Randomly generate indices for SVI
 			svi_sample_indices = self.get_svi_sample_indices()
@@ -269,10 +280,10 @@ class EQTL_FACTORIZATION_VI(object):
 			self.S_U = np.copy(self.S_U_full[svi_sample_indices, :])
 			self.U_var = np.copy(self.U_var_full[svi_sample_indices, :])
 			self.U_var_s_0 = np.copy(self.U_var_s_0_full[svi_sample_indices, :])
+		G_squared = np.square(self.G)
 		###################
 		# UPDATE U
 		###################
-		G_squared = np.square(self.G)
 		V_S_squared_expected_val = (np.square(self.V_mu) + self.V_var)
 		for k in range(self.K):
 			V_k_S_k_squared_expected_val = V_S_squared_expected_val[k, :]
@@ -290,6 +301,7 @@ class EQTL_FACTORIZATION_VI(object):
 		U_S_squared_expected_val = (np.square(self.U_mu) + self.U_var)*self.S_U
 		for k in range(self.K):
 			self.update_V_k(k, U_S_expected_val, U_S_squared_expected_val[:,k], G_squared)
+
 
 
 	def update_U_k(self, k, V_S_expected_val, V_k_S_k_squared_expected_val, G_squared):
@@ -520,10 +532,16 @@ class EQTL_FACTORIZATION_VI(object):
 		kl_divergence = compute_kl_divergence_of_gaussian_fixed_variance(W_mu, W_var, expected_gamma_v, self.K)
 		return kl_divergence
 	def compute_kl_divergence_of_U_S(self):
-		S = np.transpose(self.S_U_full)
-		W_mu = np.transpose(self.U_mu_full)
-		W_var = np.transpose(self.U_var_full)
-		W_var_s_0 = np.transpose(self.U_var_s_0_full)
+		if self.SVI == True:
+			S = np.transpose(self.S_U_full)
+			W_mu = np.transpose(self.U_mu_full)
+			W_var = np.transpose(self.U_var_full)
+			W_var_s_0 = np.transpose(self.U_var_s_0_full)
+		elif self.SVI == False:
+			S = np.transpose(self.S_U)
+			W_mu = np.transpose(self.U_mu)
+			W_var = np.transpose(self.U_var)
+			W_var_s_0 = np.transpose(self.U_var_s_0)
 		gamma_expected = self.gamma_v
 		theta_a = self.theta_U_a
 		theta_b = self.theta_U_b
@@ -596,7 +614,8 @@ class EQTL_FACTORIZATION_VI(object):
 			self.z = np.copy(self.z_full)
 			pca = sklearn.decomposition.PCA(n_components=self.K, whiten=True)
 			pca.fit(np.random.randn(self.N, 9999).T)
-			self.U_mu = pca.components_.T
+			self.U_mu = pca.components_.T*10.0
+			#self.U_mu = np.random.randn(self.N, self.K)
 			self.U_var = np.ones((self.N, self.K))*(1.0/self.gamma_v) 
 			self.U_var_s_0 = np.ones((self.N, self.K))*(1.0/self.gamma_v)
 			self.S_U = np.ones((self.N,self.K))
@@ -612,7 +631,8 @@ class EQTL_FACTORIZATION_VI(object):
 			self.z = np.copy(self.z_full)[svi_sample_indices]
 			pca = sklearn.decomposition.PCA(n_components=self.K, whiten=True)
 			pca.fit(np.random.randn(self.N_full, 9999).T)
-			self.U_mu_full = pca.components_.T
+			self.U_mu_full = pca.components_.T*10.0
+			#self.U_mu_full = np.random.randn(self.N_full, self.K)
 			self.U_var_full = np.ones((self.N_full, self.K))*(1.0/self.gamma_v)
 			self.U_var_s_0_full = np.ones((self.N_full, self.K))*(1.0/self.gamma_v)
 			self.S_U_full = np.ones((self.N_full,self.K))
@@ -634,7 +654,7 @@ class EQTL_FACTORIZATION_VI(object):
 		#self.V_mu = np.random.randn(self.K, self.T)
 		pca = sklearn.decomposition.PCA(n_components=self.K, whiten=True)
 		pca.fit(np.random.randn(self.T, 9999).T)
-		self.V_mu = pca.components_
+		self.V_mu = pca.components_*10.0
 		self.V_var = np.ones((self.K, self.T))*(1.0/self.gamma_v)
 
 		betas = run_linear_model_for_initialization(self.Y, self.G)
@@ -654,6 +674,13 @@ class EQTL_FACTORIZATION_VI(object):
 		# bernoulli probs
 		self.theta_U_a = np.ones(self.K)*self.a_prior + 9
 		self.theta_U_b = np.ones(self.K)*self.b_prior
+
+		# Initialize other variables based around U
+		self.step_size = 1.0
+		self.update_V()
+		self.update_intercept()
+		self.update_F()
+		self.update_tau()
 
 		#self.gamma_U_alpha = np.ones(self.K)*self.alpha_prior
 		#self.gamma_U_beta = np.ones(self.K)*self.beta_prior

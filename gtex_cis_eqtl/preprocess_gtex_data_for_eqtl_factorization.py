@@ -680,7 +680,6 @@ print_individual_id_file_and_tissue_file(sample_names, processed_data_dir + 'ind
 print_sample_covariates(sample_names, individual_covariates, processed_data_dir + 'sample_covariates.txt')
 # We are going to limit analysis to genes tested in all tissues
 
-'''
 genes_tested_in_all_tissues = get_genes_tested_in_all_tissues(tissues, gtex_expression_dir)
 
 # Generate TPM expression matrix
@@ -749,8 +748,6 @@ print_test_effect_sizes(tissues, gtex_eqtl_dir, test_name_file, test_effect_size
 
 
 
-
-'''
 
 
 ################################

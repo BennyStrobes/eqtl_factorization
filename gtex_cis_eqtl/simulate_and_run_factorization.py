@@ -156,9 +156,9 @@ np.random.seed(8)
 ##########################
 # Simulate data
 ##########################
-I = 60000
+I = 1000
 Ni = 1
-T = 2000
+T = 1000
 K = 7
 alpha_0 = 1e-3
 beta_0 = 1e-3
@@ -171,5 +171,5 @@ print(data['theta_U'])
 ##################
 # Fit eqtl factorization using home-built variational inference
 ##################
-eqtl_vi = eqtl_factorization_vi_spike_and_slab.EQTL_FACTORIZATION_VI(K=20, alpha=1e-3, beta=1e-3, a=1, b=1, max_iter=1000, gamma_v=1, delta_elbo_threshold=.01, SVI=True, sample_batch_fraction=0.1)
+eqtl_vi = eqtl_factorization_vi_spike_and_slab.EQTL_FACTORIZATION_VI(K=20, alpha=1e-3, beta=1e-3, a=1, b=1, max_iter=1000, gamma_v=1, delta_elbo_threshold=.01, SVI=True, sample_batch_fraction=0.4)
 eqtl_vi.fit(G=G, Y=Y, z=z)
