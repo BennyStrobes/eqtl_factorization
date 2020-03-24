@@ -154,7 +154,7 @@ def compute_kl_divergence_of_beta(a_prior, b_prior, theta_a, theta_b):
 	return kl_divergence
 
 class EQTL_FACTORIZATION_VI(object):
-	def __init__(self, K=25, alpha=1e-3, beta=1e-3, a=1, b=1, gamma_v=1.0, max_iter=1000, delta_elbo_threshold=1e-8, SVI=False, sample_batch_fraction=.3, learning_rate=.5, forgetting_rate=.25):
+	def __init__(self, K=25, alpha=1e-3, beta=1e-3, a=1, b=1, gamma_v=1.0, max_iter=1000, delta_elbo_threshold=1e-8, SVI=False, sample_batch_fraction=.3, learning_rate=.4, forgetting_rate=.01):
 		self.alpha_prior = alpha
 		self.beta_prior = beta
 		self.a_prior = a 
@@ -394,6 +394,7 @@ class EQTL_FACTORIZATION_VI(object):
 		for test_index in range(self.T):
 			self.update_F_t(test_index, U_S_expected_val)
 
+	'''
 	def update_V_k(self, k, U_S_expected_val, U_k_S_k_squared_expected_val, G_squared):
 		gamma_v_expected_val = self.gamma_v
 		tau_expected_val = self.tau_alpha/self.tau_beta
@@ -415,6 +416,7 @@ class EQTL_FACTORIZATION_VI(object):
 		elif self.SVI == True:
 			self.V_var[k,:] = weighted_SVI_updated(self.V_var[k,:], new_var, self.step_size)
 			self.V_mu[k,:] = weighted_SVI_updated(self.V_mu[k,:], new_mu, self.step_size)
+	'''
 	def update_F_t(self, test_index, U_S_expected_val):
 		# Compute relevent expectations
 		gamma_f_expected_val = 1.0

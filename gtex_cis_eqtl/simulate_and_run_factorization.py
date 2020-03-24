@@ -182,8 +182,8 @@ max_iter=1000
 gamma_v=1.0
 # Only applicable to if SVI_boolean==True
 sample_batch_fraction=0.3
-learning_rate=0.6
-forgetting_rate=0.15
+learning_rate=0.4
+forgetting_rate=0.01
 
 ##########################
 # Simulate data
