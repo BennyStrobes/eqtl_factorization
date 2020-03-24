@@ -316,7 +316,7 @@ class EQTL_FACTORIZATION_VI(object):
 			self.S_U = np.copy(self.S_U_full[svi_sample_indices, :])
 			self.U_var = np.copy(self.U_var_full[svi_sample_indices, :])
 			self.U_var_s_0 = np.copy(self.U_var_s_0_full[svi_sample_indices, :])
-		G_squared = np.square(self.G)
+		#G_squared = np.square(self.G)
 		###################
 		# UPDATE U
 		###################
@@ -339,14 +339,6 @@ class EQTL_FACTORIZATION_VI(object):
 			self.S_U_full[svi_sample_indices, :] = np.copy(self.S_U)
 			self.U_var_full[svi_sample_indices, :] = np.copy(self.U_var)
 			self.U_var_s_0_full[svi_sample_indices, :] = np.copy(self.U_var_s_0)
-		###################
-		# UPDATE V
-		###################
-		# Precompute quantities
-		U_S_expected_val = self.U_mu*self.S_U
-		U_S_squared_expected_val = (np.square(self.U_mu) + self.U_var)*self.S_U
-		for k in range(self.K):
-			self.update_V_k(k, U_S_expected_val, U_S_squared_expected_val[:,k], G_squared)
 	def update_U_n(self, sample_index, V_S_squared_expected_val):
 		for k in range(self.K):
 			self.update_U_nk(sample_index, k, V_S_squared_expected_val[k,:])
