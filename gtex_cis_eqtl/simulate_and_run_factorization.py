@@ -164,7 +164,7 @@ Ni = int(sys.argv[4])  # Number of samples per individual
 T = int(sys.argv[5])  # number of tests
 K = int(sys.argv[6])  # Number of latent factors
 seed = int(sys.argv[7])  # random seed
-
+parrallel_boolean = string_to_boolean(sys.argv[8])  # Whether to parrallelize loops
 
 #########################
 # Set Seed
@@ -193,7 +193,7 @@ Y, G, z, data = simulate_data_for_eqtl_factorization2(I, Ni, T, K)
 ##################
 # Fit eqtl factorization using home-built variational inference
 ##################
-eqtl_vi = eqtl_factorization_vi_spike_and_slab.EQTL_FACTORIZATION_VI(K=20, alpha=alpha_0, beta=beta_0, a=a_0, b=b_0, max_iter=max_iter, gamma_v=gamma_v, delta_elbo_threshold=.01, SVI=svi_boolean, sample_batch_fraction=sample_batch_fraction, learning_rate=learning_rate, forgetting_rate=forgetting_rate)
+eqtl_vi = eqtl_factorization_vi_spike_and_slab.EQTL_FACTORIZATION_VI(K=20, alpha=alpha_0, beta=beta_0, a=a_0, b=b_0, max_iter=max_iter, gamma_v=gamma_v, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean, sample_batch_fraction=sample_batch_fraction, learning_rate=learning_rate, forgetting_rate=forgetting_rate)
 eqtl_vi.fit(G=G, Y=Y, z=z)
 pickle.dump(eqtl_vi, open(output_root + '_model', 'wb'))
 #eqtl_vi = pickle.load(open(output_root + '_model', 'rb'))

@@ -21,20 +21,25 @@ module load python/3.7.4-anaconda
 ###############
 # Run model
 ################
+svi="False"
+parrallel="False"
+seeds=("0")
+for seed in "${seeds[@]}"; do
+	echo "Seed: "$seed
+	output_stem=$simulated_results_dir$num_individuals"_individuals_"$num_samples_per_individual"_samples_per_individual_"$num_tests"_tests_"$num_latent_factors"_latent_factors_"$svi"_svi_boolean_"$seed"_seed_parrallelized_"
+	python simulate_and_run_factorization.py $output_stem $svi $num_individuals $num_samples_per_individual $num_tests $num_latent_factors $seed $parrallel
+done
+
+
+
+
+
 if false; then
 svi="True"
 seeds=("0")
 for seed in "${seeds[@]}"; do
 	echo "Seed: "$seed
-	output_stem=$simulated_results_dir$num_individuals"_individuals_"$num_samples_per_individual"_samples_per_individual_"$num_tests"_tests_"$num_latent_factors"_latent_factors_"$svi"_svi_boolean_"$seed"_seed_"
-	python simulate_and_run_factorization.py $output_stem $svi $num_individuals $num_samples_per_individual $num_tests $num_latent_factors $seed
-done
-
-svi="True"
-seeds=("0")
-for seed in "${seeds[@]}"; do
-	echo "Seed: "$seed
-	output_stem=$simulated_results_dir$num_individuals"_individuals_"$num_samples_per_individual"_samples_per_individual_"$num_tests"_tests_"$num_latent_factors"_latent_factors_"$svi"_svi_boolean_"$seed"_seed_"
+	output_stem=$simulated_results_dir$num_individuals"_individuals_"$num_samples_per_individual"_samples_per_individual_"$num_tests"_tests_"$num_latent_factors"_latent_factors_"$svi"_svi_boolean_"$seed"_seed_parrallelized_"
 	python simulate_and_run_factorization.py $output_stem $svi $num_individuals $num_samples_per_individual $num_tests $num_latent_factors $seed
 done
 fi

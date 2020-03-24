@@ -153,8 +153,33 @@ def compute_kl_divergence_of_beta(a_prior, b_prior, theta_a, theta_b):
 	kl_divergence = entropy_term - likelihood_term
 	return kl_divergence
 
+
+def outside_update_U_n(U_mu, S_U, U_var, U_var_s_0, G_slice, Y_slice, K, V_S_expected_val, V_S_squared_expected_val, F_S_expected_val, intercept_mu, gamma_v, tau_expected_val, theta_U_a, theta_U_b):
+	for k in range(K):
+		# Compute relevent expectations
+		U_S_expected_val = U_mu*S_U
+		V_k_S_k_expected_val = V_S_expected_val[k,:]
+		theta_U_expected_val = theta_U_a[k]/(theta_U_a[k] + theta_U_b[k])
+		ln_theta_U_expected_val = special.digamma(theta_U_a[k]) - special.digamma(theta_U_a[k]+theta_U_b[k])  # expectation of ln(1-X)
+		ln_1_minus_theta_U_expected_val = special.digamma(theta_U_b[k]) - special.digamma(theta_U_a[k]+theta_U_b[k])
+		# Compute expectations on other components
+		other_components_expected = (U_S_expected_val@V_S_expected_val) - U_S_expected_val[k]*V_S_expected_val[k,:]
+		# Update variance of q(U|s=1)
+		a_term = np.sum(tau_expected_val*np.square(G_slice)*V_S_squared_expected_val[k,:]) + gamma_v
+		U_var[k] = 1.0/a_term
+		# Update variance of q(U|s=0)
+		U_var_s_0[k] = 1.0/gamma_v
+		# Update mean of q(U|s=1)
+		resid = Y_slice - intercept_mu - G_slice*(F_S_expected_val + other_components_expected)
+		b_term = np.sum(tau_expected_val*G_slice*V_k_S_k_expected_val*resid)
+		U_mu[k] = U_var[k]*b_term
+		# Now update q(S_U=1)
+		z_term = ln_theta_U_expected_val - ln_1_minus_theta_U_expected_val + .5*np.log(gamma_v) - .5*np.log(a_term) + (np.square(b_term)/(2.0*a_term))
+		S_U[k] = sigmoid_function(z_term)
+	return np.hstack((U_mu, S_U, U_var, U_var_s_0))
+
 class EQTL_FACTORIZATION_VI(object):
-	def __init__(self, K=25, alpha=1e-3, beta=1e-3, a=1, b=1, gamma_v=1.0, max_iter=1000, delta_elbo_threshold=1e-8, SVI=False, sample_batch_fraction=.3, learning_rate=.4, forgetting_rate=.01):
+	def __init__(self, K=25, alpha=1e-3, beta=1e-3, a=1, b=1, gamma_v=1.0, max_iter=1000, delta_elbo_threshold=1e-8, SVI=False, parrallel_boolean=False, sample_batch_fraction=.3, learning_rate=.4, forgetting_rate=.01, num_test_cores=10, num_sample_cores=10):
 		self.alpha_prior = alpha
 		self.beta_prior = beta
 		self.a_prior = a 
@@ -165,6 +190,9 @@ class EQTL_FACTORIZATION_VI(object):
 		self.iter = 0
 		self.delta_elbo_threshold = delta_elbo_threshold
 		self.SVI = SVI
+		self.parrallel_boolean = parrallel_boolean
+		self.num_sample_cores = num_sample_cores
+		self.num_test_cores = num_test_cores
 		if SVI == True:
 			self.sample_batch_fraction = sample_batch_fraction
 			self.learning_rate = learning_rate
@@ -321,19 +349,31 @@ class EQTL_FACTORIZATION_VI(object):
 		# UPDATE U
 		###################
 		V_S_squared_expected_val = (np.square(self.V_mu) + self.V_var)
+		U_mu_copy = np.copy(self.U_mu)
+		S_U_copy = np.copy(self.S_U)
+		U_var_copy = np.copy(self.U_var)
+		U_var_s_0_copy = np.copy(self.U_var_s_0)
+		U_update_data = []
+
+		# Don't parrallelize
+		if self.parrallel_boolean == False:
+			for sample_index in range(self.N):
+				U_update_data.append(outside_update_U_n(U_mu_copy[sample_index,:], S_U_copy[sample_index,:], U_var_copy[sample_index,:], U_var_s_0_copy[sample_index,:], self.G[sample_index, :], self.Y[sample_index, :], self.K, self.V_mu, V_S_squared_expected_val, self.F_mu, self.intercept_mu, self.gamma_v, self.tau_alpha/self.tau_beta, self.theta_U_a, self.theta_U_b))
+		elif self.parrallel_boolean == True:
+			start_time = time.time()
+			U_update_data = Parallel(n_jobs=self.num_sample_cores)(delayed(outside_update_U_n)(U_mu_copy[sample_index,:], S_U_copy[sample_index,:], U_var_copy[sample_index,:], U_var_s_0_copy[sample_index,:], self.G[sample_index, :], self.Y[sample_index, :], self.K, self.V_mu, V_S_squared_expected_val, self.F_mu, self.intercept_mu, self.gamma_v, self.tau_alpha/self.tau_beta, self.theta_U_a, self.theta_U_b) for sample_index in range(self.N))
+
+		# Convert to array
+		U_update_data = np.asarray(U_update_data)
+		# Fill in data structures
+		self.U_mu = U_update_data[:,(self.K*0):(1*self.K)]
+		self.S_U = U_update_data[:,(self.K*1):(2*self.K)]
+		self.U_var = U_update_data[:,(self.K*2):(3*self.K)]
+		self.U_var_s_0 = U_update_data[:,(self.K*3):(4*self.K)]
+		'''
 		for sample_index in range(self.N):
 			self.update_U_n(sample_index, V_S_squared_expected_val)
 		'''
-		start_time = time.time()
-		num_cores=10
-		V_S_squared_expected_val = (np.square(self.V_mu) + self.V_var)
-		aa=Parallel(n_jobs=num_cores)(delayed(self.update_U_n)(sample_index, V_S_squared_expected_val) for sample_index in range(self.N))
-		#Parallel(n_jobs=num_cores)(delayed(self.update_U_n)(sample_index, V_S_squared_expected_val) for sample_index in range(self.N))
-		end_time = time.time()
-		print(end_time-start_time)
-		pdb.set_trace()
-		'''
-
 		if self.SVI == True:
 			self.U_mu_full[svi_sample_indices, :] = np.copy(self.U_mu)
 			self.S_U_full[svi_sample_indices, :] = np.copy(self.S_U)
