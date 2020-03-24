@@ -21,8 +21,8 @@ module load python/3.7.4-anaconda
 ###############
 # Run model
 ################
-svi="False"
-parrallel="True"
+svi="True"
+parrallel="False"
 seeds=("0")
 for seed in "${seeds[@]}"; do
 	echo "Seed: "$seed
