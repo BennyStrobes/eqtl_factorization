@@ -1,13 +1,49 @@
 #######################
 # Used Directories
 #######################
-# Data to contain simulated data
-simulated_data_dir="/Users/bennystrobes/Documents/data/eqtl_factorization_simulation/simulated_data/"
-# Data to contain traied eqtl factorization models
-eqtl_factorization_dir="/Users/bennystrobes/Documents/data/eqtl_factorization_simulation/models/"
+# Simulated results directory
+simulated_results_dir="/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/gtex_cis_eqtl/simulation/simulated_eqtl_results/"
+# visualize simulated results directory
+visualize_simulated_results_dir="/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/gtex_cis_eqtl/simulation/visualize_simulated_eqtl_results/"
+
+
+##############
+# Parameters
+##############
+num_individuals="1000"
+num_samples_per_individual="1"
+num_tests="1000"
+num_latent_factors="7"
+
+module load python/3.7.4-anaconda
+
+
+###############
+# Run model
+################
+if false; then
+svi="True"
+seeds=("0")
+for seed in "${seeds[@]}"; do
+	echo "Seed: "$seed
+	output_stem=$simulated_results_dir$num_individuals"_individuals_"$num_samples_per_individual"_samples_per_individual_"$num_tests"_tests_"$num_latent_factors"_latent_factors_"$svi"_svi_boolean_"$seed"_seed_"
+	python simulate_and_run_factorization.py $output_stem $svi $num_individuals $num_samples_per_individual $num_tests $num_latent_factors $seed
+done
+fi
+
+svi="True"
+seeds=("0")
+for seed in "${seeds[@]}"; do
+	echo "Seed: "$seed
+	output_stem=$simulated_results_dir$num_individuals"_individuals_"$num_samples_per_individual"_samples_per_individual_"$num_tests"_tests_"$num_latent_factors"_latent_factors_"$svi"_svi_boolean_"$seed"_seed_temp_"
+	python simulate_and_run_factorization.py $output_stem $svi $num_individuals $num_samples_per_individual $num_tests $num_latent_factors $seed
+done
 
 
 
-
-
-python simulate_and_run_factorization.py
+###############
+# Visualize Results
+################
+if false; then
+Rscript visualize_simulated_eqtl_factorization_results.R $simulated_results_dir $visualize_simulated_results_dir
+fi

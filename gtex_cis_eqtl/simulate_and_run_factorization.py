@@ -4,8 +4,16 @@ import sys
 import pdb
 import eqtl_factorization_vi_spike_and_slab
 import eqtl_factorization_vi_spike_and_slab_no_gaussian_loading
+import pickle
 
-
+def string_to_boolean(stringer):
+	if stringer == "True":
+		return True
+	elif stringer == "False":
+		return False
+	else:
+		print("BOOLEAN NOT RECOGNIZED")
+		return
 
 def simulate_data_for_eqtl_factorization(I, Ni, T, K, alpha_0, beta_0, a_0, b_0):
 	# Simulate gammas
@@ -146,30 +154,53 @@ def simulate_data_for_eqtl_factorization2(I, Ni, T, K):
 	data['S_U'] = S_U
 	return Y, G, Z, data
 
+#######################
+# Command line args
+#######################
+output_root = sys.argv[1]  # Output root (where to save things)
+svi_boolean = string_to_boolean(sys.argv[2]) # Whether to use SVI or not
+I = int(sys.argv[3])  # Number of individuals
+Ni = int(sys.argv[4])  # Number of samples per individual
+T = int(sys.argv[5])  # number of tests
+K = int(sys.argv[6])  # Number of latent factors
+seed = int(sys.argv[7])  # random seed
 
 
 #########################
 # Set Seed
 #########################
-np.random.seed(8)
+np.random.seed(seed)
 
 ##########################
-# Simulate data
+# Parameters
 ##########################
-I = 1000
-Ni = 1
-T = 1000
-K = 7
 alpha_0 = 1e-3
 beta_0 = 1e-3
 a_0 = 1
 b_0 = 1
+max_iter=1000
+gamma_v=1.0
+# Only applicable to if SVI_boolean==True
+sample_batch_fraction=0.3
+learning_rate=0.6
+forgetting_rate=0.15
 
-#Y, G, z, data = simulate_data_for_eqtl_factorization(I, Ni, T, K, 1, 1, a_0, b_0)
+##########################
+# Simulate data
+##########################
 Y, G, z, data = simulate_data_for_eqtl_factorization2(I, Ni, T, K)
-print(data['theta_U'])
+
 ##################
 # Fit eqtl factorization using home-built variational inference
 ##################
-eqtl_vi = eqtl_factorization_vi_spike_and_slab.EQTL_FACTORIZATION_VI(K=20, alpha=1e-3, beta=1e-3, a=1, b=1, max_iter=1000, gamma_v=1, delta_elbo_threshold=.01, SVI=True, sample_batch_fraction=0.4)
+eqtl_vi = eqtl_factorization_vi_spike_and_slab.EQTL_FACTORIZATION_VI(K=20, alpha=alpha_0, beta=beta_0, a=a_0, b=b_0, max_iter=max_iter, gamma_v=gamma_v, delta_elbo_threshold=.01, SVI=svi_boolean, sample_batch_fraction=sample_batch_fraction, learning_rate=learning_rate, forgetting_rate=forgetting_rate)
 eqtl_vi.fit(G=G, Y=Y, z=z)
+pickle.dump(eqtl_vi, open(output_root + '_model', 'wb'))
+#eqtl_vi = pickle.load(open(output_root + '_model', 'rb'))
+
+if eqtl_vi.SVI == True:
+	np.savetxt(output_root + 'U_S.txt', (eqtl_vi.U_mu_full*eqtl_vi.S_U_full), fmt="%s", delimiter='\t')
+else:
+	np.savetxt(output_root + 'U_S.txt', (eqtl_vi.U_mu*eqtl_vi.S_U), fmt="%s", delimiter='\t')
+np.savetxt(output_root + 'actual_U_S.txt', (data['U']*data['S_U']), fmt="%s", delimiter='\t')
+
