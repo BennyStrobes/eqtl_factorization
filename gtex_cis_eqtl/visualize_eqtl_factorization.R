@@ -157,14 +157,15 @@ make_umap_loading_scatter_plot <- function(tissues, tissue_colors, sample_covari
 
 	df <- data.frame(loading_1=umap_loadings[,1], loading_2=umap_loadings[,2], tissue=factor(tissues), race=factor(as.character(as.numeric(covariates$race==3))))
 	plotter <- ggplot(df) + 
-	           geom_point(aes(x=loading_1, y=loading_2, color=tissue, shape=race)) +
+	           geom_point(aes(x=loading_1, y=loading_2, color=tissue, shape=race), size=1) +
 	           scale_color_manual(values=colors) + 
-	           scale_shape_manual(values = c(0,4)) +
+	           scale_shape_manual(values = c(15,3)) +
 	           gtex_v8_figure_theme() + 
 	           guides(colour = guide_legend(override.aes = list(size=2))) +
 	           labs(x="UMAP 1", y = "UMAP 2", color="", shape="Race") + 
-	           guides(colour=guide_legend(nrow=4,byrow=TRUE, override.aes = list(size=2))) +
-	           theme(legend.position="bottom")
+	           guides(colour=guide_legend(nrow=5,byrow=TRUE, override.aes = list(size=2))) +
+	           theme(legend.position="bottom") + 
+	           theme(legend.text = element_text(size=8), legend.title = element_text(size=8))
 	return(plotter)
 }
 
@@ -346,13 +347,14 @@ make_loading_boxplot_plot_by_tissue <- function(tissues,tissue_colors, loading_f
 
 	}
 
-	boxplot <- ggplot(df, aes(x=latent_factor, y=loading, fill=tissue)) + geom_boxplot(outlier.size = .1) +
+	boxplot <- ggplot(df, aes(x=latent_factor, y=loading, fill=tissue)) + geom_boxplot(outlier.size = .001) +
 				gtex_v8_figure_theme() + 
 				scale_fill_manual(values=colors) + 
 	        	labs(x="Latent factor", y = "Sample loading", fill="Known tissue") +
 	        	theme(legend.position="bottom") +
 	        	guides(colour = guide_legend(override.aes = list(size=2))) +
-	           	guides(colour=guide_legend(nrow=4,byrow=TRUE, override.aes = list(size=2)))
+	           	guides(colour=guide_legend(nrow=4,byrow=TRUE, override.aes = list(size=2))) +
+	           	ylim(-.1,.1)
 	   
 
 	return(boxplot)
@@ -552,6 +554,143 @@ make_absolute_effect_size_boxplot <- function(effect_size_file, tissue_colors, f
 }
 
 
+#Make heatmap showing correlation of loadings between models
+make_loading_correlation_heatmap <- function(model1_loading_file, model2_loading_file, x_axis_label, y_axis_label) {
+
+	# Load in loading matrices
+	model1_loadings <- read.table(model1_loading_file, header=FALSE)
+	model2_loadings <- read.table(model2_loading_file, header=FALSE)
+
+	num_dim_x = dim(model1_loadings)[2]
+	num_dim_y = dim(model2_loadings)[2]
+	
+	corr_matrix = matrix(0, num_dim_x, num_dim_y)
+
+	for (x_index in 1:num_dim_x) {
+		for (y_index in 1:num_dim_y) {
+			corr_matrix[x_index, y_index] <- abs(cor(model1_loadings[,x_index], model2_loadings[, y_index]))
+		}
+	}
+	
+	melted_mat <- melt(corr_matrix)
+    colnames(melted_mat) <- c("model1", "model2", "correlation")
+
+
+    #  PLOT!
+    heatmap <- ggplot(data=melted_mat, aes(x=model1, y=model2)) + geom_tile(aes(fill=correlation)) + 
+		gtex_v8_figure_theme() +
+   		labs(y=y_axis_label, x=x_axis_label, fill="Absolute\nPearson correlation") +
+   		#theme(axis.text.x=element_blank(), axis.ticks.x=element_blank()) + 
+   		#theme(axis.text.y=element_blank(), axis.ticks.y=element_blank()) +
+   		scale_fill_gradient(low="white",high="blue") +
+   		scale_x_continuous(breaks=1:num_dim_x, labels=1:num_dim_x) +
+   		scale_y_continuous(breaks=1:num_dim_y, labels=1:num_dim_y)
+	return(heatmap)
+
+}
+
+
+make_ancestry_scatter_plot_in_one_tissue <- function(tissue, ancestry_specific_factor, ancestry_specific_eqtl_effect_size_file) {
+	ancestry_specific_eqtl_effect_sizes <- read.table(ancestry_specific_eqtl_effect_size_file, header=TRUE)
+
+	ancestry_specific_eqtl_effect_sizes$aa_effect_size[ancestry_specific_eqtl_effect_sizes$aa_effect_size == "NaN"] = NA
+	ancestry_specific_eqtl_effect_sizes$ea_effect_size[ancestry_specific_eqtl_effect_sizes$ea_effect_size == "NaN"] = NA
+
+	# Put into cmpact data frame
+	df <- data.frame(factor=abs(ancestry_specific_factor), delta_effect_size=abs(ancestry_specific_eqtl_effect_sizes$ea_effect_size-ancestry_specific_eqtl_effect_sizes$aa_effect_size))
+
+	test_scores <- cor.test(df$factor, df$delta_effect_size, use="complete.obs")
+	plotter <- ggplot(df, aes(x=delta_effect_size, y=factor)) + 
+	           geom_point(size=.01, colour="slateblue3") +
+	           gtex_v8_figure_theme() + 
+	           labs(x="Abs(European Ancestry - African Ancestry cis-eQTL effect size)", y ="Abs(Factor weight)", title=paste0(tissue, " / spearman rho: ", signif(test_scores$estimate, 4), " / p-value: ", signif(test_scores$p.value, 4))) 
+	return(plotter)
+
+}
+make_ancestry_scatter_plot <- function(factor_file, tissue_names, ancestry_specific_eqtl_file_root) {
+	# Extract ancestry specific factor
+	factors <- read.table(factor_file, header=FALSE)
+	ancestry_specific_factor <- as.numeric(factors[4,])
+	# make scatter plot in 1 tissue
+	tissue_1_ancestry_scatter <- make_ancestry_scatter_plot_in_one_tissue(tissue_names[1], ancestry_specific_factor, paste0(ancestry_specific_eqtl_file_root, tissue_names[1], "_effect_sizes.txt"))
+
+	tissue_2_ancestry_scatter <- make_ancestry_scatter_plot_in_one_tissue(tissue_names[2], ancestry_specific_factor, paste0(ancestry_specific_eqtl_file_root, tissue_names[2], "_effect_sizes.txt"))
+
+	tissue_3_ancestry_scatter <- make_ancestry_scatter_plot_in_one_tissue(tissue_names[3], ancestry_specific_factor, paste0(ancestry_specific_eqtl_file_root, tissue_names[3], "_effect_sizes.txt"))
+
+	tissue_4_ancestry_scatter <- make_ancestry_scatter_plot_in_one_tissue(tissue_names[4], ancestry_specific_factor, paste0(ancestry_specific_eqtl_file_root, tissue_names[4], "_effect_sizes.txt"))
+
+	combined_ancestry_scatter <- plot_grid(tissue_1_ancestry_scatter, tissue_2_ancestry_scatter, tissue_3_ancestry_scatter, tissue_4_ancestry_scatter, ncol=1)
+
+	return(combined_ancestry_scatter)
+}
+
+make_ancestry_missingness_boxplot <- function(factor_file, tissue_names, ancestry_specific_eqtl_file_root) {
+	# Extract ancestry specific factor
+	factors <- read.table(factor_file, header=FALSE)
+	ancestry_specific_factor <- as.numeric(factors[4,])
+	# Extract ancestry specific effect sizes
+	ancestry_specific_eqtl_effect_sizes_1 <- read.table(paste0(ancestry_specific_eqtl_file_root, tissue_names[1], "_effect_sizes.txt"), header=TRUE)
+	ancestry_specific_eqtl_effect_sizes_2 <- read.table(paste0(ancestry_specific_eqtl_file_root, tissue_names[2], "_effect_sizes.txt"), header=TRUE)
+	ancestry_specific_eqtl_effect_sizes_3 <- read.table(paste0(ancestry_specific_eqtl_file_root, tissue_names[3], "_effect_sizes.txt"), header=TRUE)
+	ancestry_specific_eqtl_effect_sizes_4 <- read.table(paste0(ancestry_specific_eqtl_file_root, tissue_names[4], "_effect_sizes.txt"), header=TRUE)
+
+	delta_effect_size_1 <- ancestry_specific_eqtl_effect_sizes_1$ea_effect_size - ancestry_specific_eqtl_effect_sizes_1$aa_effect_size
+	delta_effect_size_2 <- ancestry_specific_eqtl_effect_sizes_2$ea_effect_size - ancestry_specific_eqtl_effect_sizes_2$aa_effect_size
+	delta_effect_size_3 <- ancestry_specific_eqtl_effect_sizes_3$ea_effect_size - ancestry_specific_eqtl_effect_sizes_3$aa_effect_size
+	delta_effect_size_4 <- ancestry_specific_eqtl_effect_sizes_4$ea_effect_size - ancestry_specific_eqtl_effect_sizes_4$aa_effect_size
+
+	num_tests <- length(ancestry_specific_factor)
+	median_delta_effect_sizes <- c()
+
+	for (test_index in 1:num_tests) {
+		med_delta_effect_size <- median(c(delta_effect_size_1[test_index], delta_effect_size_2[test_index], delta_effect_size_3[test_index], delta_effect_size_4[test_index]))
+		median_delta_effect_sizes <- c(median_delta_effect_sizes, med_delta_effect_size)
+	}
+	
+	df <- data.frame(factor=abs(ancestry_specific_factor), missingness=is.na(median_delta_effect_sizes))
+
+	#test_scores <- cor.test(df$factor, df$delta_effect_size, use="complete.obs")
+	plotter <- ggplot(df, aes(x=factor(missingness), y=factor)) + 
+				geom_boxplot(outlier.size = .1) +
+	           gtex_v8_figure_theme() + 
+	           labs(x="Missingness of eQTLs in an ancestry", y ="Abs(Factor weight)") 
+	return(plotter)
+}
+
+make_median_ancestry_scatter_plot <- function(factor_file, tissue_names, ancestry_specific_eqtl_file_root) {
+	# Extract ancestry specific factor
+	factors <- read.table(factor_file, header=FALSE)
+	ancestry_specific_factor <- as.numeric(factors[4,])
+	# Extract ancestry specific effect sizes
+	ancestry_specific_eqtl_effect_sizes_1 <- read.table(paste0(ancestry_specific_eqtl_file_root, tissue_names[1], "_effect_sizes.txt"), header=TRUE)
+	ancestry_specific_eqtl_effect_sizes_2 <- read.table(paste0(ancestry_specific_eqtl_file_root, tissue_names[2], "_effect_sizes.txt"), header=TRUE)
+	ancestry_specific_eqtl_effect_sizes_3 <- read.table(paste0(ancestry_specific_eqtl_file_root, tissue_names[3], "_effect_sizes.txt"), header=TRUE)
+	ancestry_specific_eqtl_effect_sizes_4 <- read.table(paste0(ancestry_specific_eqtl_file_root, tissue_names[4], "_effect_sizes.txt"), header=TRUE)
+
+	delta_effect_size_1 <- ancestry_specific_eqtl_effect_sizes_1$ea_effect_size - ancestry_specific_eqtl_effect_sizes_1$aa_effect_size
+	delta_effect_size_2 <- ancestry_specific_eqtl_effect_sizes_2$ea_effect_size - ancestry_specific_eqtl_effect_sizes_2$aa_effect_size
+	delta_effect_size_3 <- ancestry_specific_eqtl_effect_sizes_3$ea_effect_size - ancestry_specific_eqtl_effect_sizes_3$aa_effect_size
+	delta_effect_size_4 <- ancestry_specific_eqtl_effect_sizes_4$ea_effect_size - ancestry_specific_eqtl_effect_sizes_4$aa_effect_size
+
+	num_tests <- length(ancestry_specific_factor)
+	median_delta_effect_sizes <- c()
+
+	for (test_index in 1:num_tests) {
+		med_delta_effect_size <- median(c(delta_effect_size_1[test_index], delta_effect_size_2[test_index], delta_effect_size_3[test_index], delta_effect_size_4[test_index]))
+		median_delta_effect_sizes <- c(median_delta_effect_sizes, med_delta_effect_size)
+	}
+	
+	df <- data.frame(factor=abs(ancestry_specific_factor), delta_effect_size=abs(median_delta_effect_sizes))
+
+	test_scores <- cor.test(df$factor, df$delta_effect_size, use="complete.obs")
+	plotter <- ggplot(df, aes(x=delta_effect_size, y=factor)) + 
+	           geom_point(size=.01, colour="slateblue3") +
+	           gtex_v8_figure_theme() + 
+	           labs(x="Abs(Median(European Ancestry - African Ancestry cis-eQTL effect size))", y ="Abs(Factor weight)", title=paste0("spearman rho: ", signif(test_scores$estimate, 4), " / p-value: ", signif(test_scores$p.value, 4))) 
+	return(plotter)
+}
+
 processed_data_dir <- args[1]
 eqtl_results_dir <- args[2]
 visualization_dir <- args[3]
@@ -570,95 +709,162 @@ for (tiss_num in 1:length(tissue_colors$tissue_id)) {
 	}
 }
 
+
+############################
+# Load in files
+############################
+tissue_4_file <- paste0(processed_data_dir, "tissues_subset_4_sample_names.txt")
+tissue_4_sample_covariate_file <- paste0(processed_data_dir, "tissues_subset_4_sample_covariates.txt")
+tissue_4_names <- get_tissue_names(tissue_4_file)
+tissue_4_ancestry_specific_eqtl_file_root <- paste0(processed_data_dir, "tissues_subset_4_ancestry_specific_")
+
+tissue_20_file <- paste0(processed_data_dir, "tissues_subset_20_sample_names.txt")
+tissue_20_sample_covariate_file <- paste0(processed_data_dir, "tissues_subset_20_sample_covariates.txt")
+tissue_20_names <- get_tissue_names(tissue_20_file)
+
+
+
 ############################
 # Model Specification
 ############################
-model_name <- "eqtl_factorization_vi_spike_and_slab"
-num_factors <- "25"
-num_tissues <- "4"
-random_effects_bool <- "False"
-model_stem <- paste0("eqtl_factorization_tissues_subset_", num_tissues, "_gtex_data_", num_factors, "_factors_", model_name, "_model_", random_effects_bool, "_re_")
-seed_number=5
-seed_model_stem <- paste0(model_stem, seed_number, "_seed_")
-loading_file <- paste0(eqtl_results_dir, seed_model_stem, "U_S.txt")
+tissue_4_no_svi_model_stem <- paste0("eqtl_factorization_tissues_subset_4_gtex_data_30_factors_eqtl_factorization_vi_spike_and_slab_model_False_re_False_svi_0_seed_")
+tissue_4_no_svi_loading_file <- paste0(eqtl_results_dir, tissue_4_no_svi_model_stem, "U_S.txt")
+tissue_4_no_svi_factor_file <- paste0(eqtl_results_dir, tissue_4_no_svi_model_stem, "V.txt")
 
-tissue_file <- paste0(processed_data_dir, "tissues_subset_", num_tissues, "_sample_names.txt")
-sample_covariate_file <- paste0(processed_data_dir, "tissues_subset_", num_tissues, "_sample_covariates.txt")
-effect_size_file <- paste0(processed_data_dir, "tissues_subset_", num_tissues, "_test_effect_sizes.txt")
-tissue_names <- get_tissue_names(tissue_file)
+
+tissue_4_svi_model_stem <- paste0("eqtl_factorization_tissues_subset_4_gtex_data_30_factors_eqtl_factorization_vi_spike_and_slab_model_False_re_True_svi_1_seed_")
+tissue_4_svi_loading_file <- paste0(eqtl_results_dir, tissue_4_svi_model_stem, "U_S.txt")
+
+tissue_20_model_stem <- paste0("eqtl_factorization_tissues_subset_20_gtex_data_30_factors_eqtl_factorization_vi_spike_and_slab_model_False_re_True_svi_0_seed_")
+tissue_20_loading_file <- paste0(eqtl_results_dir, tissue_20_model_stem, "U_S.txt")
+
+
+
+############################
+# Start making plots!!
+############################
+
+
 
 ######################
 # Make box plot for each Race, showing loading distributions
-output_file <- paste0(visualization_dir, seed_model_stem, "race_colored_loading_boxplot.pdf")
-boxplot <- make_loading_boxplot_plot_by_race(sample_covariate_file, loading_file)
+# 4-tissue (No SVI)
+output_file <- paste0(visualization_dir, tissue_4_no_svi_model_stem, "race_colored_loading_boxplot.pdf")
+boxplot <- make_loading_boxplot_plot_by_race(tissue_4_sample_covariate_file, tissue_4_no_svi_loading_file)
 ggsave(boxplot, file=output_file, width=7.2, height=5.5, units="in")
+# 4 tissue (SVI)
+output_file <- paste0(visualization_dir, tissue_4_svi_model_stem, "race_colored_loading_boxplot.pdf")
+boxplot <- make_loading_boxplot_plot_by_race(tissue_4_sample_covariate_file, tissue_4_svi_loading_file)
+ggsave(boxplot, file=output_file, width=7.2, height=5.5, units="in")
+# 20 tissue (SVI)
+output_file <- paste0(visualization_dir, tissue_20_model_stem, "race_colored_loading_boxplot.pdf")
+boxplot <- make_loading_boxplot_plot_by_race(tissue_20_sample_covariate_file, tissue_20_loading_file)
+ggsave(boxplot, file=output_file, width=7.2, height=5.5, units="in")
+
 
 ######################
 # Make box plot for each tissue, showing loading distributions
-output_file <- paste0(visualization_dir, seed_model_stem, "tissue_colored_loading_boxplot.pdf")
-boxplot <- make_loading_boxplot_plot_by_tissue(tissue_names, tissue_colors, loading_file)
+# 4-tissue (No SVI)
+output_file <- paste0(visualization_dir, tissue_4_no_svi_model_stem, "tissue_colored_loading_boxplot.pdf")
+boxplot <- make_loading_boxplot_plot_by_tissue(tissue_4_names, tissue_colors, tissue_4_no_svi_loading_file)
 ggsave(boxplot, file=output_file, width=7.2, height=5.5, units="in")
+# 4-tissue (SVI)
+output_file <- paste0(visualization_dir, tissue_4_svi_model_stem, "tissue_colored_loading_boxplot.pdf")
+boxplot <- make_loading_boxplot_plot_by_tissue(tissue_4_names, tissue_colors, tissue_4_svi_loading_file)
+ggsave(boxplot, file=output_file, width=7.2, height=5.5, units="in")
+# 20-tissue (SVI)
+output_file <- paste0(visualization_dir, tissue_20_model_stem, "tissue_colored_loading_boxplot.pdf")
+boxplot <- make_loading_boxplot_plot_by_tissue(tissue_20_names, tissue_colors, tissue_20_loading_file)
+ggsave(boxplot, file=output_file, width=14, height=5.5, units="in")
+
+
+
 #####################
 # Run Umap on loadings. Plot Umap loadings in scatter plot color by observed tissue type
-output_file <- paste0(visualization_dir, seed_model_stem, "umap_loading_scatter.pdf")
-umap_scatter <- make_umap_loading_scatter_plot(tissue_names, tissue_colors, sample_covariate_file, loading_file)
+# 4-tissue (No SVI)
+output_file <- paste0(visualization_dir, tissue_4_no_svi_model_stem, "umap_loading_scatter.pdf")
+umap_scatter <- make_umap_loading_scatter_plot(tissue_4_names, tissue_colors, tissue_4_sample_covariate_file, tissue_4_no_svi_loading_file)
 ggsave(umap_scatter, file=output_file, width=7.2*1.5, height=5.5*1.5, units="in")
+# 4-tissue (SVI)
+output_file <- paste0(visualization_dir, tissue_4_svi_model_stem, "umap_loading_scatter.pdf")
+umap_scatter <- make_umap_loading_scatter_plot(tissue_4_names, tissue_colors, tissue_4_sample_covariate_file, tissue_4_svi_loading_file)
+ggsave(umap_scatter, file=output_file, width=7.2*1.5, height=5.5*1.5, units="in")
+# 20-tissue (SVI)
+output_file <- paste0(visualization_dir, tissue_20_model_stem, "umap_loading_scatter.pdf")
+umap_scatter <- make_umap_loading_scatter_plot(tissue_20_names, tissue_colors, tissue_20_sample_covariate_file, tissue_20_loading_file)
+ggsave(umap_scatter, file=output_file, width=7.2*1.5, height=5.5*1.5, units="in")
+
 
 ######################
 # Make scatter plot where each sample is a point, x and y axis are factor loadings, and points are colored by their tissue type
-output_file <- paste0(visualization_dir, seed_model_stem, "loading_scatter.pdf")
-scatter <- make_loading_scatter_plot(tissue_names,sample_covariate_file, tissue_colors, loading_file)
+# 4-tissue (No SVI)
+output_file <- paste0(visualization_dir, tissue_4_no_svi_model_stem, "loading_scatter.pdf")
+scatter <- make_loading_scatter_plot(tissue_4_names, tissue_4_sample_covariate_file, tissue_colors, tissue_4_no_svi_loading_file)
+ggsave(scatter, file=output_file, width=7.2, height=5.5, units="in")
+# 4-tissue (SVI)
+output_file <- paste0(visualization_dir, tissue_4_svi_model_stem, "loading_scatter.pdf")
+scatter <- make_loading_scatter_plot(tissue_4_names, tissue_4_sample_covariate_file, tissue_colors, tissue_4_svi_loading_file)
 ggsave(scatter, file=output_file, width=7.2, height=5.5, units="in")
 
 
-if (FALSE) {
-############################
-# Model Specification
-############################
-model_name <- "vi_prior_on_loadings_only_special_init"
-num_factors <- "15"
-num_tissues <- "4"
-random_effects_bool <- "False"
-model_stem <- paste0("eqtl_factorization_tissues_subset_", num_tissues, "_gtex_data_", num_factors, "_factors_", model_name, "_model_", random_effects_bool, "_re_")
-seed_number=1
-seed_model_stem <- paste0(model_stem, seed_number, "_seed_")
-loading_file <- paste0(eqtl_results_dir, seed_model_stem, "U_S.txt")
 
-tissue_file <- paste0(processed_data_dir, "tissues_subset_", num_tissues, "_sample_names.txt")
-sample_covariate_file <- paste0(processed_data_dir, "tissues_subset_", num_tissues, "_sample_covariates.txt")
-effect_size_file <- paste0(processed_data_dir, "tissues_subset_", num_tissues, "_test_effect_sizes.txt")
-tissue_names <- get_tissue_names(tissue_file)
 
 ######################
-# Make box plot for each Race, showing loading distributions
-output_file <- paste0(visualization_dir, seed_model_stem, "race_colored_loading_boxplot.pdf")
-boxplot <- make_loading_boxplot_plot_by_race(sample_covariate_file, loading_file)
-ggsave(boxplot, file=output_file, width=7.2, height=5.5, units="in")
+# Make heatmap comparing (showing correlation of) loading matrices of two models trained on the same data
+output_file <- paste0(visualization_dir, "gtex_4_tissue_svi_vs_no_svi_loading_correlation_heatmap.pdf")
+svi_vs_no_svi_heatmap <- make_loading_correlation_heatmap(tissue_4_no_svi_loading_file, tissue_4_svi_loading_file, "Loadings (standard VI)", "Loadings (Stochastic VI)")
+ggsave(svi_vs_no_svi_heatmap, file=output_file, width=7.2, height=5.5, units="in")
+
+
 
 ######################
-# Make box plot for each sex, showing loading distributions
-output_file <- paste0(visualization_dir, seed_model_stem, "sex_colored_loading_boxplot.pdf")
-boxplot <- make_loading_boxplot_plot_by_sex(sample_covariate_file, loading_file)
-ggsave(boxplot, file=output_file, width=7.2, height=5.5, units="in")
+# Make box-plot of factor scores of "ancestry-factor" stratefied by whether there is missingness in only 1 of ancestry studies
+# 4-tissue (No SVI)
+output_file <- paste0(visualization_dir, tissue_4_no_svi_model_stem, "ancestry_factor_boxplot_colored_by_delta_ancestry_eqtl_missingness.pdf")
+ancestry_boxplot <- make_ancestry_missingness_boxplot(tissue_4_no_svi_factor_file, unique(tissue_4_names), tissue_4_ancestry_specific_eqtl_file_root)
+ggsave(ancestry_boxplot, file=output_file, width=7.2, height=5.0, units="in")
 
 ######################
-# Make box plot for each sex, showing loading distributions
-output_file <- paste0(visualization_dir, seed_model_stem, "cohort_colored_loading_boxplot.pdf")
-boxplot <- make_loading_boxplot_plot_by_cohort(sample_covariate_file, loading_file)
-ggsave(boxplot, file=output_file, width=7.2, height=5.5, units="in")
+# Make Scatter-plot showing median-delta (european ancestry eqtl beta vs african ancestry eqtl beta) across tissues against by factor scores of "ancestry-factor"
+# 4-tissue (No SVI)
+output_file <- paste0(visualization_dir, tissue_4_no_svi_model_stem, "median_delta_ancestry_specific_effect_size_scatter_vs_ancestry_factor_score.pdf")
+ancestry_scatter <- make_median_ancestry_scatter_plot(tissue_4_no_svi_factor_file, unique(tissue_4_names), tissue_4_ancestry_specific_eqtl_file_root)
+ggsave(ancestry_scatter, file=output_file, width=7.2, height=5.5, units="in")
 
 ######################
-# Make box plot for each tissue, showing loading distributions
-output_file <- paste0(visualization_dir, seed_model_stem, "tissue_colored_loading_boxplot.pdf")
-boxplot <- make_loading_boxplot_plot_by_tissue(tissue_names, tissue_colors, loading_file)
-ggsave(boxplot, file=output_file, width=7.2, height=5.5, units="in")
-#####################
-# Run Umap on loadings. Plot Umap loadings in scatter plot color by observed tissue type
-output_file <- paste0(visualization_dir, seed_model_stem, "umap_loading_scatter.pdf")
-umap_scatter <- make_umap_loading_scatter_plot(tissue_names, tissue_colors, sample_covariate_file, loading_file)
-ggsave(umap_scatter, file=output_file, width=7.2*1.5, height=5.5*1.5, units="in")
+# Make Scatter-plot showing delta (european ancestry eqtl beta vs african ancestry eqtl beta) against by factor scores of "ancestry-factor"
+# 4-tissue (No SVI)
+output_file <- paste0(visualization_dir, tissue_4_no_svi_model_stem, "delta_ancestry_specific_effect_size_scatter_vs_ancestry_factor_score.pdf")
+ancestry_scatter <- make_ancestry_scatter_plot(tissue_4_no_svi_factor_file, unique(tissue_4_names), tissue_4_ancestry_specific_eqtl_file_root)
+ggsave(ancestry_scatter, file=output_file, width=7.2, height=8.5, units="in")
 
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
