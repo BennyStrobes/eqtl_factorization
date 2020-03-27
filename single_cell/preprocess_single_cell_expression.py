@@ -3,7 +3,7 @@ import os
 import sys
 import pdb
 import h5py
-
+from sklearn.decomposition import PCA
 
 
 # Print covariates to readble file
@@ -146,6 +146,89 @@ def generate_pca_from_ye_lab_file(data, pca_file):
 		t.write('\t'.join(pca_scores) + '\n')
 	t.close()
 
+def pca_understanding(X):
+	num_genes = X.shape[1]
+	for gene_num in range(num_genes):
+	#	X[:, gene_num] = (X[:, gene_num] - np.mean(X[:, gene_num]))/np.std(X[:, gene_num])
+		X[:, gene_num] = (X[:, gene_num] - np.mean(X[:, gene_num]))
+	print(X.shape)
+	# SVD approach
+	uuu, sss, vh = np.linalg.svd(np.transpose(X), full_matrices=False)
+	svd_loadings = np.transpose(vh)[:,:40]
+
+	pdb.set_trace()
+
+	ye = np.loadtxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/processed_expression/pca_scores_ye_lab.txt')
+
+
+	for pc_num in range(39):
+		corry = np.corrcoef(svd_loadings[:,pc_num], ye[:, pc_num])[0,1]
+		print(str(pc_num) + ' : ' + str(corry))
+	pdb.set_trace()
+
+# Filter expression and covariate file to only contain SLE individuals
+def filter_data_to_only_sle_individuals(cell_covariate_file, sc_expression_file, filtered_cell_covariate_file, filtered_sc_expression_file):
+	# Initialize vector to keep track of which cells are from sle individuals (will be 1 if they are from, 0 if they are not)
+	valid_cells = []
+	# Filter covariate file first
+	f = open(cell_covariate_file)
+	t = open(filtered_cell_covariate_file, 'w')
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		# Skip header
+		if head_count == 0:
+			head_count = head_count + 1
+			t.write(line + '\n')
+			continue
+		if data[1] != 'sle':
+			valid_cells.append(0)
+			continue
+		valid_cells.append(1)
+		t.write(line + '\n')
+	f.close()
+	t.close()
+	# Filter expression file now
+	f = open(sc_expression_file)
+	t = open(filtered_sc_expression_file, 'w')
+	counter = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		# Check if cell corresponds to sle individual
+		if valid_cells[counter] == 1:
+			t.write(line + '\n')
+		counter = counter + 1
+	f.close()
+	t.close()
+
+
+def standardize_gene_expression_data(input_expression_file, output_standardized_expression_file):
+	X = np.loadtxt(input_expression_file)
+	num_genes = X.shape[1]
+	print(X.shape)
+	# Loop through genes
+	for gene_num in range(num_genes):
+		X[:, gene_num] = (X[:, gene_num] - np.mean(X[:, gene_num]))/np.std(X[:, gene_num])
+	# Save to output file
+	np.savetxt(output_standardized_expression_file, X, fmt="%s", delimiter='\t')
+
+# Generate expression PC loadings and variance explained of those expression PCs
+def generate_pca_scores_and_variance_explained(filtered_standardized_sc_expression_file, num_pcs, filtered_cells_pca_file, filtered_cells_pca_ve_file):
+	# Load in data
+	X = np.loadtxt(filtered_standardized_sc_expression_file)
+
+	# Run PCA (via SVD)
+	uuu, sss, vh = np.linalg.svd(np.transpose(X), full_matrices=False)
+	svd_loadings = np.transpose(vh)[:,:num_pcs]
+
+	# Save to output file
+	np.savetxt(filtered_cells_pca_file, svd_loadings, fmt="%s", delimiter='\t')
+
+	# Compute variance explained
+	ve = (np.square(sss)/np.sum(np.square(sss)))[:num_pcs]
+	np.savetxt(filtered_cells_pca_ve_file, ve, fmt="%s", delimiter='\n')
 
 # Input data from Ye-Lab
 input_h5py_file = sys.argv[1]
@@ -181,6 +264,35 @@ umap_file = processed_expression_dir + 'umap_scores_ye_lab.txt'
 # generate_umap_from_ye_lab_file(data, umap_file)
 
 # Grab UMAP scores from ye-lab data structure
+# This data was genead by centering (mean 0) the expression data (sc_expression_file), but not scaling (each gene does not have SD 1)
+# Also worth noting that they multiplied the loadings by the singular values
 pca_file = processed_expression_dir + 'pca_scores_ye_lab.txt'
-generate_pca_from_ye_lab_file(data, pca_file)
+# generate_pca_from_ye_lab_file(data, pca_file)
+
+
+# Filter expression and covariate file to only contain SLE individuals
+filtered_cell_covariate_file = processed_expression_dir + 'cell_covariates_sle_individuals.txt'
+filtered_sc_expression_file = processed_expression_dir + 'single_cell_expression_sle_individuals.txt'
+# filter_data_to_only_sle_individuals(cell_covariate_file, sc_expression_file, filtered_cell_covariate_file, filtered_sc_expression_file)
+
+# Standardize expression so each gene has mean 0 and standard deviation 1 (across individuals)
+filtered_standardized_sc_expression_file = processed_expression_dir + 'single_cell_expression_sle_individuals_standardized.txt'
+# standardize_gene_expression_data(filtered_sc_expression_file, filtered_standardized_sc_expression_file)
+
+# Generate expression PC loadings and variance explained of those expression PCs
+num_pcs=200
+filtered_cells_pca_file = processed_expression_dir + 'pca_scores_sle_individuals.txt'
+filtered_cells_pca_ve_file = processed_expression_dir + 'pca_variance_explained_sle_individuals.txt'
+# generate_pca_scores_and_variance_explained(filtered_standardized_sc_expression_file, num_pcs, filtered_cells_pca_file, filtered_cells_pca_ve_file)
+
+
+
+
+
+
+
+##### TO DO: Make sure we can recreate the PC-scores. 
+##### -- regenerate expression and covariate files with only lupus samples
+##### -- generate expression PCs with only lupus samples
+##### -- generate residual expression matrices
 

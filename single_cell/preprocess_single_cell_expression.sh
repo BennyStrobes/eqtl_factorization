@@ -13,26 +13,13 @@ gene_annotation_file="$4"
 
 
 
-
 if false; then
 python preprocess_single_cell_expression.py $input_h5py_file $processed_expression_dir $gene_annotation_file
 fi
-
+if false; then
 Rscript visualize_processed_single_cell_expression.R $processed_expression_dir $visualize_processed_expression_dir
-
-
-
-
-
-if false; then
-Rscript preprocess_single_cell_expression.R $raw_umi_count_dir $meta_data_dir $processed_expression_dir $visualize_processed_expression_dir "sctransform" $gene_annotation_file
 fi
-if false; then
-Rscript preprocess_single_cell_expression.R $raw_umi_count_dir $meta_data_dir $processed_expression_dir $visualize_processed_expression_dir "sctransform_with_covariates" $gene_annotation_file
-fi
-if false; then
-Rscript preprocess_single_cell_expression.R $raw_umi_count_dir $meta_data_dir $processed_expression_dir $visualize_processed_expression_dir "sctransform_with_covariates_and_individual" $gene_annotation_file
-fi
+
 
 
 

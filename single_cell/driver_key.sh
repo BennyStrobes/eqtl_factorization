@@ -29,8 +29,9 @@ visualize_processed_expression_dir=$output_root"visualize_processed_expression/"
 eqtl_input_dir=$output_root"eqtl_input/"
 
 
+if false; then
 sh preprocess_single_cell_expression.sh $input_h5py_file $processed_expression_dir $visualize_processed_expression_dir $gene_annotation_file
-
+fi
 
 if false; then
 sh prepare_eqtl_input.sh $gene_annotation_file $processed_expression_dir $eqtl_input_dir $genotype_data_dir
