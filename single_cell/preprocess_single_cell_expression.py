@@ -245,54 +245,44 @@ data = h5py.File(input_h5py_file, 'r')
 
 # Print covariates to readable file
 cell_covariate_file = processed_expression_dir + 'cell_covariates_ye_lab.txt'
-# generate_cell_covariate_file(data, cell_covariate_file)
+generate_cell_covariate_file(data, cell_covariate_file)
 
 # Print expression data to a readable file
 sc_expression_file = processed_expression_dir + 'single_cell_expression_ye_lab.txt'
-# generate_expression_file(data, sc_expression_file)
+generate_expression_file(data, sc_expression_file)
 
 # Print gene_names to a readable file
 gene_names_file = processed_expression_dir + 'gene_names_ye_lab.txt'
-#generate_gene_names_file(data, gene_names_file)
+generate_gene_names_file(data, gene_names_file)
 
 # Get cell type colors and print to file
 cell_type_colors_file = processed_expression_dir + 'cell_type_colors_ye_lab.txt'
-#print_cell_type_colors_to_file(data, cell_type_colors_file)
+print_cell_type_colors_to_file(data, cell_type_colors_file)
 
 # Grab UMAP scores from ye-lab data structure
 umap_file = processed_expression_dir + 'umap_scores_ye_lab.txt'
-# generate_umap_from_ye_lab_file(data, umap_file)
+generate_umap_from_ye_lab_file(data, umap_file)
 
 # Grab UMAP scores from ye-lab data structure
 # This data was genead by centering (mean 0) the expression data (sc_expression_file), but not scaling (each gene does not have SD 1)
 # Also worth noting that they multiplied the loadings by the singular values
 pca_file = processed_expression_dir + 'pca_scores_ye_lab.txt'
-# generate_pca_from_ye_lab_file(data, pca_file)
+generate_pca_from_ye_lab_file(data, pca_file)
 
 
 # Filter expression and covariate file to only contain SLE individuals
 filtered_cell_covariate_file = processed_expression_dir + 'cell_covariates_sle_individuals.txt'
 filtered_sc_expression_file = processed_expression_dir + 'single_cell_expression_sle_individuals.txt'
-# filter_data_to_only_sle_individuals(cell_covariate_file, sc_expression_file, filtered_cell_covariate_file, filtered_sc_expression_file)
+filter_data_to_only_sle_individuals(cell_covariate_file, sc_expression_file, filtered_cell_covariate_file, filtered_sc_expression_file)
 
 # Standardize expression so each gene has mean 0 and standard deviation 1 (across individuals)
 filtered_standardized_sc_expression_file = processed_expression_dir + 'single_cell_expression_sle_individuals_standardized.txt'
-# standardize_gene_expression_data(filtered_sc_expression_file, filtered_standardized_sc_expression_file)
+standardize_gene_expression_data(filtered_sc_expression_file, filtered_standardized_sc_expression_file)
 
 # Generate expression PC loadings and variance explained of those expression PCs
 num_pcs=200
 filtered_cells_pca_file = processed_expression_dir + 'pca_scores_sle_individuals.txt'
 filtered_cells_pca_ve_file = processed_expression_dir + 'pca_variance_explained_sle_individuals.txt'
-# generate_pca_scores_and_variance_explained(filtered_standardized_sc_expression_file, num_pcs, filtered_cells_pca_file, filtered_cells_pca_ve_file)
+generate_pca_scores_and_variance_explained(filtered_standardized_sc_expression_file, num_pcs, filtered_cells_pca_file, filtered_cells_pca_ve_file)
 
-
-
-
-
-
-
-##### TO DO: Make sure we can recreate the PC-scores. 
-##### -- regenerate expression and covariate files with only lupus samples
-##### -- generate expression PCs with only lupus samples
-##### -- generate residual expression matrices
 
