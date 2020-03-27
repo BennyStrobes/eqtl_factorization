@@ -21,6 +21,36 @@ def get_tissues(file_name):
 	f.close()
 	return arr, arr2
 
+def regress_out_covariates_and_center(genotype_input_file, covariate_file, genotype_output_file):
+	# Load in covariates
+	covariate_raw = np.transpose(np.loadtxt(covariate_file, dtype=str, delimiter='\t'))
+	covariate_names = covariate_raw[1:,0]
+	covariate_samples = covariate_raw[0,1:]
+	covariate_mat = covariate_raw[1:,1:].astype(float)
+	
+	# Load in expression data
+	genotype_raw = np.loadtxt(genotype_input_file, dtype=float, delimiter='\t')
+	genotype_mat = np.transpose(genotype_raw)
+
+	# Initialize output matrix 
+	num_samples = genotype_mat.shape[0]
+	num_genes = genotype_mat.shape[1]
+
+	t = open(genotype_output_file, 'w')
+
+
+	model = linear_model.LinearRegression(fit_intercept=True) 
+	modelfit = model.fit(np.transpose(covariate_mat),genotype_mat)
+	pred = modelfit.predict(np.transpose(covariate_mat))
+
+	resid = genotype_mat - pred
+	for gene_number in range(num_genes):
+		# print(np.std(resid[:,gene_number]))
+		#residual_expression = regress_out_covariates_for_one_gene(expr_mat[:,gene_number], covariate_mat)
+		#gene_id = gene_ids[gene_number]
+		t.write('\t'.join(resid[:,gene_number].astype(str)) + '\n')
+	t.close()
+
 
 
 def regress_out_covariates(expression_input_file, covariate_file, expression_output_file):
@@ -735,6 +765,10 @@ print_big_matrix(processed_data_dir + 'expr.txt', tests, genes, 0)
 
 print_big_matrix(processed_data_dir + 'genotype.txt', tests, variants, 1)
 
+covariate_file = processed_data_dir + 'covariates.txt'
+genotype_input_file = processed_data_dir + 'genotype.txt'
+genotype_output_file = processed_data_dir + 'genotype_standardized.txt'
+regress_out_covariates_and_center(genotype_input_file, covariate_file, genotype_output_file)
 
 
 
