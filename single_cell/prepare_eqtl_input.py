@@ -2,6 +2,7 @@ import numpy as np
 import os
 import sys
 import pdb
+from sklearn import linear_model
 
 
 
@@ -82,6 +83,16 @@ def create_gene_chromsome(chrom_num, gene_mapping, distance):
 				chromosome[pos] = chromosome[pos] + ':' + gene_id
 	return chromosome
 
+def get_maf(genotype):
+	af = np.sum(genotype)/(2.0*len(genotype))
+	if af > .5:
+		maf = 1.0 - af
+	else:
+		maf = af
+	if maf > .5 or maf < 0.0:
+		print('assumption error')
+		pdb.set_trace()
+	return maf
 
 ########################
 # Step 1: Create file with all variant gene pairs such that gene is within $distanceKB of gene
@@ -125,6 +136,11 @@ def extract_variant_gene_pairs_for_eqtl_testing(gene_file, gene_annotation_file,
 				pdb.set_trace()
 			# No genes within 10KB of variant
 			if chromosome[variant_pos] == 'Null':
+				continue
+			genotype = np.asarray(data[1:]).astype(float)
+			maf = get_maf(genotype)
+			if maf < .05:
+				print('skipped variant')
 				continue
 			# List of genes that variant maps to
 			mapping_genes = chromosome[variant_pos].split(':')
@@ -301,6 +317,21 @@ def get_ordered_list_of_gene_names(ld_pruned_variant_gene_pair_file):
 		gene_names.append(data[0])
 	return np.asarray(gene_names)
 
+def get_ordered_list_of_variant_names(ld_pruned_variant_gene_pair_file):
+	variant_names = []
+	dicti = {}
+	f = open(ld_pruned_variant_gene_pair_file)
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		variant_names.append(data[1])
+		dicti[data[1]] = 1
+	return np.asarray(variant_names), dicti
+
 def create_mapping_from_gene_names_to_expression_vectors(sc_expression_file, gene_names_file):
 	# Get gene names
 	gene_names = np.loadtxt(gene_names_file,dtype=str)
@@ -329,39 +360,141 @@ def generate_single_cell_expression_eqtl_training_data(ld_pruned_variant_gene_pa
 
 def regress_out_covariates(expression_input_file, covariate_file, expression_output_file, num_pcs):
 	# Load in covariates
-	covariate_raw = np.transpose(np.loadtxt(covariate_file, dtype=str, delimiter='\t'))
-	#covariate_names = covariate_raw[1:,0]
-	#covariate_samples = covariate_raw[0,1:]
-	# This num_PCsXnum_samples
-	covariate_mat = covariate_raw[:num_pcs,:].astype(float)
+	covariate_raw = np.loadtxt(covariate_file, dtype=str, delimiter='\t')
+
+	covariate_mat = covariate_raw[:,:num_pcs].astype(float)
 	
+
+	f = open(expression_input_file)
+	t = open(expression_output_file, 'w')
+
+	counter = 0
+	for line in f:
+		if np.mod(counter, 50) == 0:
+			print(counter)
+		counter = counter + 1
+		line = line.rstrip()
+		data = line.split()
+		# Extract expression (each line corresponds to a gene)
+		expr = np.asarray(data).astype(float)
+		# Fit linear model of covariates onto expression
+		model = linear_model.LinearRegression(fit_intercept=True) 
+		modelfit = model.fit(covariate_mat, expr)
+		# Get predicted expression according to the LM
+		pred = modelfit.predict(covariate_mat)
+		# Get residual expression
+		resid = expr - pred
+		# Print residual expression to output file
+		t.write('\t'.join(resid.astype(str)) + '\n')
+	f.close()
+	t.close()
+
 	# Load in expression data
-	expression_raw = np.loadtxt(expression_input_file, dtype=str, delimiter='\t')
+	#expression_raw = np.loadtxt(expression_input_file, dtype=str, delimiter='\t')
 	#expression_samples = expression_raw[1:,0]
 	#gene_ids = expression_raw[0,1:]
 	# This is num_samplesXnum_genes
-	expr_mat = np.transpose(expression_raw.astype(float))
+	#expr_mat = np.transpose(expression_raw.astype(float))
 
 
 	# Initialize output matrix 
-	num_samples = expr_mat.shape[0]
-	num_genes = expr_mat.shape[1]
+	#num_samples = expr_mat.shape[0]
+	#num_genes = expr_mat.shape[1]
 
-	t = open(expression_output_file, 'w')
+	#t = open(expression_output_file, 'w')
 	#t.write('Gene_id\t' + '\t'.join(expression_samples) + '\n')
 
 
-	model = linear_model.LinearRegression(fit_intercept=True) 
-	modelfit = model.fit(np.transpose(covariate_mat),expr_mat)
-	pred = modelfit.predict(np.transpose(covariate_mat))
+	#model = linear_model.LinearRegression(fit_intercept=True) 
+	#modelfit = model.fit(np.transpose(covariate_mat),expr_mat)
+	#pred = modelfit.predict(np.transpose(covariate_mat))
 
-	resid = expr_mat - pred
-	for gene_number in range(num_genes):
+	#resid = expr_mat - pred
+	#for gene_number in range(num_genes):
 		# print(np.std(resid[:,gene_number]))
 		#residual_expression = regress_out_covariates_for_one_gene(expr_mat[:,gene_number], covariate_mat)
 		#gene_id = gene_ids[gene_number]
-		t.write('\t'.join(resid[:,gene_number].astype(str)) + '\n')
+		#t.write('\t'.join(resid[:,gene_number].astype(str)) + '\n')
+	#t.close()
+
+def get_cell_level_ordered_individaul_array(cell_level_info_file):
+	array = []
+	head_count = 0
+	f = open(cell_level_info_file)
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		array.append(data[4])
+	f.close()
+	return np.asarray(array)
+
+def get_genotype_level_ordered_individual_array(genotype_data_dir):
+	chrom_num = 1
+	genotype_file = genotype_data_dir + 'chr' + str(chrom_num) + '.genotypes.matrix.eqtl.txt'
+	f = open(genotype_file)
+	head_count = 0
+	for line in f:
+		if head_count == 0:
+			line = line.rstrip()
+			data = line.split()
+			indi = data
+			head_count = head_count + 1
+			continue
+	f.close()
+	'''
+	# Errror checking making sure other chromosmes have same order
+	for chrom_num in range(1,23):
+		genotype_file = genotype_data_dir + 'chr' + str(chrom_num) + '.genotypes.matrix.eqtl.txt'
+		f = open(genotype_file)
+		head_count = 0
+		for line in f:
+			if head_count == 0:
+				head_count = head_count + 1
+				line = line.rstrip()
+				data = line.split()
+				if np.array_equal(np.asarray(data), np.asarray(indi)) == False:
+					print('assumption erro')
+					pdb.set_trace()
+				continue
+		f.close()
+	'''
+	return np.asarray(indi)
+
+
+def construct_genotype_matrix(ld_pruned_variant_gene_pair_file, genotype_data_dir, cell_level_info_file, single_cell_genotype_eqtl_training_data_file):
+	variant_names, variant_list = get_ordered_list_of_variant_names(ld_pruned_variant_gene_pair_file)
+
+	ordered_individuals_cell_level = get_cell_level_ordered_individaul_array(cell_level_info_file)
+	
+	ordered_individuals_genotype_level = get_genotype_level_ordered_individual_array(genotype_data_dir)
+
+	# Create mapping from variant_id to genotype vectors
+	variant_to_genotype = create_mapping_from_variants_to_genotype(variant_list, genotype_data_dir)
+	
+	# Create array mapping from genotype-level array to single cell-level array
+	mapping_array = []
+	converter = {}
+	for i, indi in enumerate(ordered_individuals_genotype_level):
+		converter[indi] = i 
+	for indi in ordered_individuals_cell_level:
+		mapping_array.append(converter[indi])
+	mapping_array = np.asarray(mapping_array)
+	# Simple error checking
+	if np.array_equal(ordered_individuals_cell_level, ordered_individuals_genotype_level[mapping_array]) == False:
+		print('assumption error')
+		pdb.set_trace()
+
+	# print new genotype file
+	t = open(single_cell_genotype_eqtl_training_data_file, 'w')
+	for variant_id in variant_names:
+		genotype_vector = (variant_to_genotype[variant_id]).astype(str)
+		cell_level_genotype_vector = genotype_vector[mapping_array]
+		t.write('\t'.join(cell_level_genotype_vector) + '\n')
 	t.close()
+
 
 ######################
 # Command line args
@@ -397,7 +530,8 @@ r_squared_threshold=0.7
 variant_gene_pair_file = eqtl_input_dir + 'variant_gene_pairs_' + str(distance) + '_bp.txt'
 # Output file containing list of (pruned) variant gene pairs
 ld_pruned_variant_gene_pair_file = eqtl_input_dir + 'variant_gene_pairs_' + str(distance) + '_bp_' + str(r_squared_threshold) + '_r_squared_pruned.txt'
-# ld_prune_variant_gene_pair_file(variant_gene_pair_file, ld_pruned_variant_gene_pair_file, r_squared_threshold, genotype_data_dir, random_seed)
+
+#ld_prune_variant_gene_pair_file(variant_gene_pair_file, ld_pruned_variant_gene_pair_file, r_squared_threshold, genotype_data_dir, random_seed)
 
 # Only allow snps with r_squared threshold less than this
 r_squared_threshold=0.5
@@ -405,7 +539,8 @@ r_squared_threshold=0.5
 variant_gene_pair_file = eqtl_input_dir + 'variant_gene_pairs_' + str(distance) + '_bp.txt'
 # Output file containing list of (pruned) variant gene pairs
 ld_pruned_variant_gene_pair_file = eqtl_input_dir + 'variant_gene_pairs_' + str(distance) + '_bp_' + str(r_squared_threshold) + '_r_squared_pruned.txt'
-# ld_prune_variant_gene_pair_file(variant_gene_pair_file, ld_pruned_variant_gene_pair_file, r_squared_threshold, genotype_data_dir, random_seed)
+
+#ld_prune_variant_gene_pair_file(variant_gene_pair_file, ld_pruned_variant_gene_pair_file, r_squared_threshold, genotype_data_dir, random_seed)
 
 
 
@@ -424,7 +559,7 @@ gene_name_file = processed_expression_dir + 'gene_names_ye_lab.txt'
 # Input test names
 ld_pruned_variant_gene_pair_file = eqtl_input_dir + 'variant_gene_pairs_' + str(distance) + '_bp_' + str(r_squared_threshold) + '_r_squared_pruned.txt'
 
-# generate_single_cell_expression_eqtl_training_data(ld_pruned_variant_gene_pair_file, sc_expression_file, gene_name_file, single_cell_expression_eqtl_traing_data_file)
+#generate_single_cell_expression_eqtl_training_data(ld_pruned_variant_gene_pair_file, sc_expression_file, gene_name_file, single_cell_expression_eqtl_traing_data_file)
 
 
 ########################
@@ -442,6 +577,39 @@ covariate_file = processed_expression_dir + 'pca_scores_sle_individuals.txt'
 regress_out_covariates(single_cell_expression_eqtl_traing_data_file, covariate_file, single_cell_corrected_expression_eqtl_traing_data_file, num_pcs)
 
 
-# Step 4: make genotype matrix ( need to look into what was previously done for standardization)
-# Step 5: correct those matrices
-# Make z matrix
+########################
+# Step 4: Generate Genotype matrix
+########################
+# File containing mapping from cell index to individual id
+cell_level_info_file = processed_expression_dir + 'cell_covariates_sle_individuals.txt'
+# Output file
+single_cell_genotype_eqtl_training_data_file = eqtl_input_dir + 'sc_genotype_training_data_uncorrected_' + str(distance) + '_bp_' + str(r_squared_threshold) + '_r_squared_pruned.txt'
+
+# construct_genotype_matrix(ld_pruned_variant_gene_pair_file, genotype_data_dir, cell_level_info_file, single_cell_genotype_eqtl_training_data_file)
+
+
+########################
+# Step 5: Generate residual genotype
+########################
+# num_pcs
+num_pcs = 50
+# Input file
+single_cell_genotype_eqtl_training_data_file = eqtl_input_dir + 'sc_genotype_training_data_uncorrected_' + str(distance) + '_bp_' + str(r_squared_threshold) + '_r_squared_pruned.txt'
+# Output file
+single_cell_corrected_genotype_eqtl_traing_data_file = eqtl_input_dir + 'sc_corrected_genotype_training_data_uncorrected_' + str(distance) + '_bp_' + str(r_squared_threshold) + '_r_squared_pruned.txt'
+# Covariate file
+covariate_file = processed_expression_dir + 'pca_scores_sle_individuals.txt'
+
+regress_out_covariates(single_cell_genotype_eqtl_training_data_file, covariate_file, single_cell_corrected_genotype_eqtl_traing_data_file, num_pcs)
+
+
+
+
+
+
+
+
+
+
+
+# STEP 6 Make z matrix
