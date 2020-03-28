@@ -495,6 +495,22 @@ def construct_genotype_matrix(ld_pruned_variant_gene_pair_file, genotype_data_di
 		t.write('\t'.join(cell_level_genotype_vector) + '\n')
 	t.close()
 
+# Step 6: Generate individual id file (z matrix in eqtl factorization)
+def generate_individual_id_file(cell_level_info_file, single_cell_individual_id_file):
+	# Get array of length number of cells and each element corresponds to the individual id corresponding to that cell
+	indi_ids = get_cell_level_ordered_individaul_array(cell_level_info_file)
+	# Creating mapping from individual id to a number
+	unique_indi_ids = np.unique(indi_ids)
+	indi_to_number = {}
+	for i, indi_id in enumerate(unique_indi_ids):
+		indi_to_number[indi_id] = i
+	# print to output file
+	t = open(single_cell_individual_id_file, 'w')
+	for indi_id in indi_ids:
+		number = indi_to_number[indi_id]
+		t.write(str(number) + '\n')
+	t.close()
+
 
 ######################
 # Command line args
@@ -574,7 +590,7 @@ single_cell_corrected_expression_eqtl_traing_data_file = eqtl_input_dir + 'sc_co
 # Covariate file
 covariate_file = processed_expression_dir + 'pca_scores_sle_individuals.txt'
 
-regress_out_covariates(single_cell_expression_eqtl_traing_data_file, covariate_file, single_cell_corrected_expression_eqtl_traing_data_file, num_pcs)
+# regress_out_covariates(single_cell_expression_eqtl_traing_data_file, covariate_file, single_cell_corrected_expression_eqtl_traing_data_file, num_pcs)
 
 
 ########################
@@ -600,7 +616,20 @@ single_cell_corrected_genotype_eqtl_traing_data_file = eqtl_input_dir + 'sc_corr
 # Covariate file
 covariate_file = processed_expression_dir + 'pca_scores_sle_individuals.txt'
 
-regress_out_covariates(single_cell_genotype_eqtl_training_data_file, covariate_file, single_cell_corrected_genotype_eqtl_traing_data_file, num_pcs)
+# regress_out_covariates(single_cell_genotype_eqtl_training_data_file, covariate_file, single_cell_corrected_genotype_eqtl_traing_data_file, num_pcs)
+
+
+
+
+########################
+# Step 6: Generate individual id file (z matrix in eqtl factorization)
+########################
+# File containing mapping from cell index to individual id
+cell_level_info_file = processed_expression_dir + 'cell_covariates_sle_individuals.txt'
+# Output file
+single_cell_individual_id_file = eqtl_input_dir + 'sc_individual_id.txt'
+
+generate_individual_id_file(cell_level_info_file, single_cell_individual_id_file)
 
 
 
@@ -609,7 +638,3 @@ regress_out_covariates(single_cell_genotype_eqtl_training_data_file, covariate_f
 
 
 
-
-
-
-# STEP 6 Make z matrix

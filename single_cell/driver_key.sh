@@ -28,19 +28,55 @@ visualize_processed_expression_dir=$output_root"visualize_processed_expression/"
 # Directory containing pre-processed eqtl files
 eqtl_input_dir=$output_root"eqtl_input/"
 
+# Directory containing pre-processed eqtl files
+eqtl_results_dir=$output_root"eqtl_factorization_results/"
 
+
+
+
+
+######################
+# Preprocess single cell expression
+######################
 if false; then
 sh preprocess_single_cell_expression.sh $input_h5py_file $processed_expression_dir $visualize_processed_expression_dir $gene_annotation_file
 fi
 
+######################
+# Get single cell expression and genotype data into a format to run eqtl-factorization
+######################
+if false; then
 sh prepare_eqtl_input.sh $gene_annotation_file $processed_expression_dir $eqtl_input_dir $genotype_data_dir
+fi
 
 
 
+######################
+# Run eqtl-factorization
+######################
+# eqtl factorization input files (generated in 'prepare_eqtl_input.sh')
+sample_overlap_file=$eqtl_input_dir"sc_individual_id.txt"
+# TRAINING
+expression_training_file=$eqtl_input_dir"sc_corrected_expression_training_data_uncorrected_10000_bp_0.5_r_squared_pruned.txt"
+genotype_training_file=$eqtl_input_dir"sc_corrected_genotype_training_data_uncorrected_10000_bp_0.5_r_squared_pruned.txt"
+# TESTING
+expression_testing_file=$eqtl_input_dir"sc_corrected_expression_training_data_uncorrected_10000_bp_0.5_r_squared_pruned.txt"
+genotype_testing_file=$eqtl_input_dir"sc_corrected_genotype_training_data_uncorrected_10000_bp_0.5_r_squared_pruned.txt"
 
 
+# Paramaters
+model_name="eqtl_factorization_vi_spike_and_slab"
+num_latent_factors="30"
+random_effects="False"
+svi="True"
+parrallel="True"
 
-
+seeds=("0" )
+for seed in "${seeds[@]}"; do
+	echo "Seed: "$seed
+	file_stem="eqtl_factorization_sc_data_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed"
+	sh eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name $random_effects $svi $parrallel
+done
 
 
 
