@@ -266,7 +266,7 @@ def outside_update_tau_t(tau_alpha, tau_beta, G_slice, Y_slice, N, U_S, V_S_t, F
 
 
 class EQTL_FACTORIZATION_VI(object):
-	def __init__(self, K=25, alpha=1e-3, beta=1e-3, a=1, b=1, gamma_v=1.0, max_iter=1000, delta_elbo_threshold=1e-8, SVI=False, parrallel_boolean=False, sample_batch_fraction=.3, learning_rate=.4, forgetting_rate=.01, num_test_cores=24, num_sample_cores=24):
+	def __init__(self, K=25, alpha=1e-3, beta=1e-3, a=1, b=1, gamma_v=1.0, max_iter=1000, delta_elbo_threshold=1e-8, SVI=False, parrallel_boolean=False, sample_batch_fraction=.3, learning_rate=.4, forgetting_rate=.008, num_test_cores=24, num_sample_cores=24):
 		self.alpha_prior = alpha
 		self.beta_prior = beta
 		self.a_prior = a 
@@ -318,7 +318,8 @@ class EQTL_FACTORIZATION_VI(object):
 			if np.mod(vi_iter, 50) == 0 and vi_iter > 0:
 				# UPDATE remove irrelevent_factors TO BE IN TERMS OF *_FULL (ie re-learn theta_U on all data)
 				self.remove_irrelevent_factors()
-				pickle.dump(self, open('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temp_model', 'wb'))
+				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temp_model_U_S.txt', (self.U_mu_full*self.S_U_full), fmt="%s", delimiter='\t')
+				# pickle.dump(self, open('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temp_model', 'wb'))
 
 			
 			# Compute ELBO after update

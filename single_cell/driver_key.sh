@@ -72,11 +72,13 @@ svi="True"
 parrallel="True"
 
 seeds=("0" )
+if false; then
 for seed in "${seeds[@]}"; do
 	echo "Seed: "$seed
 	file_stem="eqtl_factorization_sc_data_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed"
 	sh eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name $random_effects $svi $parrallel
 done
+fi
 
 
 
