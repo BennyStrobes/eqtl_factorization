@@ -42,11 +42,11 @@ european_ancestry_gtex_eqtl_dir="/work-zfs/abattle4/surya/worksets/for_ben/GTEx_
 # Preprocess data
 #########################
 if false; then
+
 ## 1 tissues case: HLV
 tissues_file=$input_data_dir"tissues_subset_1_Heart_Left_Ventricle.txt"
 output_dir=$processed_data_dir"tissues_subset_1_Heart_Left_Ventricle_"
 python preprocess_gtex_data_for_eqtl_factorization.py $tissues_file $gtex_expression_dir $gtex_tpm_dir $gtex_covariate_dir $gtex_genotype_dir $gtex_egene_dir $gtex_individual_information_file $gtex_eqtl_dir $cell_type_decomposition_hlv_file $output_dir
-
 
 ## 4 tissues case
 tissues_file=$input_data_dir"tissues_subset_4.txt"
@@ -96,18 +96,18 @@ svi="True"
 parrallel="False"
 
 seeds=("0" "1" "2" "3" )
-if false; then
 for seed in "${seeds[@]}"; do
 	echo "Seed: "$seed
-	file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed"
+	file_stem="eqtl_factorization_standardized_genotype_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed"
 	sbatch eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name $random_effects $svi $parrallel
 done
 
 svi="False"
 seeds=("0" "1" "2" "3")
+if false; then
 for seed in "${seeds[@]}"; do
 	echo "Seed: "$seed
-	file_stem="eqtl_factorization_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed"
+	file_stem="eqtl_factorization_standardized_genotype_"$tissue_subset_name"gtex_data_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed"
 	sbatch eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name $random_effects $svi $parrallel
 done
 fi
