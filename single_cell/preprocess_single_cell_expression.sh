@@ -13,9 +13,8 @@ gene_annotation_file="$4"
 
 
 
-if false; then
 python preprocess_single_cell_expression.py $input_h5py_file $processed_expression_dir $gene_annotation_file
-fi
+
 if false; then
 Rscript visualize_processed_single_cell_expression.R $processed_expression_dir $visualize_processed_expression_dir
 fi

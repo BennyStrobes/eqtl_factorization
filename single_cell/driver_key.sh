@@ -31,7 +31,8 @@ eqtl_input_dir=$output_root"eqtl_input/"
 # Directory containing pre-processed eqtl files
 eqtl_results_dir=$output_root"eqtl_factorization_results/"
 
-
+# Directory containing pre-processed eqtl files
+eqtl_visualization_dir=$output_root"visualize_eqtl_factorization/"
 
 
 
@@ -55,18 +56,18 @@ fi
 # Run eqtl-factorization
 ######################
 # eqtl factorization input files (generated in 'prepare_eqtl_input.sh')
-sample_overlap_file=$eqtl_input_dir"sc_individual_id.txt"
+sample_overlap_file=$eqtl_input_dir"sc_individual_id_random_subset.txt"
 # TRAINING
-expression_training_file=$eqtl_input_dir"sc_corrected_expression_training_data_uncorrected_10000_bp_0.5_r_squared_pruned.txt"
-genotype_training_file=$eqtl_input_dir"sc_corrected_genotype_training_data_uncorrected_10000_bp_0.5_r_squared_pruned.txt"
+expression_training_file=$eqtl_input_dir"sc_corrected_expression_random_subset_training_data_uncorrected_10000_bp_0.5_r_squared_pruned.h5"
+genotype_training_file=$eqtl_input_dir"sc_corrected_genotype_random_subset_training_data_uncorrected_10000_bp_0.5_r_squared_pruned.h5"
 # TESTING
-expression_testing_file=$eqtl_input_dir"sc_corrected_expression_training_data_uncorrected_10000_bp_0.5_r_squared_pruned.txt"
-genotype_testing_file=$eqtl_input_dir"sc_corrected_genotype_training_data_uncorrected_10000_bp_0.5_r_squared_pruned.txt"
+expression_testing_file=$eqtl_input_dir"sc_corrected_expression_random_subset_training_data_uncorrected_10000_bp_0.5_r_squared_pruned.h5"
+genotype_testing_file=$eqtl_input_dir"sc_corrected_genotype_random_subset_training_data_uncorrected_10000_bp_0.5_r_squared_pruned.h5"
 
 
 # Paramaters
 model_name="eqtl_factorization_vi_spike_and_slab"
-num_latent_factors="30"
+num_latent_factors="20"
 random_effects="False"
 svi="True"
 parrallel="True"
@@ -80,9 +81,9 @@ for seed in "${seeds[@]}"; do
 done
 fi
 
-
-
-
+if false; then
+Rscript visualize_single_cell_eqtl_factorization.R $processed_expression_dir $eqtl_input_dir $eqtl_results_dir $eqtl_visualization_dir
+fi
 
 
 

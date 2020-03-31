@@ -133,7 +133,6 @@ def simulate_data_for_eqtl_factorization2(I, Ni, T, K):
 		for ni in range(Ni):
 			Z.append(str(individual_index))
 
-	'''
 	gene_random_effects_sdevs = np.sqrt(np.random.exponential(size=T))
 	alphas = np.zeros((I, T))
 	for t in range(T):
@@ -144,7 +143,6 @@ def simulate_data_for_eqtl_factorization2(I, Ni, T, K):
 			for ni in range(Ni):
 				Y[sample_num, t] = Y[sample_num, t] + individual_intercept
 				sample_num = sample_num + 1
-	'''
 	data = {}
 	data['U'] = U_true
 	data['V'] = V_true
@@ -152,6 +150,8 @@ def simulate_data_for_eqtl_factorization2(I, Ni, T, K):
 	data['resid'] = gene_residual_sdevs
 	data['theta_U'] = theta_U
 	data['S_U'] = S_U
+	data['alphas'] = alphas
+	data['gene_random_effects_sdevs'] = gene_random_effects_sdevs
 	return Y, G, Z, data
 
 #######################
@@ -190,12 +190,15 @@ forgetting_rate=0.01
 ##########################
 Y, G, z, data = simulate_data_for_eqtl_factorization2(I, Ni, T, K)
 
+pdb.set_trace()
+
 ##################
 # Fit eqtl factorization using home-built variational inference
 ##################
 eqtl_vi = eqtl_factorization_vi_spike_and_slab.EQTL_FACTORIZATION_VI(K=20, alpha=alpha_0, beta=beta_0, a=a_0, b=b_0, max_iter=max_iter, gamma_v=gamma_v, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean, sample_batch_fraction=sample_batch_fraction, learning_rate=learning_rate, forgetting_rate=forgetting_rate)
 eqtl_vi.fit(G=G, Y=Y, z=z)
 pickle.dump(eqtl_vi, open(output_root + '_model', 'wb'))
+pdb.set_trace()
 #eqtl_vi = pickle.load(open(output_root + '_model', 'rb'))
 
 if eqtl_vi.SVI == True:

@@ -293,7 +293,6 @@ class EQTL_FACTORIZATION_VI(object):
 			z: groupings of length num_samples
 		"""
 		self.G_full = G
-		print(self.G_full.shape)
 		self.Y_full = Y
 		self.z_full = np.asarray(z)
 		self.initialize_variables()

@@ -203,6 +203,44 @@ def filter_data_to_only_sle_individuals(cell_covariate_file, sc_expression_file,
 	f.close()
 	t.close()
 
+# Filter expression and covariate file to only contain SLE individuals
+def filter_data_to_only_sle_individuals_and_randomly_subset(cell_covariate_file, sc_expression_file, filtered_cell_covariate_file, filtered_sc_expression_file):
+	np.random.seed(0)
+	# Initialize vector to keep track of which cells are from sle individuals (will be 1 if they are from, 0 if they are not)
+	valid_cells = []
+	# Filter covariate file first
+	f = open(cell_covariate_file)
+	t = open(filtered_cell_covariate_file, 'w')
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		# Skip header
+		if head_count == 0:
+			head_count = head_count + 1
+			t.write(line + '\n')
+			continue
+		if data[1] != 'sle' or np.random.binomial(1,.1) == 0:
+			valid_cells.append(0)
+			continue
+		valid_cells.append(1)
+		t.write(line + '\n')
+	f.close()
+	t.close()
+	# Filter expression file now
+	f = open(sc_expression_file)
+	t = open(filtered_sc_expression_file, 'w')
+	counter = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		# Check if cell corresponds to sle individual
+		if valid_cells[counter] == 1:
+			t.write(line + '\n')
+		counter = counter + 1
+	f.close()
+	t.close()
+
 
 def standardize_gene_expression_data(input_expression_file, output_standardized_expression_file):
 	X = np.loadtxt(input_expression_file)
@@ -245,44 +283,62 @@ data = h5py.File(input_h5py_file, 'r')
 
 # Print covariates to readable file
 cell_covariate_file = processed_expression_dir + 'cell_covariates_ye_lab.txt'
-generate_cell_covariate_file(data, cell_covariate_file)
+#generate_cell_covariate_file(data, cell_covariate_file)
 
 # Print expression data to a readable file
 sc_expression_file = processed_expression_dir + 'single_cell_expression_ye_lab.txt'
-generate_expression_file(data, sc_expression_file)
+#generate_expression_file(data, sc_expression_file)
 
 # Print gene_names to a readable file
 gene_names_file = processed_expression_dir + 'gene_names_ye_lab.txt'
-generate_gene_names_file(data, gene_names_file)
+#generate_gene_names_file(data, gene_names_file)
 
 # Get cell type colors and print to file
 cell_type_colors_file = processed_expression_dir + 'cell_type_colors_ye_lab.txt'
-print_cell_type_colors_to_file(data, cell_type_colors_file)
+#print_cell_type_colors_to_file(data, cell_type_colors_file)
 
 # Grab UMAP scores from ye-lab data structure
 umap_file = processed_expression_dir + 'umap_scores_ye_lab.txt'
-generate_umap_from_ye_lab_file(data, umap_file)
+#generate_umap_from_ye_lab_file(data, umap_file)
 
 # Grab UMAP scores from ye-lab data structure
 # This data was genead by centering (mean 0) the expression data (sc_expression_file), but not scaling (each gene does not have SD 1)
 # Also worth noting that they multiplied the loadings by the singular values
 pca_file = processed_expression_dir + 'pca_scores_ye_lab.txt'
-generate_pca_from_ye_lab_file(data, pca_file)
-
+#generate_pca_from_ye_lab_file(data, pca_file)
 
 # Filter expression and covariate file to only contain SLE individuals
 filtered_cell_covariate_file = processed_expression_dir + 'cell_covariates_sle_individuals.txt'
 filtered_sc_expression_file = processed_expression_dir + 'single_cell_expression_sle_individuals.txt'
-filter_data_to_only_sle_individuals(cell_covariate_file, sc_expression_file, filtered_cell_covariate_file, filtered_sc_expression_file)
+#filter_data_to_only_sle_individuals(cell_covariate_file, sc_expression_file, filtered_cell_covariate_file, filtered_sc_expression_file)
 
 # Standardize expression so each gene has mean 0 and standard deviation 1 (across individuals)
 filtered_standardized_sc_expression_file = processed_expression_dir + 'single_cell_expression_sle_individuals_standardized.txt'
-standardize_gene_expression_data(filtered_sc_expression_file, filtered_standardized_sc_expression_file)
+#standardize_gene_expression_data(filtered_sc_expression_file, filtered_standardized_sc_expression_file)
 
 # Generate expression PC loadings and variance explained of those expression PCs
 num_pcs=200
 filtered_cells_pca_file = processed_expression_dir + 'pca_scores_sle_individuals.txt'
 filtered_cells_pca_ve_file = processed_expression_dir + 'pca_variance_explained_sle_individuals.txt'
+#generate_pca_scores_and_variance_explained(filtered_standardized_sc_expression_file, num_pcs, filtered_cells_pca_file, filtered_cells_pca_ve_file)
+
+
+
+# Filter expression and covariate file to only contain SLE individuals
+filtered_cell_covariate_file = processed_expression_dir + 'cell_covariates_sle_individuals_random_subset.txt'
+filtered_sc_expression_file = processed_expression_dir + 'single_cell_expression_sle_individuals_random_subset.txt'
+filter_data_to_only_sle_individuals_and_randomly_subset(cell_covariate_file, sc_expression_file, filtered_cell_covariate_file, filtered_sc_expression_file)
+print('1')
+# Standardize expression so each gene has mean 0 and standard deviation 1 (across individuals)
+filtered_standardized_sc_expression_file = processed_expression_dir + 'single_cell_expression_sle_individuals_random_subset_standardized.txt'
+standardize_gene_expression_data(filtered_sc_expression_file, filtered_standardized_sc_expression_file)
+print('2')
+# Generate expression PC loadings and variance explained of those expression PCs
+num_pcs=200
+filtered_cells_pca_file = processed_expression_dir + 'pca_scores_sle_individuals_random_subset.txt'
+filtered_cells_pca_ve_file = processed_expression_dir + 'pca_variance_explained_sle_individuals_random_subset.txt'
 generate_pca_scores_and_variance_explained(filtered_standardized_sc_expression_file, num_pcs, filtered_cells_pca_file, filtered_cells_pca_ve_file)
+print('3')
+
 
 

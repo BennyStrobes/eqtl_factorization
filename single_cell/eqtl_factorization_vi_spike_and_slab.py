@@ -223,6 +223,7 @@ def outside_update_F_t(F_mu, F_var, G_slice, Y_slice, U_S_expected_val, V_S_t_ex
 
 	# Update variance of q(F|s=1)
 	a_term = gamma_f_expected_val + (1.0/sample_batch_fraction)*tau_t_expected_val*np.sum(np.square(G_slice))
+	#a_term = 1.0 + (1.0/sample_batch_fraction)*tau_t_expected_val*np.sum(np.square(G_slice))
 	# Update mean of q(F|s=1)
 	resid = Y_slice - intercept_mu_t - G_slice*(other_components_expected)
 	b_term = np.sum(tau_t_expected_val*G_slice*resid*(1.0/sample_batch_fraction))
@@ -266,7 +267,7 @@ def outside_update_tau_t(tau_alpha, tau_beta, G_slice, Y_slice, N, U_S, V_S_t, F
 
 
 class EQTL_FACTORIZATION_VI(object):
-	def __init__(self, K=25, alpha=1e-3, beta=1e-3, a=1, b=1, gamma_v=1.0, max_iter=1000, delta_elbo_threshold=1e-8, SVI=False, parrallel_boolean=False, sample_batch_fraction=.3, learning_rate=.4, forgetting_rate=.008, num_test_cores=24, num_sample_cores=24):
+	def __init__(self, K=25, alpha=1e-3, beta=1e-3, a=1, b=1, gamma_v=1.0, max_iter=1000, delta_elbo_threshold=1e-8, SVI=False, parrallel_boolean=False, sample_batch_fraction=.3, learning_rate=.8, forgetting_rate=.004, num_test_cores=24, num_sample_cores=24):
 		self.alpha_prior = alpha
 		self.beta_prior = beta
 		self.a_prior = a 
@@ -299,7 +300,7 @@ class EQTL_FACTORIZATION_VI(object):
 		self.Y_full = Y
 		self.z_full = np.asarray(z)
 		self.initialize_variables()
-		self.update_elbo()
+		# self.update_elbo()
 		# Loop through VI iterations
 		for vi_iter in range(self.max_iter):
 			start_time = time.time()
@@ -318,7 +319,9 @@ class EQTL_FACTORIZATION_VI(object):
 			if np.mod(vi_iter, 50) == 0 and vi_iter > 0:
 				# UPDATE remove irrelevent_factors TO BE IN TERMS OF *_FULL (ie re-learn theta_U on all data)
 				self.remove_irrelevent_factors()
-				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temp_model_U_S.txt', (self.U_mu_full*self.S_U_full), fmt="%s", delimiter='\t')
+				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temp_model_subset_U_S.txt', (self.U_mu_full*self.S_U_full), fmt="%s", delimiter='\t')
+				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temp_model_subset_V.txt', (self.V_mu), fmt="%s", delimiter='\t')
+				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temp_model_subset_intercept.txt', (self.intercept_mu), fmt="%s", delimiter='\t')
 				# pickle.dump(self, open('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temp_model', 'wb'))
 
 			
@@ -877,7 +880,7 @@ class EQTL_FACTORIZATION_VI(object):
 			self.z = np.copy(self.z_full)[svi_sample_indices]
 			pca = sklearn.decomposition.PCA(n_components=self.K, whiten=True)
 			pca.fit(np.random.randn(self.N_full, 9999).T)
-			self.U_mu_full = pca.components_.T*10.0
+			self.U_mu_full = pca.components_.T*100.0
 			#self.U_mu_full = np.random.randn(self.N_full, self.K)
 			self.U_var_full = np.ones((self.N_full, self.K))*(1.0/self.gamma_v)
 			self.U_var_s_0_full = np.ones((self.N_full, self.K))*(1.0/self.gamma_v)
@@ -900,10 +903,12 @@ class EQTL_FACTORIZATION_VI(object):
 		#self.V_mu = np.random.randn(self.K, self.T)
 		pca = sklearn.decomposition.PCA(n_components=self.K, whiten=True)
 		pca.fit(np.random.randn(self.T, 9999).T)
-		self.V_mu = pca.components_*10.0
+		self.V_mu = pca.components_*100.0
+		#self.V_mu = np.random.randn(self.K, self.T)
 		self.V_var = np.ones((self.K, self.T))*(1.0/self.gamma_v)
 
 		betas = run_linear_model_for_initialization(self.Y, self.G)
+		print(betas)
 		#self.F_mu = eqtl_vi_init.F_mu
 		self.F_mu = betas
 		self.F_var = np.ones(self.T)
@@ -918,7 +923,7 @@ class EQTL_FACTORIZATION_VI(object):
 		self.tau_alpha = np.ones(self.T)*self.alpha_prior
 		self.tau_beta = np.ones(self.T)*self.beta_prior
 		# bernoulli probs
-		self.theta_U_a = np.ones(self.K)*self.a_prior + 9
+		self.theta_U_a = np.ones(self.K)*self.a_prior 
 		self.theta_U_b = np.ones(self.K)*self.b_prior
 
 		# Initialize other variables based around U
@@ -931,6 +936,7 @@ class EQTL_FACTORIZATION_VI(object):
 		if self.SVI == True:
 			self.sample_batch_fraction = actual_sample_batch_fraction
 			self.N = round((self.Y_full.shape[0])*self.sample_batch_fraction)
+		print('Model initialization complete')
 
 		#self.gamma_U_alpha = np.ones(self.K)*self.alpha_prior
 		#self.gamma_U_beta = np.ones(self.K)*self.beta_prior

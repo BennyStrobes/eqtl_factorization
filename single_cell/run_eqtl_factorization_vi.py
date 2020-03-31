@@ -4,6 +4,7 @@ import sys
 import pdb
 import eqtl_factorization_vi_spike_and_slab
 import pickle
+import h5py
 
 
 
@@ -57,26 +58,31 @@ def train_eqtl_factorization_model(sample_overlap_file, expression_training_file
 	# Load in data
 	############################
 	# Load in expression data (dimension: num_samplesXnum_tests)
-	Y = np.transpose(np.loadtxt(expression_training_file, delimiter='\t'))
+	if expression_training_file.endswith('.txt'):
+		Y = np.transpose(np.loadtxt(expression_training_file, delimiter='\t'))
+	elif expression_training_file.endswith('.h5'):
+		Y = np.transpose(np.asarray(h5py.File(expression_training_file,'r')['data']))
 	# Load in genotype data (dimension: num_samplesXnum_tests)
-	G = np.transpose(np.loadtxt(genotype_training_file, delimiter='\t'))
+	if genotype_training_file.endswith('.txt'):
+		G = np.transpose(np.loadtxt(genotype_training_file, delimiter='\t'))
+	elif genotype_training_file.endswith('.h5'):
+		G = np.transpose(np.asarray(h5py.File(genotype_training_file,'r')['data']))
 	# Load in sample overlap data
 	Z,  num_individuals = load_in_sample_overlap_data(sample_overlap_file)
-	#Y,G,Z = subset_matrices(Y,G,Z)
 
-	#G = standardize_each_column_of_matrix(G)
 	# Get number of samples, number of tests, number of individuals
 	num_samples = Y.shape[0]
 	num_tests = Y.shape[1]
 
-	if svi_boolean == True:
-		max_it = 1000
-	elif svi_boolean == False:
-		max_it = 1000
+	max_it = 1000
+	print('data loaded')
 
+
+	############################
 	# RUN MODEL
+	#############################
 	if model_name == 'eqtl_factorization_vi_spike_and_slab':
-		eqtl_vi = eqtl_factorization_vi_spike_and_slab.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-3, beta=1e-3, a=1, b=1, gamma_v=1.0, max_iter=max_it, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean, sample_batch_fraction=.05)
+		eqtl_vi = eqtl_factorization_vi_spike_and_slab.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-16, beta=1e-16, a=1, b=1, gamma_v=10.0, max_iter=max_it, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean, sample_batch_fraction=.1)
 		eqtl_vi.fit(G=G, Y=Y, z=Z)
 		# pickle.dump(eqtl_vi, open(output_root + '_model', 'wb'))
 		#eqtl_vi = pickle.load(open(output_root + '_model', 'rb'))

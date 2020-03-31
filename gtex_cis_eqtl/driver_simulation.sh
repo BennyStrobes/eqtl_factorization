@@ -10,8 +10,8 @@ visualize_simulated_results_dir="/work-zfs/abattle4/bstrober/single_cell_eqtl_fa
 ##############
 # Parameters
 ##############
-num_individuals="1000"
-num_samples_per_individual="1"
+num_individuals="100"
+num_samples_per_individual="10"
 num_tests="1000"
 num_latent_factors="7"
 
@@ -24,13 +24,12 @@ module load python/3.7.4-anaconda
 svi="True"
 parrallel="True"
 seeds=("0")
-if false; then
 for seed in "${seeds[@]}"; do
 	echo "Seed: "$seed
 	output_stem=$simulated_results_dir$num_individuals"_individuals_"$num_samples_per_individual"_samples_per_individual_"$num_tests"_tests_"$num_latent_factors"_latent_factors_"$svi"_svi_boolean_"$seed"_seed_parrallelized_"
 	python simulate_and_run_factorization.py $output_stem $svi $num_individuals $num_samples_per_individual $num_tests $num_latent_factors $seed $parrallel
 done
-fi
+
 
 
 
