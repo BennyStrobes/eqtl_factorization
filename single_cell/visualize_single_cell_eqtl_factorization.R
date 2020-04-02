@@ -18,7 +18,7 @@ gtex_v8_figure_theme <- function() {
 make_umap_loading_scatter_plot_colored_by_categorical_variable <- function(covariates, umap_loadings, covariate_name) {
 	df <- data.frame(loading_1=umap_loadings[,1], loading_2=umap_loadings[,2], covariate=factor(covariates))
 	plotter <- ggplot(df) + 
-	           geom_point(aes(x=loading_1, y=loading_2, color=covariate), size=.01) +
+	           geom_point(aes(x=loading_1, y=loading_2, color=covariate), size=.001) +
 	           gtex_v8_figure_theme() + 
 	           guides(colour = guide_legend(override.aes = list(size=2))) +
 	           labs(x="UMAP 1", y = "UMAP 2", color=covariate_name) + 
@@ -40,6 +40,19 @@ make_umap_loading_scatter_plot_colored_by_real_valued_variable <- function(covar
 	           theme(legend.text = element_text(size=8), legend.title = element_text(size=8))
 	return(plotter)
 }
+
+loading_scatter_plot_colored_by_categorical_covariate <- function(covariates, loadings, dim1, dim2, covariate_name) {
+	df <- data.frame(loading_1=loadings[,dim1], loading_2=loadings[,dim2], covariate=factor(covariates))
+	plotter <- ggplot(df) + 
+	           geom_point(aes(x=loading_1, y=loading_2, color=covariate), size=.001) +
+	           gtex_v8_figure_theme() + 
+	           labs(x="Loading 1", y = "Loading 2", color=covariate_name) + 
+	           theme(legend.position="bottom") + 
+	           guides(colour=guide_legend(nrow=3,byrow=TRUE, override.aes = list(size=2))) +
+	           theme(legend.text = element_text(size=8), legend.title = element_text(size=8))
+	return(plotter)
+}
+
 
 
 
@@ -129,7 +142,11 @@ make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate <- 
 	factor_number <- 12
 	factor_12_boxplot <- make_loading_boxplot_for_one_factor_by_categorical_covariate(covariate, loadings[,factor_number], factor_number, covariate_name)
 
-	combined <- plot_grid(factor_1_boxplot, factor_2_boxplot, factor_3_boxplot, factor_4_boxplot, factor_5_boxplot, factor_6_boxplot, factor_7_boxplot, factor_8_boxplot, factor_9_boxplot, factor_10_boxplot, factor_11_boxplot, factor_12_boxplot, ncol=1)
+	factor_number <- 13
+	factor_13_boxplot <- make_loading_boxplot_for_one_factor_by_categorical_covariate(covariate, loadings[,factor_number], factor_number, covariate_name)
+
+
+	combined <- plot_grid(factor_1_boxplot, factor_2_boxplot, factor_3_boxplot, factor_4_boxplot, factor_5_boxplot, factor_6_boxplot, factor_7_boxplot, factor_8_boxplot, factor_9_boxplot, factor_10_boxplot, factor_11_boxplot, factor_12_boxplot, factor_13_boxplot, ncol=1)
 
 	return(combined)
 }
@@ -159,17 +176,14 @@ make_covariate_loading_correlation_heatmap <- function(covariates, loadings) {
     num_pcs <- dim(loadings)[2]
     num_covs <- dim(covs)[2]
     for (num_pc in 1:num_pcs) {
-    	print(num_pc)
         for (num_cov in 1:num_covs) {
-        	print(num_cov)
             pc_vec <- loadings[,num_pc]
             cov_vec <- covs[,num_cov]
-            print(summary(pc_vec))
-            print(summary(cov_vec))
             lin_model <- lm(pc_vec ~ cov_vec)
             pve_map[num_cov, num_pc] <- summary(lin_model)$adj.r.squared
         }
     }
+    print(pve_map)
     
     ord <- hclust( dist(scale(pve_map), method = "euclidean"), method = "ward.D" )$order
 
@@ -202,9 +216,11 @@ eqtl_input_dir <- args[2]
 eqtl_results_dir <- args[3]
 eqtl_visualization_dir <- args[4]
 
+print("Hello")
+
 # Input files
 covariate_file <- paste0(processed_expression_dir, "cell_covariates_sle_individuals_random_subset.txt")
-eqtl_factorization_loading_file <- paste0(eqtl_results_dir, "temp_model_subset_U_S.txt")
+eqtl_factorization_loading_file <- paste0(eqtl_results_dir, "temp_model_subset_re_U_S.txt")
 
 # Load in data
 covariates <- read.table(covariate_file, header=TRUE)
@@ -212,25 +228,33 @@ loadings <- read.table(eqtl_factorization_loading_file, header=FALSE)
 # Filter loadings file
 good_loadings <- c(2, 3, 4, 6, 8, 12, 13, 14, 15, 16, 17, 18)
 good_loadings <- c(17, 13, 16, 18, 12, 4, 14, 2, 15, 6, 3, 8)
+
+good_loadings <- c(12, 11, 3, 15, 16, 14, 10, 13, 8, 2, 1, 4, 7)
 loadings <- loadings[,good_loadings]
 
 # Create UMAP factors
 #umap_loadings = umap(loadings)$layout
 #saveRDS( umap_loadings, "umap_loadings.rds")
+print("UMAP DONE")
 umap_loadings <- readRDS("umap_loadings.rds")
 
 
 
+######################################
+# Make scatter-plot of loading1 vs loading2 colored by known cell type
+#######################################
+output_file <- paste0(eqtl_visualization_dir, "loading1_vs_loading2_colored_by_known_cell_type.pdf")
+scatter <- loading_scatter_plot_colored_by_categorical_covariate(covariates$ct_cov, loadings, 1, 2, "Known cell type")
+ggsave(scatter, file=output_file, width=7.2, height=6, units="in")
 
 ######################################
 # Make correlation heatmap correlating covariates with loadings
 #######################################
 output_file <- paste0(eqtl_visualization_dir, "covariate_loading_correlation_heatmap.pdf")
-heatmap <- make_covariate_loading_correlation_heatmap(covariates, loadings)
-ggsave(heatmap, file=output_file, width=7.2, height=6, units="in")
+#heatmap <- make_covariate_loading_correlation_heatmap(covariates, loadings)
+#ggsave(heatmap, file=output_file, width=7.2, height=6, units="in")
 
 if (FALSE) {
-
 ######################################
 # Make loading boxplot with row for every factor colored by cell type
 #######################################
@@ -324,4 +348,3 @@ output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_n
 umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$n_genes, umap_loadings, "Number of genes")
 ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
 }
-

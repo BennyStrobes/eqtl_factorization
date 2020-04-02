@@ -132,7 +132,6 @@ def simulate_data_for_eqtl_factorization2(I, Ni, T, K):
 	for individual_index in range(I):
 		for ni in range(Ni):
 			Z.append(str(individual_index))
-
 	gene_random_effects_sdevs = np.sqrt(np.random.exponential(size=T))
 	alphas = np.zeros((I, T))
 	for t in range(T):
@@ -174,11 +173,11 @@ np.random.seed(seed)
 ##########################
 # Parameters
 ##########################
-alpha_0 = 1e-3
-beta_0 = 1e-3
+alpha_0 = 1e-16
+beta_0 = 1e-16
 a_0 = 1
 b_0 = 1
-max_iter=1000
+max_iter=300
 gamma_v=1.0
 # Only applicable to if SVI_boolean==True
 sample_batch_fraction=0.3
@@ -190,7 +189,6 @@ forgetting_rate=0.01
 ##########################
 Y, G, z, data = simulate_data_for_eqtl_factorization2(I, Ni, T, K)
 
-pdb.set_trace()
 
 ##################
 # Fit eqtl factorization using home-built variational inference

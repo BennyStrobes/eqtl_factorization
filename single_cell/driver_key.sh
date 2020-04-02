@@ -68,7 +68,7 @@ genotype_testing_file=$eqtl_input_dir"sc_corrected_genotype_random_subset_traini
 # Paramaters
 model_name="eqtl_factorization_vi_spike_and_slab"
 num_latent_factors="20"
-random_effects="False"
+random_effects="True"
 svi="True"
 parrallel="True"
 
@@ -81,9 +81,8 @@ for seed in "${seeds[@]}"; do
 done
 fi
 
-if false; then
 Rscript visualize_single_cell_eqtl_factorization.R $processed_expression_dir $eqtl_input_dir $eqtl_results_dir $eqtl_visualization_dir
-fi
+
 
 
 

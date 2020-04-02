@@ -9,8 +9,6 @@ import sklearn.decomposition
 from joblib import Parallel, delayed
 import multiprocessing
 import time
-import pickle
-
 
 def sigmoid_function(x):
 	return 1.0/(1.0 + np.exp(-x))
@@ -156,7 +154,7 @@ def compute_kl_divergence_of_beta(a_prior, b_prior, theta_a, theta_b):
 	return kl_divergence
 
 
-def outside_update_U_n(U_mu, S_U, U_var, U_var_s_0, G_slice, Y_slice, K, V_S_expected_val, V_S_squared_expected_val, F_S_expected_val, intercept_mu, gamma_v, tau_expected_val, theta_U_a, theta_U_b):
+def outside_update_U_n(U_mu, S_U, U_var, U_var_s_0, G_slice, Y_slice, K, V_S_expected_val, V_S_squared_expected_val, F_S_expected_val, intercept_mu, gamma_v, tau_expected_val, theta_U_a, theta_U_b, alpha_i_expected_val):
 	for k in range(K):
 		# Compute relevent expectations
 		U_S_expected_val = U_mu*S_U
@@ -172,7 +170,7 @@ def outside_update_U_n(U_mu, S_U, U_var, U_var_s_0, G_slice, Y_slice, K, V_S_exp
 		# Update variance of q(U|s=0)
 		U_var_s_0[k] = 1.0/gamma_v
 		# Update mean of q(U|s=1)
-		resid = Y_slice - intercept_mu - G_slice*(F_S_expected_val + other_components_expected)
+		resid = Y_slice - intercept_mu - alpha_i_expected_val - G_slice*(F_S_expected_val + other_components_expected)
 		b_term = np.sum(tau_expected_val*G_slice*V_k_S_k_expected_val*resid)
 		U_mu[k] = U_var[k]*b_term
 		# Now update q(S_U=1)
@@ -180,14 +178,14 @@ def outside_update_U_n(U_mu, S_U, U_var, U_var_s_0, G_slice, Y_slice, K, V_S_exp
 		S_U[k] = sigmoid_function(z_term)
 	return np.hstack((U_mu, S_U, U_var, U_var_s_0))
 
-def outside_update_V_t(V_mu, V_var, G_slice, Y_slice, K, U_S_expected_val, U_S_squared_expected_val, F_S_t_expected_val, intercept_mu, gamma_v, tau_t_expected_val, sample_batch_fraction, step_size, SVI):
+def outside_update_V_t(V_mu, V_var, G_slice, Y_slice, K, U_S_expected_val, U_S_squared_expected_val, F_S_t_expected_val, intercept_mu, alpha_t_mu, gamma_v, tau_t_expected_val, sample_batch_fraction, step_size, SVI):
 	for k in range(K):
 		# Compute expectations on other components
 		other_components_expected = (U_S_expected_val@V_mu) - U_S_expected_val[:, k]*V_mu[k]
 		# Update variance of q(V|s=1)
 		a_term = gamma_v + (1.0/sample_batch_fraction)*(tau_t_expected_val*np.sum(np.square(G_slice)*U_S_squared_expected_val[:,k]))
 		# Update mean of q(U|s=1)
-		resid = Y_slice - intercept_mu - G_slice*(other_components_expected + F_S_t_expected_val)
+		resid = Y_slice - alpha_t_mu - intercept_mu - G_slice*(other_components_expected + F_S_t_expected_val)
 		b_term = (1.0/sample_batch_fraction)*np.sum(tau_t_expected_val*G_slice*U_S_expected_val[:,k]*resid)
 
 		new_var = 1.0/a_term
@@ -200,11 +198,11 @@ def outside_update_V_t(V_mu, V_var, G_slice, Y_slice, K, U_S_expected_val, U_S_s
 			V_mu[k] = weighted_SVI_updated(V_mu[k], new_mu, step_size)
 	return np.hstack((V_mu, V_var))
 
-def outside_update_intercept_t(intercept_mu, intercept_var, G_slice, Y_slice, N, U_S_expected_val, V_S_t_expected_val, F_S_t_expected_val, tau_t_expected_val, sample_batch_fraction, step_size, SVI):
+def outside_update_intercept_t(intercept_mu, intercept_var, G_slice, Y_slice, N, U_S_expected_val, V_S_t_expected_val, F_S_t_expected_val, tau_t_expected_val, alpha_t_mu, sample_batch_fraction, step_size, SVI):
 	# Compute relevent expectations
 	# Compute expectations on other components
 	other_components_expected = U_S_expected_val@V_S_t_expected_val
-	resid = Y_slice - G_slice*(F_S_t_expected_val + other_components_expected)
+	resid = Y_slice - alpha_t_mu - G_slice*(F_S_t_expected_val + other_components_expected)
 
 	new_var = 1.0/((1.0/sample_batch_fraction)*N*tau_t_expected_val)
 	new_mu = new_var*tau_t_expected_val*np.sum(resid)*(1.0/sample_batch_fraction)
@@ -217,15 +215,37 @@ def outside_update_intercept_t(intercept_mu, intercept_var, G_slice, Y_slice, N,
 		intercept_mu = weighted_SVI_updated(intercept_mu, new_mu, step_size)
 	return np.hstack((intercept_mu, intercept_var))
 
-def outside_update_F_t(F_mu, F_var, G_slice, Y_slice, U_S_expected_val, V_S_t_expected_val, intercept_mu_t, gamma_f_expected_val, tau_t_expected_val, sample_batch_fraction, step_size, SVI):
+def outside_update_alpha_t(alpha_mu_copy, alpha_var_copy, G_slice, Y_slice, I, U_S_expected_val, V_S_t_expected_val, F_S_t_expected_val, intercept_mu_t, tau_t_expected_val, psi_t_expected_val, individual_to_sample_indices, individual_to_number_full_indices, step_size, SVI):
+	other_components_expected = U_S_expected_val@V_S_t_expected_val
+	resid = Y_slice - intercept_mu_t - G_slice*(F_S_t_expected_val + other_components_expected)
+	# Loop through individuals
+	for individual_index in range(I):
+		# Indices of samples corresponding to this label
+		sample_indices = individual_to_sample_indices[individual_index]
+		# Number of indices corresponding to this sample (w/o subsetting)
+		num_full_indices = individual_to_number_full_indices[individual_index]
+		# Number of indices corresponding to this individaul
+		n_i = len(sample_indices)
+		individual_batch_fraction = n_i/num_full_indices
+		# Update variance of q(alpha_it)
+		new_var = 1.0/((1.0/individual_batch_fraction)*n_i*tau_t_expected_val + psi_t_expected_val)
+		new_mu = new_var*tau_t_expected_val*np.sum(resid[sample_indices])*(1.0/individual_batch_fraction)
+		if SVI == False:
+			alpha_var_copy[individual_index] = new_var
+			alpha_mu_copy[individual_index] = new_mu
+		elif SVI == True:
+			alpha_var_copy[individual_index] = weighted_SVI_updated(alpha_var_copy[individual_index], new_var, step_size)
+			alpha_mu_copy[individual_index] = weighted_SVI_updated(alpha_mu_copy[individual_index], new_mu, step_size)
+	return np.hstack((alpha_mu_copy, alpha_var_copy))
+
+def outside_update_F_t(F_mu, F_var, G_slice, Y_slice, U_S_expected_val, V_S_t_expected_val, intercept_mu_t, gamma_f_expected_val, tau_t_expected_val, alpha_t_mu, sample_batch_fraction, step_size, SVI):
 	# Compute expectations on other components
 	other_components_expected = U_S_expected_val@V_S_t_expected_val
 
 	# Update variance of q(F|s=1)
 	a_term = gamma_f_expected_val + (1.0/sample_batch_fraction)*tau_t_expected_val*np.sum(np.square(G_slice))
-	#a_term = 1.0 + (1.0/sample_batch_fraction)*tau_t_expected_val*np.sum(np.square(G_slice))
 	# Update mean of q(F|s=1)
-	resid = Y_slice - intercept_mu_t - G_slice*(other_components_expected)
+	resid = Y_slice - alpha_t_mu - intercept_mu_t - G_slice*(other_components_expected)
 	b_term = np.sum(tau_t_expected_val*G_slice*resid*(1.0/sample_batch_fraction))
 	new_var = 1.0/a_term
 	new_mu = new_var*b_term
@@ -237,17 +257,20 @@ def outside_update_F_t(F_mu, F_var, G_slice, Y_slice, U_S_expected_val, V_S_t_ex
 		F_mu = weighted_SVI_updated(F_mu, new_mu, step_size)
 	return np.hstack((F_mu, F_var))
 
-def outside_update_tau_t(tau_alpha, tau_beta, G_slice, Y_slice, N, U_S, V_S_t, F_S_t, intercept_t, V_S_t_squared, F_S_t_squared, U_S_squared, intercept_t_squared, alpha_prior, beta_prior, sample_batch_fraction, step_size, SVI):
+def outside_update_tau_t(tau_alpha, tau_beta, G_slice, Y_slice, N, U_S, V_S_t, F_S_t, intercept_t, V_S_t_squared, F_S_t_squared, U_S_squared, intercept_t_squared, alpha_mu_t, alpha_var_t, alpha_prior, beta_prior, sample_batch_fraction, step_size, SVI):
 	# Compute Relevent expectations
 	squared_factor_terms = U_S_squared@V_S_t_squared
 	factor_terms = U_S@V_S_t
 
-	# First add together square terms
-	resid = np.square(Y_slice) + intercept_t_squared + np.square(G_slice)*(F_S_t_squared + squared_factor_terms)
-	# Now add terms with Y
-	resid = resid - (2.0*Y_slice*(intercept_t + G_slice*factor_terms + G_slice*F_S_t))
+	alpha_t_squared = np.square(alpha_mu_t) + alpha_var_t
 
-	resid = resid + 2.0*intercept_t*(G_slice*(factor_terms + F_S_t))
+	# First add together square terms
+	resid = np.square(Y_slice) + alpha_t_squared + intercept_t_squared + np.square(G_slice)*(F_S_t_squared + squared_factor_terms)
+	# Now add terms with Y
+	resid = resid - (2.0*Y_slice*(intercept_t + alpha_mu_t + G_slice*factor_terms + G_slice*F_S_t))
+
+	resid = resid + 2.0*intercept_t*(alpha_mu_t + G_slice*(factor_terms + F_S_t))
+	resid = resid + 2.0*alpha_mu_t*G_slice*(factor_terms + F_S_t)
 	# Now add terms with factors
 	resid = resid + 2.0*G_slice*factor_terms*G_slice*F_S_t
 	# Now add terms with interactions between factors
@@ -267,7 +290,7 @@ def outside_update_tau_t(tau_alpha, tau_beta, G_slice, Y_slice, N, U_S, V_S_t, F
 
 
 class EQTL_FACTORIZATION_VI(object):
-	def __init__(self, K=25, alpha=1e-3, beta=1e-3, a=1, b=1, gamma_v=1.0, max_iter=1000, delta_elbo_threshold=1e-8, SVI=False, parrallel_boolean=False, sample_batch_fraction=.3, learning_rate=.8, forgetting_rate=.004, num_test_cores=24, num_sample_cores=24):
+	def __init__(self, K=25, alpha=1e-3, beta=1e-3, a=1, b=1, gamma_v=1.0, max_iter=1000, delta_elbo_threshold=1e-8, SVI=False, parrallel_boolean=False, sample_batch_fraction=.3, learning_rate=.9, forgetting_rate=.004, num_test_cores=24, num_sample_cores=24):
 		self.alpha_prior = alpha
 		self.beta_prior = beta
 		self.a_prior = a 
@@ -296,7 +319,6 @@ class EQTL_FACTORIZATION_VI(object):
 			z: groupings of length num_samples
 		"""
 		self.G_full = G
-		print(self.G_full.shape)
 		self.Y_full = Y
 		self.z_full = np.asarray(z)
 		self.initialize_variables()
@@ -309,20 +331,19 @@ class EQTL_FACTORIZATION_VI(object):
 			# Update parameter estimaters via coordinate ascent
 			print('Step size: ' + str(self.step_size))
 			self.update_U()
-			self.update_V()
 			self.update_intercept()
+			self.update_alpha()
+			self.update_V()
 			self.update_F()
 			self.update_theta_U()
+			self.update_psi()
 			self.update_tau()
 			self.iter = self.iter + 1
 			# Remove irrelevent factors
 			if np.mod(vi_iter, 50) == 0 and vi_iter > 0:
 				# UPDATE remove irrelevent_factors TO BE IN TERMS OF *_FULL (ie re-learn theta_U on all data)
 				self.remove_irrelevent_factors()
-				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temp_model_subset_U_S.txt', (self.U_mu_full*self.S_U_full), fmt="%s", delimiter='\t')
-				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temp_model_subset_V.txt', (self.V_mu), fmt="%s", delimiter='\t')
-				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temp_model_subset_intercept.txt', (self.intercept_mu), fmt="%s", delimiter='\t')
-				# pickle.dump(self, open('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temp_model', 'wb'))
+				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temp_model_subset_re_U_S.txt', (self.U_mu_full*self.S_U_full), fmt="%s", delimiter='\t')
 
 			
 			# Compute ELBO after update
@@ -402,9 +423,9 @@ class EQTL_FACTORIZATION_VI(object):
 
 		if self.parrallel_boolean == False:
 			for test_index in range(self.T):
-				V_update_data.append(outside_update_V_t(V_mu_copy[:, test_index], V_var_copy[:, test_index], self.G[:, test_index], self.Y[:, test_index], self.K, U_S_expected_val, U_S_squared_expected_val, self.F_mu[test_index], self.intercept_mu[test_index], self.gamma_v, tau_expected_val[test_index], self.sample_batch_fraction, self.step_size, self.SVI))
+				V_update_data.append(outside_update_V_t(V_mu_copy[:, test_index], V_var_copy[:, test_index], self.G[:, test_index], self.Y[:, test_index], self.K, U_S_expected_val, U_S_squared_expected_val, self.F_mu[test_index], self.intercept_mu[test_index], self.alpha_big_mu[:, test_index], self.gamma_v, tau_expected_val[test_index], self.sample_batch_fraction, self.step_size, self.SVI))
 		elif self.parrallel_boolean == True:
-			V_update_data = Parallel(n_jobs=self.num_test_cores)(delayed(outside_update_V_t)(V_mu_copy[:, test_index], V_var_copy[:, test_index], self.G[:, test_index], self.Y[:, test_index], self.K, U_S_expected_val, U_S_squared_expected_val, self.F_mu[test_index], self.intercept_mu[test_index], self.gamma_v, tau_expected_val[test_index], self.sample_batch_fraction, self.step_size, self.SVI) for test_index in range(self.T))
+			V_update_data = Parallel(n_jobs=self.num_test_cores)(delayed(outside_update_V_t)(V_mu_copy[:, test_index], V_var_copy[:, test_index], self.G[:, test_index], self.Y[:, test_index], self.K, U_S_expected_val, U_S_squared_expected_val, self.F_mu[test_index], self.intercept_mu[test_index], self.alpha_big_mu[:, test_index], self.gamma_v, tau_expected_val[test_index], self.sample_batch_fraction, self.step_size, self.SVI) for test_index in range(self.T))
 
 		# Convert to array
 		V_update_data = np.asarray(V_update_data).T
@@ -462,6 +483,21 @@ class EQTL_FACTORIZATION_VI(object):
 			self.S_U = np.copy(self.S_U_full[svi_sample_indices, :])
 			self.U_var = np.copy(self.U_var_full[svi_sample_indices, :])
 			self.U_var_s_0 = np.copy(self.U_var_s_0_full[svi_sample_indices, :])
+			# Convert random effects matrix to samplesXtests instead of groupsXtest
+			self.alpha_big_mu = np.zeros((self.N, self.T))
+			self.alpha_big_var = np.zeros((self.N, self.T))
+			for sample_num, z_label in enumerate(self.z):
+				self.alpha_big_mu[sample_num,:] = self.alpha_mu[self.z_mapping[z_label], :]
+				self.alpha_big_var[sample_num,:] = self.alpha_var[self.z_mapping[z_label], :]
+			self.individual_to_sample_indices = []
+			for ii in range(self.I):
+				# z_label corresponding to this individual
+				z_label = self.z_inverse_mapping[ii]
+				sample_indices = np.where(np.asarray(self.z) == z_label)[0]
+				if len(sample_indices) == 0:
+					print('sample indices update U assumption error')
+					pdb.set_trace()
+				self.individual_to_sample_indices.append(sample_indices)
 		#G_squared = np.square(self.G)
 		###################
 		# UPDATE U
@@ -476,10 +512,10 @@ class EQTL_FACTORIZATION_VI(object):
 		# Don't parrallelize
 		if self.parrallel_boolean == False:
 			for sample_index in range(self.N):
-				U_update_data.append(outside_update_U_n(U_mu_copy[sample_index,:], S_U_copy[sample_index,:], U_var_copy[sample_index,:], U_var_s_0_copy[sample_index,:], self.G[sample_index, :], self.Y[sample_index, :], self.K, self.V_mu, V_S_squared_expected_val, self.F_mu, self.intercept_mu, self.gamma_v, self.tau_alpha/self.tau_beta, self.theta_U_a, self.theta_U_b))
+				U_update_data.append(outside_update_U_n(U_mu_copy[sample_index,:], S_U_copy[sample_index,:], U_var_copy[sample_index,:], U_var_s_0_copy[sample_index,:], self.G[sample_index, :], self.Y[sample_index, :], self.K, self.V_mu, V_S_squared_expected_val, self.F_mu, self.intercept_mu, self.gamma_v, self.tau_alpha/self.tau_beta, self.theta_U_a, self.theta_U_b, self.alpha_big_mu[sample_index, :]))
 		# Parrallelize
 		elif self.parrallel_boolean == True:
-			U_update_data = Parallel(n_jobs=self.num_sample_cores)(delayed(outside_update_U_n)(U_mu_copy[sample_index,:], S_U_copy[sample_index,:], U_var_copy[sample_index,:], U_var_s_0_copy[sample_index,:], self.G[sample_index, :], self.Y[sample_index, :], self.K, self.V_mu, V_S_squared_expected_val, self.F_mu, self.intercept_mu, self.gamma_v, self.tau_alpha/self.tau_beta, self.theta_U_a, self.theta_U_b) for sample_index in range(self.N))
+			U_update_data = Parallel(n_jobs=self.num_sample_cores)(delayed(outside_update_U_n)(U_mu_copy[sample_index,:], S_U_copy[sample_index,:], U_var_copy[sample_index,:], U_var_s_0_copy[sample_index,:], self.G[sample_index, :], self.Y[sample_index, :], self.K, self.V_mu, V_S_squared_expected_val, self.F_mu, self.intercept_mu, self.gamma_v, self.tau_alpha/self.tau_beta, self.theta_U_a, self.theta_U_b, self.alpha_big_mu[sample_index, :]) for sample_index in range(self.N))
 
 		# Convert to array
 		U_update_data = np.asarray(U_update_data)
@@ -559,9 +595,9 @@ class EQTL_FACTORIZATION_VI(object):
 		F_update_data = []
 		if self.parrallel_boolean == False:
 			for test_index in range(self.T):
-				F_update_data.append(outside_update_F_t(F_mu_copy[test_index], F_var_copy[test_index], self.G[:, test_index], self.Y[:, test_index], U_S_expected_val, self.V_mu[:,test_index], self.intercept_mu[test_index], self.gamma_v, tau_expected_val[test_index], self.sample_batch_fraction, self.step_size, self.SVI))
+				F_update_data.append(outside_update_F_t(F_mu_copy[test_index], F_var_copy[test_index], self.G[:, test_index], self.Y[:, test_index], U_S_expected_val, self.V_mu[:,test_index], self.intercept_mu[test_index], self.gamma_v, tau_expected_val[test_index], self.alpha_big_mu[:, test_index], self.sample_batch_fraction, self.step_size, self.SVI))
 		if self.parrallel_boolean == True:
-			F_update_data = Parallel(n_jobs=self.num_test_cores)(delayed(outside_update_F_t)(F_mu_copy[test_index], F_var_copy[test_index], self.G[:, test_index], self.Y[:, test_index], U_S_expected_val, self.V_mu[:,test_index], self.intercept_mu[test_index], self.gamma_v, tau_expected_val[test_index], self.sample_batch_fraction, self.step_size, self.SVI) for test_index in range(self.T))
+			F_update_data = Parallel(n_jobs=self.num_test_cores)(delayed(outside_update_F_t)(F_mu_copy[test_index], F_var_copy[test_index], self.G[:, test_index], self.Y[:, test_index], U_S_expected_val, self.V_mu[:,test_index], self.intercept_mu[test_index], self.gamma_v, tau_expected_val[test_index], self.alpha_big_mu[:, test_index], self.sample_batch_fraction, self.step_size, self.SVI) for test_index in range(self.T))
 		F_update_data = np.asarray(F_update_data)
 		self.F_mu = F_update_data[:,0]
 		self.F_var = F_update_data[:,1]
@@ -602,6 +638,30 @@ class EQTL_FACTORIZATION_VI(object):
 			self.F_var[test_index] = weighted_SVI_updated(self.F_var[test_index], new_var, self.step_size)
 			self.F_mu[test_index] = weighted_SVI_updated(self.F_mu[test_index], new_mu, self.step_size)
 	'''
+	def update_alpha(self):
+		U_S_expected_val = self.U_mu*self.S_U
+		tau_expected_val = self.tau_alpha/self.tau_beta
+		psi_expected_val = self.psi_alpha/self.psi_beta
+		alpha_mu_copy = np.copy(self.alpha_mu)
+		alpha_var_copy = np.copy(self.alpha_var)
+
+		alpha_update_data = []
+		if self.parrallel_boolean == False:
+			for test_index in range(self.T):
+				alpha_update_data.append(outside_update_alpha_t(alpha_mu_copy[:, test_index], alpha_var_copy[:, test_index], self.G[:, test_index], self.Y[:, test_index], self.I, U_S_expected_val, self.V_mu[:, test_index], self.F_mu[test_index], self.intercept_mu[test_index], tau_expected_val[test_index], psi_expected_val[test_index], self.individual_to_sample_indices, self.individual_to_number_full_indices, self.step_size, self.SVI))
+		else:
+				alpha_update_data = Parallel(n_jobs=self.num_test_cores)(delayed(outside_update_alpha_t)(alpha_mu_copy[:, test_index], alpha_var_copy[:, test_index], self.G[:, test_index], self.Y[:, test_index], self.I, U_S_expected_val, self.V_mu[:, test_index], self.F_mu[test_index], self.intercept_mu[test_index], tau_expected_val[test_index], psi_expected_val[test_index], self.individual_to_sample_indices, self.individual_to_number_full_indices, self.step_size, self.SVI) for test_index in range(self.T))
+		
+		alpha_update_data = np.transpose(np.asarray(alpha_update_data))
+		self.alpha_mu = alpha_update_data[:(self.I),:]
+		self.alpha_var = alpha_update_data[(self.I):, :]
+		# Now fill in big matrix
+		self.alpha_big_mu = np.zeros((self.N, self.T))
+		self.alpha_big_var = np.zeros((self.N, self.T))
+		for sample_num, z_label in enumerate(self.z):
+			self.alpha_big_mu[sample_num,:] = self.alpha_mu[self.z_mapping[z_label], :]
+			self.alpha_big_var[sample_num,:] = self.alpha_var[self.z_mapping[z_label], :]
+
 	def update_intercept(self):
 		U_S_expected_val = self.U_mu*self.S_U
 		tau_expected_val = self.tau_alpha/self.tau_beta
@@ -611,9 +671,9 @@ class EQTL_FACTORIZATION_VI(object):
 		intercept_update_data = []
 		if self.parrallel_boolean == False:
 			for test_index in range(self.T):
-				intercept_update_data.append(outside_update_intercept_t(intercept_mu_copy[test_index], intercept_var_copy[test_index], self.G[:, test_index], self.Y[:, test_index], self.N, U_S_expected_val, self.V_mu[:,test_index], self.F_mu[test_index], tau_expected_val[test_index], self.sample_batch_fraction, self.step_size, self.SVI))
+				intercept_update_data.append(outside_update_intercept_t(intercept_mu_copy[test_index], intercept_var_copy[test_index], self.G[:, test_index], self.Y[:, test_index], self.N, U_S_expected_val, self.V_mu[:,test_index], self.F_mu[test_index], tau_expected_val[test_index], self.alpha_big_mu[:, test_index], self.sample_batch_fraction, self.step_size, self.SVI))
 		if self.parrallel_boolean == True:
-				intercept_update_data = Parallel(n_jobs=self.num_test_cores)(delayed(outside_update_intercept_t)(intercept_mu_copy[test_index], intercept_var_copy[test_index], self.G[:, test_index], self.Y[:, test_index], self.N, U_S_expected_val, self.V_mu[:,test_index], self.F_mu[test_index], tau_expected_val[test_index], self.sample_batch_fraction, self.step_size, self.SVI) for test_index in range(self.T))
+				intercept_update_data = Parallel(n_jobs=self.num_test_cores)(delayed(outside_update_intercept_t)(intercept_mu_copy[test_index], intercept_var_copy[test_index], self.G[:, test_index], self.Y[:, test_index], self.N, U_S_expected_val, self.V_mu[:,test_index], self.F_mu[test_index], tau_expected_val[test_index], self.alpha_big_mu[:, test_index], self.sample_batch_fraction, self.step_size, self.SVI) for test_index in range(self.T))
 
 		intercept_update_data = np.asarray(intercept_update_data)
 		self.intercept_mu = intercept_update_data[:,0]
@@ -664,7 +724,12 @@ class EQTL_FACTORIZATION_VI(object):
 			elif self.SVI == True:
 				self.theta_U_a[k] = weighted_SVI_updated(self.theta_U_a[k], new_theta_U_a, self.step_size)
 				self.theta_U_b[k] = weighted_SVI_updated(self.theta_U_b[k], new_theta_U_b, self.step_size)
-
+	def update_psi(self):
+		alpha_squared_expected_value = np.square(self.alpha_mu) + self.alpha_var
+		# Loop through tests
+		for test_index in range(self.T):
+			self.psi_alpha[test_index] = self.alpha_prior + (self.I/2.0)
+			self.psi_beta[test_index] = self.beta_prior + (np.sum(alpha_squared_expected_value[:,test_index])/2.0)
 	def update_tau(self):
 		tau_alpha_copy = np.copy(self.tau_alpha)
 		tau_beta_copy = np.copy(self.tau_beta)
@@ -679,9 +744,9 @@ class EQTL_FACTORIZATION_VI(object):
 		tau_update_data = []
 		if self.parrallel_boolean == False:
 			for test_index in range(self.T):
-				tau_update_data.append(outside_update_tau_t(tau_alpha_copy[test_index], tau_beta_copy[test_index], self.G[:, test_index], self.Y[:, test_index], self.N, U_S, self.V_mu[:,test_index], self.F_mu[test_index], self.intercept_mu[test_index], V_S_squared[:, test_index], F_S_squared[test_index], U_S_squared, intercept_squared[test_index], self.alpha_prior, self.beta_prior, self.sample_batch_fraction, self.step_size, self.SVI))
+				tau_update_data.append(outside_update_tau_t(tau_alpha_copy[test_index], tau_beta_copy[test_index], self.G[:, test_index], self.Y[:, test_index], self.N, U_S, self.V_mu[:,test_index], self.F_mu[test_index], self.intercept_mu[test_index], V_S_squared[:, test_index], F_S_squared[test_index], U_S_squared, intercept_squared[test_index], self.alpha_big_mu[:, test_index], self.alpha_big_var[:, test_index], self.alpha_prior, self.beta_prior, self.sample_batch_fraction, self.step_size, self.SVI))
 		if self.parrallel_boolean == True:
-			tau_update_data = Parallel(n_jobs=self.num_test_cores)(delayed(outside_update_tau_t)(tau_alpha_copy[test_index], tau_beta_copy[test_index], self.G[:, test_index], self.Y[:, test_index], self.N, U_S, self.V_mu[:,test_index], self.F_mu[test_index], self.intercept_mu[test_index], V_S_squared[:, test_index], F_S_squared[test_index], U_S_squared, intercept_squared[test_index], self.alpha_prior, self.beta_prior, self.sample_batch_fraction, self.step_size, self.SVI) for test_index in range(self.T))
+			tau_update_data = Parallel(n_jobs=self.num_test_cores)(delayed(outside_update_tau_t)(tau_alpha_copy[test_index], tau_beta_copy[test_index], self.G[:, test_index], self.Y[:, test_index], self.N, U_S, self.V_mu[:,test_index], self.F_mu[test_index], self.intercept_mu[test_index], V_S_squared[:, test_index], F_S_squared[test_index], U_S_squared, intercept_squared[test_index], self.alpha_big_mu[:, test_index], self.alpha_big_var[:, test_index], self.alpha_prior, self.beta_prior, self.sample_batch_fraction, self.step_size, self.SVI) for test_index in range(self.T))
 		tau_update_data = np.asarray(tau_update_data)
 		self.tau_alpha = tau_update_data[:,0]
 		self.tau_beta = tau_update_data[:,1]
@@ -840,7 +905,25 @@ class EQTL_FACTORIZATION_VI(object):
 		return data_likelihood_term
 	# Randomly generate indices
 	def get_svi_sample_indices(self):
-		return np.random.choice(self.N_full, size=self.N, replace=False)
+		svi_sample_indices = []
+		for individual_index in range(self.I):
+			individual_indices = self.individual_to_sample_indices_full[individual_index]
+			n_i = len(individual_indices)
+			subset_n_i = int(np.ceil(n_i*self.sample_batch_fraction))
+			randos = np.random.choice(individual_indices, size=int(subset_n_i), replace=False)
+			for rando in randos:
+				svi_sample_indices.append(rando)
+		svi_sample_indices = np.asarray(svi_sample_indices)
+		if len(svi_sample_indices) > self.N:
+			svi_sample_indices = np.random.choice(svi_sample_indices,size=self.N, replace=False)
+		if len(svi_sample_indices) != self.N:
+			print('svi_sample_indices assumption error1')
+			pdb.set_trace()
+		if len(np.unique(svi_sample_indices)) != self.N:
+			print('svi_sample_indices assumption error2')
+			pdb.set_trace()
+		return svi_sample_indices
+		# return np.random.choice(self.N_full, size=self.N, replace=False)
 	def initialize_variables(self):
 		# Initialize array to keep track of ELBO
 		self.elbo = []
@@ -890,25 +973,46 @@ class EQTL_FACTORIZATION_VI(object):
 			self.U_var_s_0 = np.copy(self.U_var_s_0_full[svi_sample_indices, :])
 			self.S_U = np.copy(self.S_U_full[svi_sample_indices, :])
 
-		# Fit model with limited priors for initialization
-		#eqtl_vi_init = eqtl_factorization_vi_shared_effect_no_priors_for_initialization.EQTL_FACTORIZATION_VI(K=self.K, alpha=self.alpha_prior, beta=self.beta_prior, gamma_v=self.gamma_v, max_iter=3, delta_elbo_threshold=.01)
-		#eqtl_vi_init.fit(G=self.G, Y=self.Y, z=self.z)
 
-		#self.U_mu = eqtl_vi_init.U_mu
-		#self.U_mu = np.random.randn(self.N, self.K)
-		# Initialize with orthogonal factors
+		# Random effects
+		self.z_mapping = {}
+		self.z_inverse_mapping = {}
+		# Create mapping from grouping to index
+		_, idx = np.unique(self.z, return_index=True)
+		unique_groups = np.asarray(self.z)[np.sort(idx)]
+		for i, label in enumerate(unique_groups):
+			self.z_mapping[label] = i
+			self.z_inverse_mapping[i] = label
+		self.I = len(np.unique(self.z))
+		self.individual_to_sample_indices = []
+		self.individual_to_sample_indices_full = []
+		self.individual_to_number_full_indices = []
+		for ii in range(self.I):
+			# z_label corresponding to this individual
+			z_label = self.z_inverse_mapping[ii]
+			sample_indices = np.where(np.asarray(self.z) == z_label)[0]
+			self.individual_to_sample_indices.append(sample_indices)
+			self.individual_to_sample_indices_full.append(sample_indices)
+			self.individual_to_number_full_indices.append(float(len(sample_indices)))
+		# Variances
+		self.psi_alpha = np.ones(self.T)*self.alpha_prior
+		self.psi_beta = np.ones(self.T)*self.beta_prior
+		# Random effects
+		self.alpha_mu = np.zeros((self.I, self.T))
+		self.alpha_var = np.zeros((self.I, self.T)) + 1.0
+		# Convert random effects matrix to samplesXtests instead of groupsXtest
+		self.alpha_big_mu = np.zeros((self.N, self.T))
+		self.alpha_big_var = np.zeros((self.N, self.T))
+		for sample_num, z_label in enumerate(self.z):
+			self.alpha_big_mu[sample_num,:] = self.alpha_mu[self.z_mapping[z_label], :]
+			self.alpha_big_var[sample_num,:] = self.alpha_var[self.z_mapping[z_label], :]
 
-		
-		#self.V_mu = eqtl_vi_init.V_mu
-		#self.V_mu = np.random.randn(self.K, self.T)
 		pca = sklearn.decomposition.PCA(n_components=self.K, whiten=True)
 		pca.fit(np.random.randn(self.T, 9999).T)
 		self.V_mu = pca.components_*100.0
-		#self.V_mu = np.random.randn(self.K, self.T)
 		self.V_var = np.ones((self.K, self.T))*(1.0/self.gamma_v)
 
 		betas = run_linear_model_for_initialization(self.Y, self.G)
-		print(betas)
 		#self.F_mu = eqtl_vi_init.F_mu
 		self.F_mu = betas
 		self.F_var = np.ones(self.T)
@@ -928,15 +1032,16 @@ class EQTL_FACTORIZATION_VI(object):
 
 		# Initialize other variables based around U
 		self.step_size = 1.0
-		self.update_V()
 		self.update_intercept()
+		self.update_alpha()
+		self.update_V()
 		self.update_F()
+		self.update_psi()
 		self.update_tau()
 
 		if self.SVI == True:
 			self.sample_batch_fraction = actual_sample_batch_fraction
 			self.N = round((self.Y_full.shape[0])*self.sample_batch_fraction)
-		print('Model initialization complete')
 
 		#self.gamma_U_alpha = np.ones(self.K)*self.alpha_prior
 		#self.gamma_U_beta = np.ones(self.K)*self.beta_prior
