@@ -156,7 +156,7 @@ make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate <- 
 #######################################
 make_covariate_loading_correlation_heatmap <- function(covariates, loadings) {
 	# Covariates columns to consider
-	valid_covariates <- c(3, 4, 5, 6, 7, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24, 25, 26, 27)
+	valid_covariates <- c(2, 4, 5, 6, 9, 10, 11)
 	#print(summary(covariates[, valid_covariates]))
 	# Remove unimportant columns
     loadings <- as.matrix(loadings)
@@ -220,21 +220,18 @@ print("Hello")
 
 # Input files
 covariate_file <- paste0(processed_expression_dir, "cell_covariates_sle_individuals_random_subset.txt")
-eqtl_factorization_loading_file <- paste0(eqtl_results_dir, "temp_model_subset_re_U_S.txt")
+eqtl_factorization_loading_file <- paste0(eqtl_results_dir, "eqtl_factorization_sc_datas_20_factors_eqtl_factorization_vi_spike_and_slab_model_True_re_True_svi_0_seed_U_S.txt")
 
 # Load in data
-covariates <- read.table(covariate_file, header=TRUE)
+covariates <- read.table(covariate_file, header=TRUE, sep="\t")
 loadings <- read.table(eqtl_factorization_loading_file, header=FALSE)
 # Filter loadings file
-good_loadings <- c(2, 3, 4, 6, 8, 12, 13, 14, 15, 16, 17, 18)
-good_loadings <- c(17, 13, 16, 18, 12, 4, 14, 2, 15, 6, 3, 8)
 
-good_loadings <- c(12, 11, 3, 15, 16, 14, 10, 13, 8, 2, 1, 4, 7)
-loadings <- loadings[,good_loadings]
+#loadings <- loadings[,good_loadings]
 
 # Create UMAP factors
-#umap_loadings = umap(loadings)$layout
-#saveRDS( umap_loadings, "umap_loadings.rds")
+umap_loadings = umap(loadings)$layout
+saveRDS( umap_loadings, "umap_loadings.rds")
 print("UMAP DONE")
 umap_loadings <- readRDS("umap_loadings.rds")
 
@@ -244,37 +241,36 @@ umap_loadings <- readRDS("umap_loadings.rds")
 # Make scatter-plot of loading1 vs loading2 colored by known cell type
 #######################################
 output_file <- paste0(eqtl_visualization_dir, "loading1_vs_loading2_colored_by_known_cell_type.pdf")
-scatter <- loading_scatter_plot_colored_by_categorical_covariate(covariates$ct_cov, loadings, 1, 2, "Known cell type")
-ggsave(scatter, file=output_file, width=7.2, height=6, units="in")
+#scatter <- loading_scatter_plot_colored_by_categorical_covariate(covariates$ct_cov, loadings, 1, 2, "Known cell type")
+#ggsave(scatter, file=output_file, width=7.2, height=6, units="in")
 
 ######################################
 # Make correlation heatmap correlating covariates with loadings
 #######################################
 output_file <- paste0(eqtl_visualization_dir, "covariate_loading_correlation_heatmap.pdf")
-#heatmap <- make_covariate_loading_correlation_heatmap(covariates, loadings)
-#ggsave(heatmap, file=output_file, width=7.2, height=6, units="in")
+heatmap <- make_covariate_loading_correlation_heatmap(covariates, loadings)
+ggsave(heatmap, file=output_file, width=7.2, height=6, units="in")
 
-if (FALSE) {
 ######################################
 # Make loading boxplot with row for every factor colored by cell type
 #######################################
 output_file <- paste0(eqtl_visualization_dir, "loading_boxplot_with_row_for_every_factor_colored_by_cell_type.pdf")
-boxplot <- make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate(covariates$ct_cov, loadings, "Known cell type")
-ggsave(boxplot, file=output_file, width=10.2, height=20.5, units="in")
+#boxplot <- make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate(covariates$ct_cov, loadings, "Known cell type")
+#ggsave(boxplot, file=output_file, width=10.2, height=20.5, units="in")
 
 ######################################
 # Make loading boxplot with row for every factor colored by individual
 #######################################
 output_file <- paste0(eqtl_visualization_dir, "loading_boxplot_with_row_for_every_factor_colored_by_individual.pdf")
-boxplot <- make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate(covariates$ind_cov, loadings, "Individual")
-ggsave(boxplot, file=output_file, width=10.2, height=20.5, units="in")
+#boxplot <- make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate(covariates$ind_cov, loadings, "Individual")
+#ggsave(boxplot, file=output_file, width=10.2, height=20.5, units="in")
 
 ######################################
 # Make loading boxplot with row for every factor colored by batch
 #######################################
 output_file <- paste0(eqtl_visualization_dir, "loading_boxplot_with_row_for_every_factor_colored_by_batch.pdf")
-boxplot <- make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate(covariates$batch_cov, loadings, "Batch")
-ggsave(boxplot, file=output_file, width=10.2, height=20.5, units="in")
+#boxplot <- make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate(covariates$batch_cov, loadings, "Batch")
+#ggsave(boxplot, file=output_file, width=10.2, height=20.5, units="in")
 
 ######################################
 # Make loading boxplot colored by cell type
@@ -308,8 +304,8 @@ ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
 # Visualize UMAP scatter plot colored by male/femaile
 #######################################
 output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_gender.pdf")
-umap_scatter <- make_umap_loading_scatter_plot_colored_by_categorical_variable(covariates$Female, umap_loadings, "Known female/male")
-ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+#umap_scatter <- make_umap_loading_scatter_plot_colored_by_categorical_variable(covariates$Female, umap_loadings, "Known female/male")
+#ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
 
 ######################################
 # Visualize UMAP scatter plot colored by batch
@@ -347,4 +343,3 @@ ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
 output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_number_of_genes.pdf")
 umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$n_genes, umap_loadings, "Number of genes")
 ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
-}

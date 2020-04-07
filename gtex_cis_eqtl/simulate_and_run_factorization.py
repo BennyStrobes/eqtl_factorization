@@ -3,6 +3,8 @@ import os
 import sys
 import pdb
 import eqtl_factorization_vi_spike_and_slab
+import eqtl_factorization_vi_spike_and_slab_both_sides
+
 import eqtl_factorization_vi_spike_and_slab_no_gaussian_loading
 import pickle
 
@@ -123,6 +125,9 @@ def simulate_data_for_eqtl_factorization2(I, Ni, T, K):
 			S_U[n, component_num] = 1
 	theta_U = np.sum(S_U,axis=0)/(S_U.shape[0])
 
+	S_V = 1.0*(np.random.uniform(size=(K,T)) < .4)
+	theta_V = np.sum(S_V,axis=1)/(S_V.shape[1])
+
 	Y = G*np.dot(S_U*U_true, V_true) + G*np.dot(np.ones((N,1)),F_true)
 	gene_residual_sdevs = np.sqrt(np.random.exponential(size=T))*10
 	for m in range(T):
@@ -132,7 +137,7 @@ def simulate_data_for_eqtl_factorization2(I, Ni, T, K):
 	for individual_index in range(I):
 		for ni in range(Ni):
 			Z.append(str(individual_index))
-	gene_random_effects_sdevs = np.sqrt(np.random.exponential(size=T))
+	gene_random_effects_sdevs = np.sqrt(np.random.exponential(size=T))*10.0
 	alphas = np.zeros((I, T))
 	for t in range(T):
 		sample_num = 0
@@ -148,7 +153,9 @@ def simulate_data_for_eqtl_factorization2(I, Ni, T, K):
 	data['F'] = F_true
 	data['resid'] = gene_residual_sdevs
 	data['theta_U'] = theta_U
+	data['theta_V'] = theta_V
 	data['S_U'] = S_U
+	data['S_V'] = S_V
 	data['alphas'] = alphas
 	data['gene_random_effects_sdevs'] = gene_random_effects_sdevs
 	return Y, G, Z, data
@@ -177,7 +184,7 @@ alpha_0 = 1e-16
 beta_0 = 1e-16
 a_0 = 1
 b_0 = 1
-max_iter=300
+max_iter=1000
 gamma_v=1.0
 # Only applicable to if SVI_boolean==True
 sample_batch_fraction=0.3
