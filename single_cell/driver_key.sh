@@ -64,7 +64,7 @@ genotype_testing_file=$eqtl_input_dir"sc_genotype_training_data_corrected_10000_
 
 
 # Paramaters
-model_name="eqtl_factorization_vi_spike_and_slab"
+model_name="eqtl_factorization_vi_spike_and_slab_loadings_ard_factors"
 num_latent_factors="20"
 random_effects="True"
 svi="True"

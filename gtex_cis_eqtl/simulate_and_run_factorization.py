@@ -4,6 +4,7 @@ import sys
 import pdb
 import eqtl_factorization_vi_spike_and_slab
 import eqtl_factorization_vi_spike_and_slab_both_sides
+import eqtl_factorization_vi_spike_and_slab_loadings_ard_factors
 
 import eqtl_factorization_vi_spike_and_slab_no_gaussian_loading
 import pickle
@@ -125,10 +126,9 @@ def simulate_data_for_eqtl_factorization2(I, Ni, T, K):
 			S_U[n, component_num] = 1
 	theta_U = np.sum(S_U,axis=0)/(S_U.shape[0])
 
-	S_V = 1.0*(np.random.uniform(size=(K,T)) < .4)
-	theta_V = np.sum(S_V,axis=1)/(S_V.shape[1])
+	S_V = 1.0*(np.random.uniform(size=(T)) < .6)
 
-	Y = G*np.dot(S_U*U_true, V_true) + G*np.dot(np.ones((N,1)),F_true)
+	Y = G*np.dot(S_U*U_true, V_true*S_V) + G*np.dot(np.ones((N,1)),F_true)
 	gene_residual_sdevs = np.sqrt(np.random.exponential(size=T))*10
 	for m in range(T):
 		Y[:,m] = Y[:, m] + np.random.normal(0, gene_residual_sdevs[m],size=N)
@@ -145,7 +145,7 @@ def simulate_data_for_eqtl_factorization2(I, Ni, T, K):
 			individual_intercept = np.random.normal(0, gene_random_effects_sdevs[t])
 			alphas[individual_index, t] = individual_intercept
 			for ni in range(Ni):
-				Y[sample_num, t] = Y[sample_num, t] + individual_intercept
+				# Y[sample_num, t] = Y[sample_num, t] + individual_intercept
 				sample_num = sample_num + 1
 	data = {}
 	data['U'] = U_true
@@ -153,7 +153,6 @@ def simulate_data_for_eqtl_factorization2(I, Ni, T, K):
 	data['F'] = F_true
 	data['resid'] = gene_residual_sdevs
 	data['theta_U'] = theta_U
-	data['theta_V'] = theta_V
 	data['S_U'] = S_U
 	data['S_V'] = S_V
 	data['alphas'] = alphas
@@ -200,7 +199,7 @@ Y, G, z, data = simulate_data_for_eqtl_factorization2(I, Ni, T, K)
 ##################
 # Fit eqtl factorization using home-built variational inference
 ##################
-eqtl_vi = eqtl_factorization_vi_spike_and_slab.EQTL_FACTORIZATION_VI(K=20, alpha=alpha_0, beta=beta_0, a=a_0, b=b_0, max_iter=max_iter, gamma_v=gamma_v, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean, sample_batch_fraction=sample_batch_fraction, learning_rate=learning_rate, forgetting_rate=forgetting_rate)
+eqtl_vi = eqtl_factorization_vi_spike_and_slab_loadings_ard_factors.EQTL_FACTORIZATION_VI(K=20, alpha=alpha_0, beta=beta_0, a=a_0, b=b_0, max_iter=max_iter, gamma_v=gamma_v, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean, sample_batch_fraction=sample_batch_fraction, learning_rate=learning_rate, forgetting_rate=forgetting_rate)
 eqtl_vi.fit(G=G, Y=Y, z=z)
 pickle.dump(eqtl_vi, open(output_root + '_model', 'wb'))
 pdb.set_trace()
