@@ -410,15 +410,15 @@ def extract_covariates_from_cell_level_info_file(cell_level_info_file):
 	f.close()
 	return np.asarray(arr)
 
-def regress_out_covariates(expression_input_file, covariate_file, expression_output_file, num_pcs, cell_level_info_file):
+def regress_out_covariates(expression_input_file, covariate_file, expression_output_file, num_pcs):
 	# Load in covariates
 	covariate_raw = np.loadtxt(covariate_file, dtype=str, delimiter='\t')
 
 	pc_covariate_mat = covariate_raw[:,:num_pcs].astype(float)
 	
-	cell_level_covariate_mat = extract_covariates_from_cell_level_info_file(cell_level_info_file)
-	
-	covariate_mat = np.hstack((pc_covariate_mat, cell_level_covariate_mat))
+	#cell_level_covariate_mat = extract_covariates_from_cell_level_info_file(cell_level_info_file)
+	covariate_mat = pc_covariate_mat
+	#covariate_mat = np.hstack((pc_covariate_mat, cell_level_covariate_mat))
 	f = open(expression_input_file)
 	t = open(expression_output_file, 'w')
 
@@ -580,6 +580,62 @@ def save_as_h5_file(input_text_file):
 	h5f.create_dataset('data', data=mat)
 	h5f.close()
 
+def prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, distance, genotype_data_dir, gene_file, expression_file, r_squared_threshold, max_variants_per_gene, num_pcs, covariate_file, cell_level_info_file, random_seed):
+	########################
+	# Step 1: Create file with all variant gene pairs such that gene is within $distanceKB of gene
+	########################
+	# Output file containing list of variant gene pairs
+	variant_gene_pair_file = output_root + '_variant_gene_pairs.txt'
+	extract_variant_gene_pairs_for_eqtl_testing(gene_file, gene_annotation_file, distance, genotype_data_dir, variant_gene_pair_file)
+
+
+	########################
+	# Step 2: LD prune the above file in each gene (ie limit to only independent snps per gene)
+	########################
+	# Output file containing list of (pruned) variant gene pairs
+	ld_pruned_variant_gene_pair_file = output_root + '_variant_gene_pairs_r_squared_pruned.txt'
+	ld_prune_variant_gene_pair_file(variant_gene_pair_file, ld_pruned_variant_gene_pair_file, r_squared_threshold, genotype_data_dir, max_variants_per_gene, random_seed)
+
+	########################
+	# Step 3: Generate expression matrix
+	########################
+	# Output file
+	single_cell_expression_eqtl_traing_data_file = output_root + '_expression_training_data_uncorrected_r_squared_pruned.txt'
+	generate_single_cell_expression_eqtl_training_data(ld_pruned_variant_gene_pair_file, expression_file, gene_file, single_cell_expression_eqtl_traing_data_file)
+
+	########################
+	# Step 4: Generate residual expression
+	########################
+	# Residual expression file
+	single_cell_corrected_expression_eqtl_traing_data_file = output_root + '_expression_training_data_corrected_r_squared_pruned.txt'
+	regress_out_covariates(single_cell_expression_eqtl_traing_data_file, covariate_file, single_cell_corrected_expression_eqtl_traing_data_file, num_pcs)
+	save_as_h5_file(single_cell_corrected_expression_eqtl_traing_data_file)
+
+	########################
+	# Step 5: Generate Genotype matrix
+	########################
+	# Output file
+	single_cell_genotype_eqtl_training_data_file = output_root + '_genotype_training_data_uncorrected_r_squared_pruned.txt'
+	construct_genotype_matrix(ld_pruned_variant_gene_pair_file, genotype_data_dir, cell_level_info_file, single_cell_genotype_eqtl_training_data_file)
+	save_as_h5_file(single_cell_genotype_eqtl_training_data_file)
+
+	########################
+	# Step 6: Generate residual genotype
+	########################
+	# corrected expression file (output file)
+	single_cell_corrected_genotype_eqtl_traing_data_file = output_root + '_genotype_training_data_corrected_r_squared_pruned.txt'
+	regress_out_covariates(single_cell_genotype_eqtl_training_data_file, covariate_file, single_cell_corrected_genotype_eqtl_traing_data_file, num_pcs)
+	save_as_h5_file(single_cell_corrected_genotype_eqtl_traing_data_file)
+
+	########################
+	# Step 7: Generate individual id file (z matrix in eqtl factorization)
+	########################
+	# Output file
+	single_cell_individual_id_file = output_root + '_individual_id.txt'
+	generate_individual_id_file(cell_level_info_file, single_cell_individual_id_file)
+
+
+
 ######################
 # Command line args
 ######################
@@ -589,7 +645,80 @@ eqtl_input_dir = sys.argv[3]
 genotype_data_dir = sys.argv[4]
 
 
+'''
+# Variant must be within $distance BP from TSS of gene
+distance = 10000
+# File containing availible genes
+gene_file = processed_expression_dir + 'single_cell_expression_sle_individuals_random_subset_gene_ids.txt'
+# Input file containing expression
+expression_file = processed_expression_dir + 'single_cell_expression_sle_individuals_random_subset_standardized.txt'
+# Covariate file
+covariate_file = processed_expression_dir + 'pca_scores_sle_individuals_random_subset.txt'
+# File containing mapping from cell index to individual id
+cell_level_info_file = processed_expression_dir + 'cell_covariates_sle_individuals_random_subset.txt'
+# Only allow snps with r_squared threshold less than this
+r_squared_threshold=0.5
+# Maximum number of variants per gene
+max_variants_per_gene=2
+# Number of PCs to regress out
+num_pcs = 15
+# random seed used for ld pruning
+random_seed=1
+# Output root
+output_root = eqtl_input_dir + 'single_cell_random_subset'
 
+prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, distance, genotype_data_dir, gene_file, expression_file, r_squared_threshold, max_variants_per_gene, num_pcs, covariate_file, cell_level_info_file, random_seed)
+'''
+
+
+
+
+# Variant must be within $distance BP from TSS of gene
+distance = 10000
+# File containing availible genes
+gene_file = processed_expression_dir + 'single_cell_expression_sle_individuals_gene_ids.txt'
+# Input file containing expression
+expression_file = processed_expression_dir + 'pseudobulk_expression_sle_individuals_standardized.txt'
+# Covariate file
+covariate_file = processed_expression_dir + 'pca_scores_pseudobulk_sle_individuals.txt'
+# File containing mapping from cell index to individual id
+cell_level_info_file = processed_expression_dir + 'pseudobulk_covariates_sle_individuals.txt'
+# Only allow snps with r_squared threshold less than this
+r_squared_threshold=0.5
+# Maximum number of variants per gene
+max_variants_per_gene=2
+# Number of PCs to regress out
+num_pcs = 15
+# random seed used for ld pruning
+random_seed=1
+# Output root
+output_root = eqtl_input_dir + 'pseudobulk'
+
+prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, distance, genotype_data_dir, gene_file, expression_file, r_squared_threshold, max_variants_per_gene, num_pcs, covariate_file, cell_level_info_file, random_seed)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+'''
 ########################
 # Step 1: Create file with all variant gene pairs such that gene is within $distanceKB of gene
 ########################
@@ -743,4 +872,4 @@ single_cell_individual_id_file = eqtl_input_dir + 'sc_individual_id.txt'
 generate_individual_id_file(cell_level_info_file, single_cell_individual_id_file)
 
 
-
+'''

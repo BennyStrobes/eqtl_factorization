@@ -225,9 +225,9 @@ output_root = eqtl_results_dir + file_stem
 #########################
 # Train model
 #########################
-#train_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, random_effects, svi_boolean, parrallel_boolean)
+train_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, random_effects, svi_boolean, parrallel_boolean)
 
 
-debug_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, random_effects, svi_boolean, parrallel_boolean)
+#debug_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, random_effects, svi_boolean, parrallel_boolean)
 
 

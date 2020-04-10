@@ -333,7 +333,7 @@ class EQTL_FACTORIZATION_VI(object):
 			self.update_U()
 			self.update_V()
 			self.update_alpha()
-			# self.update_intercept()
+			self.update_intercept()
 			self.update_F()
 			self.update_theta_U()
 			self.update_psi()
@@ -343,7 +343,7 @@ class EQTL_FACTORIZATION_VI(object):
 			if np.mod(vi_iter, 50) == 0 and vi_iter > 0:
 				# UPDATE remove irrelevent_factors TO BE IN TERMS OF *_FULL (ie re-learn theta_U on all data)
 				self.remove_irrelevent_factors()
-				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_U_S.txt', (self.U_mu_full*self.S_U_full), fmt="%s", delimiter='\t')
+				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_U_S.txt', (self.U_mu*self.S_U), fmt="%s", delimiter='\t')
 				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_V.txt', (self.V_mu), fmt="%s", delimiter='\t')
 				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_F.txt', (self.F_mu), fmt="%s", delimiter='\t')
 				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_alpha.txt', (self.alpha_mu), fmt="%s", delimiter='\t')
@@ -944,7 +944,6 @@ class EQTL_FACTORIZATION_VI(object):
 			self.z = np.copy(self.z_full)
 			betas = run_linear_model_for_initialization(self.Y, self.G)
 			test_sdev = np.std(betas)
-			print(test_sdev)
 			pca = sklearn.decomposition.PCA(n_components=self.K, whiten=True)
 			pca.fit(np.random.randn(self.N, 9999).T)
 			self.U_mu = pca.components_.T
@@ -971,7 +970,6 @@ class EQTL_FACTORIZATION_VI(object):
 			self.z = np.copy(self.z_full)[svi_sample_indices]
 			betas = run_linear_model_for_initialization(self.Y, self.G)
 			test_sdev = np.std(betas)
-			print(test_sdev)
 			pca = sklearn.decomposition.PCA(n_components=self.K, whiten=True)
 			pca.fit(np.random.randn(self.N_full, 9999).T)
 			self.U_mu_full = pca.components_.T
@@ -1036,7 +1034,7 @@ class EQTL_FACTORIZATION_VI(object):
 		# Intercepts
 		# self.intercept_mu = eqtl_vi_init.intercept_mu
 		self.intercept_mu = np.zeros(self.T)
-		self.intercept_var = np.ones(self.T)*.0001
+		self.intercept_var = np.ones(self.T)
 
 		# Variances
 		self.tau_alpha = np.ones(self.T)*self.alpha_prior
@@ -1049,7 +1047,7 @@ class EQTL_FACTORIZATION_VI(object):
 		self.step_size = 1.0
 		self.update_V()
 		self.update_alpha()
-		# self.update_intercept()
+		self.update_intercept()
 		self.update_F()
 		self.update_psi()
 		self.update_tau()
