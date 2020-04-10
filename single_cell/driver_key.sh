@@ -32,7 +32,7 @@ pseudobulk_eqtl_dir=$output_root"pseudobulk_eqtl/"
 eqtl_input_dir=$output_root"eqtl_input/"
 
 # Directory containing pre-processed eqtl files
-eqtl_results_dir=$output_root"eqtl_factorization_results/"
+eqtl_factorization_results_dir=$output_root"eqtl_factorization_results/"
 
 # Directory containing pre-processed eqtl files
 eqtl_visualization_dir=$output_root"visualize_eqtl_factorization/"
@@ -49,6 +49,7 @@ fi
 ######################
 # Run eQTL analysis at pseudobulk level
 ######################
+sh run_pseudobulk_eqtl_analysis.sh $processed_expression_dir $gene_annotation_file $genotype_data_dir $pseudobulk_eqtl_dir
 
 
 ######################
@@ -83,13 +84,13 @@ if false; then
 for seed in "${seeds[@]}"; do
 	echo "Seed: "$seed
 	file_stem="eqtl_factorization_pseudobulk_data_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed"
-	sh eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name $random_effects $svi $parrallel
+	sh eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_factorization_results_dir $seed $model_name $random_effects $svi $parrallel
 done
 fi
 
 
 if false; then
-Rscript visualize_single_cell_eqtl_factorization.R $processed_expression_dir $eqtl_input_dir $eqtl_results_dir $eqtl_visualization_dir
+Rscript visualize_single_cell_eqtl_factorization.R $processed_expression_dir $eqtl_input_dir $eqtl_factorization_results_dir $eqtl_visualization_dir
 fi
 
 
