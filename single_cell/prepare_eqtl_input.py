@@ -517,6 +517,39 @@ def get_genotype_level_ordered_individual_array(genotype_data_dir):
 	'''
 	return np.asarray(indi)
 
+def construct_standardized_genotype_matrix(ld_pruned_variant_gene_pair_file, genotype_data_dir, cell_level_info_file, single_cell_genotype_eqtl_training_data_file):
+	variant_names, variant_list = get_ordered_list_of_variant_names(ld_pruned_variant_gene_pair_file)
+
+	ordered_individuals_cell_level = get_cell_level_ordered_individaul_array(cell_level_info_file)
+	
+	ordered_individuals_genotype_level = get_genotype_level_ordered_individual_array(genotype_data_dir)
+
+	# Create mapping from variant_id to genotype vectors
+	variant_to_genotype = create_mapping_from_variants_to_genotype(variant_list, genotype_data_dir)
+	
+	# Create array mapping from genotype-level array to single cell-level array
+	mapping_array = []
+	converter = {}
+	for i, indi in enumerate(ordered_individuals_genotype_level):
+		converter[indi] = i 
+	for indi in ordered_individuals_cell_level:
+		mapping_array.append(converter[indi])
+	mapping_array = np.asarray(mapping_array)
+	# Simple error checking
+	if np.array_equal(ordered_individuals_cell_level, ordered_individuals_genotype_level[mapping_array]) == False:
+		print('assumption error')
+		pdb.set_trace()
+
+	# print new genotype file
+	t = open(single_cell_genotype_eqtl_training_data_file, 'w')
+	for variant_id in variant_names:
+		genotype_vector = (variant_to_genotype[variant_id]).astype(str)
+		cell_level_genotype_vector = genotype_vector[mapping_array]
+		cell_level_genotype_vector = cell_level_genotype_vector.astype(float)
+		standardized_cell_level_genotype_vector = (cell_level_genotype_vector - np.mean(cell_level_genotype_vector))/np.std(cell_level_genotype_vector)
+		t.write('\t'.join(standardized_cell_level_genotype_vector.astype(str)) + '\n')
+	t.close()
+
 
 def construct_genotype_matrix(ld_pruned_variant_gene_pair_file, genotype_data_dir, cell_level_info_file, single_cell_genotype_eqtl_training_data_file):
 	variant_names, variant_list = get_ordered_list_of_variant_names(ld_pruned_variant_gene_pair_file)
@@ -580,7 +613,47 @@ def save_as_h5_file(input_text_file):
 	h5f.create_dataset('data', data=mat)
 	h5f.close()
 
-def prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, distance, genotype_data_dir, gene_file, expression_file, r_squared_threshold, max_variants_per_gene, num_pcs, covariate_file, cell_level_info_file, random_seed):
+def extract_sig_variant_gene_pairs_from_known_cell_types(known_cell_type_file, pseudobulk_eqtl_dir, num_tests_per_cell_type, ld_pruned_variant_gene_pair_file, random_seed):
+	np.random.seed(random_seed)
+	cell_types = np.loadtxt(known_cell_type_file, dtype=str)
+	tests = {}
+	t = open(ld_pruned_variant_gene_pair_file, 'w')
+	t.write('Gene_id\tvariant_id\tchrom_num\tgene_tss\tvariant_position\n')
+	# Add test keys to tests one cell type at a time
+	for cell_type in cell_types:
+		cell_type_sig_file = pseudobulk_eqtl_dir + cell_type + '_pseudobulk_eqtl_analysis_multiple_testing_bf_bh.txt'
+		f = open(cell_type_sig_file)
+		arr = []
+		head_count = 0
+		for line in f:
+			line = line.rstrip()
+			data = line.split()
+			if head_count == 0:
+				head_count = head_count + 1
+				continue
+			arr.append(data)
+		f.close()
+		mat = np.asarray(arr)
+		num_genes = mat.shape[0]
+		if num_tests_per_cell_type > num_genes:
+			indices = np.random.choice(range(num_genes),size=num_genes,replace=False)
+		else:
+			indices = np.random.choice(range(num_genes),size=num_tests_per_cell_type,replace=False)
+		new_mat = mat[indices,:]
+		nrows = new_mat.shape[0]
+		print(nrows)
+		for row_num in range(nrows):
+			gene_id = new_mat[row_num, 0]
+			variant_id = new_mat[row_num, 1]
+			test_name = gene_id + '_' + variant_id
+			if test_name in tests:
+				continue
+			tests[test_name] = 1
+			t.write('\t'.join(new_mat[row_num, :5]) + '\n')
+	t.close()
+
+def prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, distance, genotype_data_dir, gene_file, expression_file, r_squared_threshold, max_variants_per_gene, num_pcs, covariate_file, cell_level_info_file, known_cell_type_file, pseudobulk_eqtl_dir, random_seed):
+	'''
 	########################
 	# Step 1: Create file with all variant gene pairs such that gene is within $distanceKB of gene
 	########################
@@ -595,6 +668,10 @@ def prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, 
 	# Output file containing list of (pruned) variant gene pairs
 	ld_pruned_variant_gene_pair_file = output_root + '_variant_gene_pairs_r_squared_pruned.txt'
 	ld_prune_variant_gene_pair_file(variant_gene_pair_file, ld_pruned_variant_gene_pair_file, r_squared_threshold, genotype_data_dir, max_variants_per_gene, random_seed)
+	'''
+	ld_pruned_variant_gene_pair_file = output_root + '_variant_gene_pairs_in_known_cell_types.txt'
+	num_tests_per_cell_type = 400
+	extract_sig_variant_gene_pairs_from_known_cell_types(known_cell_type_file, pseudobulk_eqtl_dir, num_tests_per_cell_type, ld_pruned_variant_gene_pair_file, random_seed)
 
 	########################
 	# Step 3: Generate expression matrix
@@ -628,6 +705,22 @@ def prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, 
 	save_as_h5_file(single_cell_corrected_genotype_eqtl_traing_data_file)
 
 	########################
+	# Step 5: Generate Genotype matrix
+	########################
+	# Output file
+	single_cell_genotype_eqtl_training_data_file = output_root + '_standardized_genotype_training_data_uncorrected_r_squared_pruned.txt'
+	construct_standardized_genotype_matrix(ld_pruned_variant_gene_pair_file, genotype_data_dir, cell_level_info_file, single_cell_genotype_eqtl_training_data_file)
+	save_as_h5_file(single_cell_genotype_eqtl_training_data_file)
+
+	########################
+	# Step 6: Generate residual genotype
+	########################
+	# corrected expression file (output file)
+	single_cell_corrected_genotype_eqtl_traing_data_file = output_root + '_standardized_genotype_training_data_corrected_r_squared_pruned.txt'
+	regress_out_covariates(single_cell_genotype_eqtl_training_data_file, covariate_file, single_cell_corrected_genotype_eqtl_traing_data_file, num_pcs)
+	save_as_h5_file(single_cell_corrected_genotype_eqtl_traing_data_file)
+
+	########################
 	# Step 7: Generate individual id file (z matrix in eqtl factorization)
 	########################
 	# Output file
@@ -643,6 +736,7 @@ gene_annotation_file = sys.argv[1]
 processed_expression_dir = sys.argv[2]
 eqtl_input_dir = sys.argv[3]
 genotype_data_dir = sys.argv[4]
+pseudobulk_eqtl_dir = sys.argv[5]
 
 
 '''
@@ -683,18 +777,20 @@ expression_file = processed_expression_dir + 'pseudobulk_expression_sle_individu
 covariate_file = processed_expression_dir + 'pca_scores_pseudobulk_sle_individuals.txt'
 # File containing mapping from cell index to individual id
 cell_level_info_file = processed_expression_dir + 'pseudobulk_covariates_sle_individuals.txt'
+# known cell types
+known_cell_type_file = pseudobulk_eqtl_dir + 'cell_types.txt'
 # Only allow snps with r_squared threshold less than this
 r_squared_threshold=0.5
 # Maximum number of variants per gene
 max_variants_per_gene=2
 # Number of PCs to regress out
-num_pcs = 15
+num_pcs = 50
 # random seed used for ld pruning
 random_seed=1
 # Output root
-output_root = eqtl_input_dir + 'pseudobulk'
+output_root = eqtl_input_dir + 'pseudobulk_sig_tests_50_pc'
 
-prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, distance, genotype_data_dir, gene_file, expression_file, r_squared_threshold, max_variants_per_gene, num_pcs, covariate_file, cell_level_info_file, random_seed)
+prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, distance, genotype_data_dir, gene_file, expression_file, r_squared_threshold, max_variants_per_gene, num_pcs, covariate_file, cell_level_info_file, known_cell_type_file, pseudobulk_eqtl_dir, random_seed)
 
 
 

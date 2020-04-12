@@ -1,10 +1,9 @@
 #!/bin/bash -l
 
 #SBATCH
-#SBATCH --time=40:00:00
-#SBATCH --partition=shared
+#SBATCH --time=20:00:00
+#SBATCH --partition=lrgmem
 #SBATCH --nodes=1
-#SBATCH --mem=10GB
 
 
 sample_overlap_file="$1"

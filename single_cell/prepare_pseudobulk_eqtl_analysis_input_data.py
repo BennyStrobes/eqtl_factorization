@@ -96,7 +96,7 @@ def generate_cell_type_pseudobulk_expression_data(cell_type, raw_pseudobulk_expr
 	# Standardize summed pseudobulk counts (samples X genes)
 	standardize_pseudobulk_counts(cell_type_raw_pseudobulk_expression, cell_type_pseudobulk_expression_file)
 	# Compute PCs
-	num_pcs=100
+	num_pcs=15
 	generate_pca_scores_and_variance_explained(cell_type_pseudobulk_expression_file, num_pcs, cell_type_pca_loading_file, cell_type_pca_ve_file)
 
 ########################
@@ -453,6 +453,7 @@ if len(np.unique(ensamble_ids)) != len(ensamble_ids):
 # For each cell type generate pseudobulk expression data
 ###################
 for cell_type in cell_types:
+	print(cell_type)
 	# Output files to generate
 	cell_type_raw_pseudobulk_expression_file = pseudobulk_eqtl_dir + cell_type + '_raw_expression.txt'
 	cell_type_pseudobulk_expression_file = pseudobulk_eqtl_dir + cell_type + '_standardized_expression.txt'

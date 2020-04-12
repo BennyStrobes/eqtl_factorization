@@ -130,12 +130,12 @@ def debug_eqtl_factorization_model(sample_overlap_file, expression_training_file
 	# Plot distribution of factor weights (are some stronger than others?)
 	# raw_expression = np.transpose(np.asarray(h5py.File('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_input/sc_raw_expression_training_data_uncorrected_10000_bp_0.5_r_squared_pruned.h5','r')['data']))
 	# raw_genotype = np.transpose(np.asarray(h5py.File('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_input/sc_genotype_training_data_uncorrected_10000_bp_0.5_r_squared_pruned.h5','r')['data']))
-	test_names = np.loadtxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_input/variant_gene_pairs_10000_bp_0.5_r_squared_pruned.txt',dtype=str,delimiter='\t')
+	test_names = np.loadtxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_input/pseudobulk_sig_tests_50_pc_variant_gene_pairs_in_known_cell_types.txt',dtype=str,delimiter='\t')
 	gene_names = test_names[1:,0]
 	variant_names = test_names[1:,1]
-	factor_num = 4
+	factor_num = 7
 	factor_weights = np.abs(eqtl_vi.V_mu[factor_num,:])
-	loading_weights = (eqtl_vi.U_mu_full*eqtl_vi.S_U_full)[:, factor_num]
+	loading_weights = (eqtl_vi.U_mu*eqtl_vi.S_U)[:, factor_num]
 	ordered_tests = np.argsort(-factor_weights)
 	geno1 = eqtl_vi.Y_full[:, ordered_tests[0]]
 	counter = 0
@@ -144,10 +144,10 @@ def debug_eqtl_factorization_model(sample_overlap_file, expression_training_file
 		print(counter)
 		print(gene_names[test_num])
 		print(eqtl_vi.V_mu[factor_num,test_num])
-		print(eqtl_vi.gamma_V_alpha[test_num]/eqtl_vi.gamma_V_beta[test_num])
 		print(np.corrcoef(geno1,  eqtl_vi.Y_full[:, test_num])[0,1])
 		pdb.set_trace()
 		if counter < 5:
+
 			fig = plt.figure()
 			plt.scatter(eqtl_vi.G_full[:, test_num], loading_weights,c=eqtl_vi.Y_full[:, test_num], s=.1)
 			plt.xlabel('Normalized Genotype (' + variant_names[test_num] + ')')
@@ -225,9 +225,9 @@ output_root = eqtl_results_dir + file_stem
 #########################
 # Train model
 #########################
-train_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, random_effects, svi_boolean, parrallel_boolean)
+#train_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, random_effects, svi_boolean, parrallel_boolean)
 
 
-#debug_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, random_effects, svi_boolean, parrallel_boolean)
+debug_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, random_effects, svi_boolean, parrallel_boolean)
 
 

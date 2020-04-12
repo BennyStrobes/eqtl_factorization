@@ -336,8 +336,7 @@ class EQTL_FACTORIZATION_VI(object):
 			self.update_intercept()
 			self.update_F()
 			self.update_theta_U()
-			if vi_iter > 5:
-				self.update_gamma_V()
+			self.update_gamma_V()
 			self.update_psi()
 			self.update_tau()
 			self.iter = self.iter + 1
@@ -345,10 +344,10 @@ class EQTL_FACTORIZATION_VI(object):
 			if np.mod(vi_iter, 50) == 0 and vi_iter > 0:
 				# UPDATE remove irrelevent_factors TO BE IN TERMS OF *_FULL (ie re-learn theta_U on all data)
 				self.remove_irrelevent_factors()
-				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_U_S.txt', (self.U_mu_full*self.S_U_full), fmt="%s", delimiter='\t')
-				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_V.txt', (self.V_mu), fmt="%s", delimiter='\t')
-				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_F.txt', (self.F_mu), fmt="%s", delimiter='\t')
-				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_gamma_V.txt', (self.gamma_V_alpha/self.gamma_V_beta), fmt="%s", delimiter='\t')
+				#np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_U_S.txt', (self.U_mu_full*self.S_U_full), fmt="%s", delimiter='\t')
+				#np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_V.txt', (self.V_mu), fmt="%s", delimiter='\t')
+				#np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_F.txt', (self.F_mu), fmt="%s", delimiter='\t')
+				#np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_gamma_V.txt', (self.gamma_V_alpha/self.gamma_V_beta), fmt="%s", delimiter='\t')
 
 			
 			# Compute ELBO after update
@@ -362,7 +361,7 @@ class EQTL_FACTORIZATION_VI(object):
 			'''
 			####################
 			print(self.theta_U_a/(self.theta_U_a + self.theta_U_b))
-			#print(self.gamma_V_alpha/self.gamma_V_beta)
+			print(self.gamma_V_alpha/self.gamma_V_beta)
 			end_time = time.time()
 			print(end_time-start_time)
 			print('##############')
@@ -430,9 +429,9 @@ class EQTL_FACTORIZATION_VI(object):
 
 		if self.parrallel_boolean == False:
 			for test_index in range(self.T):
-				V_update_data.append(outside_update_V_t(V_mu_copy[:, test_index], V_var_copy[:, test_index], self.G[:, test_index], self.Y[:, test_index], self.K, U_S_expected_val, U_S_squared_expected_val, self.F_mu[test_index], self.intercept_mu[test_index], self.alpha_big_mu[:, test_index], gamma_v[test_index], tau_expected_val[test_index], self.sample_batch_fraction, self.step_size, self.SVI))
+				V_update_data.append(outside_update_V_t(V_mu_copy[:, test_index], V_var_copy[:, test_index], self.G[:, test_index], self.Y[:, test_index], self.K, U_S_expected_val, U_S_squared_expected_val, self.F_mu[test_index], self.intercept_mu[test_index], self.alpha_big_mu[:, test_index], gamma_v, tau_expected_val[test_index], self.sample_batch_fraction, self.step_size, self.SVI))
 		elif self.parrallel_boolean == True:
-			V_update_data = Parallel(n_jobs=self.num_test_cores)(delayed(outside_update_V_t)(V_mu_copy[:, test_index], V_var_copy[:, test_index], self.G[:, test_index], self.Y[:, test_index], self.K, U_S_expected_val, U_S_squared_expected_val, self.F_mu[test_index], self.intercept_mu[test_index], self.alpha_big_mu[:, test_index], gamma_v[test_index], tau_expected_val[test_index], self.sample_batch_fraction, self.step_size, self.SVI) for test_index in range(self.T))
+			V_update_data = Parallel(n_jobs=self.num_test_cores)(delayed(outside_update_V_t)(V_mu_copy[:, test_index], V_var_copy[:, test_index], self.G[:, test_index], self.Y[:, test_index], self.K, U_S_expected_val, U_S_squared_expected_val, self.F_mu[test_index], self.intercept_mu[test_index], self.alpha_big_mu[:, test_index], gamma_v, tau_expected_val[test_index], self.sample_batch_fraction, self.step_size, self.SVI) for test_index in range(self.T))
 
 		# Convert to array
 		V_update_data = np.asarray(V_update_data).T
@@ -714,9 +713,13 @@ class EQTL_FACTORIZATION_VI(object):
 	def update_gamma_V(self):
 		V_S_squared_expected_val = np.square(self.V_mu) + self.V_var
 		# Loop through tests
-		for test_index in range(self.T):
-			self.gamma_V_alpha[test_index] = self.alpha_prior + (self.K/2.0)
-			self.gamma_V_beta[test_index] = self.beta_prior + np.sum(V_S_squared_expected_val[:, test_index])/2.0
+		'''
+		for k in range(self.K):
+			self.gamma_V_alpha[k] = self.alpha_prior + (self.T/2.0)
+			self.gamma_V_beta[k] = self.beta_prior + np.sum(V_S_squared_expected_val[k, :])/2.0
+		'''
+		self.gamma_V_alpha = self.alpha_prior + (self.T*self.K/2.0)
+		self.gamma_V_beta = self.beta_prior + np.sum(V_S_squared_expected_val)/2.0
 	def update_gamma_U(self):
 		# Loop through factors
 		for k in range(self.K):
@@ -1042,8 +1045,10 @@ class EQTL_FACTORIZATION_VI(object):
 		self.intercept_mu = np.zeros(self.T)
 		self.intercept_var = np.ones(self.T)
 
-		self.gamma_V_alpha = np.ones(self.T)
-		self.gamma_V_beta = np.ones(self.T)
+		#self.gamma_V_alpha = np.ones(self.K)
+		#self.gamma_V_beta = np.ones(self.K)
+		self.gamma_V_alpha = 1.0
+		self.gamma_V_beta = 1.0
 
 		# Variances
 		self.tau_alpha = np.ones(self.T)*self.alpha_prior
@@ -1058,7 +1063,7 @@ class EQTL_FACTORIZATION_VI(object):
 		self.update_alpha()
 		self.update_intercept()
 		self.update_F()
-		#self.update_gamma_V()
+		self.update_gamma_V()
 		self.update_psi()
 		self.update_tau()
 

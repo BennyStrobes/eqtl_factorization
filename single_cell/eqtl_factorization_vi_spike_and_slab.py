@@ -343,10 +343,10 @@ class EQTL_FACTORIZATION_VI(object):
 			if np.mod(vi_iter, 50) == 0 and vi_iter > 0:
 				# UPDATE remove irrelevent_factors TO BE IN TERMS OF *_FULL (ie re-learn theta_U on all data)
 				self.remove_irrelevent_factors()
-				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_U_S.txt', (self.U_mu*self.S_U), fmt="%s", delimiter='\t')
-				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_V.txt', (self.V_mu), fmt="%s", delimiter='\t')
-				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_F.txt', (self.F_mu), fmt="%s", delimiter='\t')
-				np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_alpha.txt', (self.alpha_mu), fmt="%s", delimiter='\t')
+				#np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_U_S.txt', (self.U_mu*self.S_U), fmt="%s", delimiter='\t')
+				#np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_V.txt', (self.V_mu), fmt="%s", delimiter='\t')
+				#np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_F.txt', (self.F_mu), fmt="%s", delimiter='\t')
+				#np.savetxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper_alpha.txt', (self.alpha_mu), fmt="%s", delimiter='\t')
 
 
 			# Compute ELBO after update
@@ -1010,7 +1010,7 @@ class EQTL_FACTORIZATION_VI(object):
 		self.psi_beta = np.ones(self.T)*self.beta_prior
 		# Random effects
 		self.alpha_mu = np.zeros((self.I, self.T))
-		self.alpha_var = np.zeros((self.I, self.T)) + 1.0
+		self.alpha_var = (np.zeros((self.I, self.T)) + 1.0)
 		# Convert random effects matrix to samplesXtests instead of groupsXtest
 		self.alpha_big_mu = np.zeros((self.N, self.T))
 		self.alpha_big_var = np.zeros((self.N, self.T))

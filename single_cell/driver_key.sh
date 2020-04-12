@@ -49,27 +49,28 @@ fi
 ######################
 # Run eQTL analysis at pseudobulk level
 ######################
+if false; then
 sh run_pseudobulk_eqtl_analysis.sh $processed_expression_dir $gene_annotation_file $genotype_data_dir $pseudobulk_eqtl_dir
-
+fi
 
 ######################
 # Get single cell expression and genotype data into a format to run eqtl-factorization
 ######################
 if false; then
-sh prepare_eqtl_input.sh $gene_annotation_file $processed_expression_dir $eqtl_input_dir $genotype_data_dir
+sh prepare_eqtl_input.sh $gene_annotation_file $processed_expression_dir $eqtl_input_dir $genotype_data_dir $pseudobulk_eqtl_dir
 fi
 
 ######################
 # Run eqtl-factorization on single cell data
 ######################
 # eqtl factorization input files (generated in 'prepare_eqtl_input.sh')
-sample_overlap_file=$eqtl_input_dir"pseudobulk_individual_id.txt"
+sample_overlap_file=$eqtl_input_dir"pseudobulk_sig_tests_individual_id.txt"
 # TRAINING
-expression_training_file=$eqtl_input_dir"pseudobulk_expression_training_data_corrected_r_squared_pruned.h5"
-genotype_training_file=$eqtl_input_dir"pseudobulk_genotype_training_data_corrected_r_squared_pruned.h5"
+expression_training_file=$eqtl_input_dir"pseudobulk_sig_tests_50_pc_expression_training_data_corrected_r_squared_pruned.h5"
+genotype_training_file=$eqtl_input_dir"pseudobulk_sig_tests_50_pc_standardized_genotype_training_data_corrected_r_squared_pruned.h5"
 # TESTING
-expression_testing_file=$eqtl_input_dir"pseudobulk_expression_training_data_corrected_r_squared_pruned.h5"
-genotype_testing_file=$eqtl_input_dir"pseudobulk_genotype_training_data_corrected_r_squared_pruned.h5"
+expression_testing_file=$eqtl_input_dir"pseudobulk_sig_tests_50_pc_expression_training_data_corrected_r_squared_pruned.h5"
+genotype_testing_file=$eqtl_input_dir"pseudobulk_sig_tests_50_pc_standardized_genotype_training_data_corrected_r_squared_pruned.h5"
 
 
 # Paramaters
@@ -77,22 +78,20 @@ model_name="eqtl_factorization_vi_spike_and_slab"
 num_latent_factors="20"
 random_effects="True"
 svi="False"
-parrallel="True"
+parrallel="False"
 
 seeds=("0" )
 if false; then
 for seed in "${seeds[@]}"; do
 	echo "Seed: "$seed
-	file_stem="eqtl_factorization_pseudobulk_data_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed"
+	file_stem="eqtl_factorization_pseudobulk_sig_tests_50_pc_data_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed"
 	sh eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_factorization_results_dir $seed $model_name $random_effects $svi $parrallel
 done
 fi
 
-
 if false; then
 Rscript visualize_single_cell_eqtl_factorization.R $processed_expression_dir $eqtl_input_dir $eqtl_factorization_results_dir $eqtl_visualization_dir
 fi
-
 
 
 

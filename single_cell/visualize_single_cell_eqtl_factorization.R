@@ -219,8 +219,8 @@ eqtl_visualization_dir <- args[4]
 print("Hello")
 
 # Input files
-covariate_file <- paste0(processed_expression_dir, "cell_covariates_sle_individuals_random_subset.txt")
-eqtl_factorization_loading_file <- paste0(eqtl_results_dir, "eqtl_factorization_sc_datas_20_factors_eqtl_factorization_vi_spike_and_slab_model_True_re_True_svi_0_seed_U_S.txt")
+covariate_file <- paste0(processed_expression_dir, "pseudobulk_covariates_sle_individuals.txt")
+eqtl_factorization_loading_file <- paste0(eqtl_results_dir, "eqtl_factorization_pseudobulk_sig_tests_50_pc_data_20_factors_eqtl_factorization_vi_spike_and_slab_loadings_ard_factors_model_True_re_False_svi_0_seed_U_S.txt")
 
 # Load in data
 covariates <- read.table(covariate_file, header=TRUE, sep="\t")
@@ -248,8 +248,8 @@ output_file <- paste0(eqtl_visualization_dir, "loading1_vs_loading2_colored_by_k
 # Make correlation heatmap correlating covariates with loadings
 #######################################
 output_file <- paste0(eqtl_visualization_dir, "covariate_loading_correlation_heatmap.pdf")
-heatmap <- make_covariate_loading_correlation_heatmap(covariates, loadings)
-ggsave(heatmap, file=output_file, width=7.2, height=6, units="in")
+#heatmap <- make_covariate_loading_correlation_heatmap(covariates, loadings)
+#ggsave(heatmap, file=output_file, width=7.2, height=6, units="in")
 
 ######################################
 # Make loading boxplot with row for every factor colored by cell type
@@ -311,8 +311,8 @@ output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_g
 # Visualize UMAP scatter plot colored by batch
 #######################################
 output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_batch.pdf")
-umap_scatter <- make_umap_loading_scatter_plot_colored_by_categorical_variable(covariates$batch_cov, umap_loadings, "Known batch")
-ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+#umap_scatter <- make_umap_loading_scatter_plot_colored_by_categorical_variable(covariates$batch_cov, umap_loadings, "Known batch")
+#ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
 
 ######################################
 # Visualize UMAP scatter plot colored by individual
@@ -326,20 +326,20 @@ ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
 # Visualize UMAP scatter plot colored by known percent mito
 #######################################
 output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_percent_mito.pdf")
-umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$percent_mito, umap_loadings, "Percent mito")
-ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+#umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$percent_mito, umap_loadings, "Percent mito")
+#ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
 
 ######################################
 # Visualize UMAP scatter plot colored by known cell counts
 #######################################
 output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_cell_counts.pdf")
-umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$n_counts, umap_loadings, "Cell counts")
-ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+#umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$n_counts, umap_loadings, "Cell counts")
+#ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
 
 
 ######################################
 # Visualize UMAP scatter plot colored by known number of genes
 #######################################
 output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_number_of_genes.pdf")
-umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$n_genes, umap_loadings, "Number of genes")
-ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+#umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$n_genes, umap_loadings, "Number of genes")
+#ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
