@@ -1,7 +1,10 @@
 #!/bin/bash -l
 
 #SBATCH
-#SBATCH --time=10:00:00
+#SBATCH --time=20:00:00
+#SBATCH --partition=lrgmem
+#SBATCH --mem=100GB
+
 #SBATCH --nodes=1
 
 gene_annotation_file="$1"

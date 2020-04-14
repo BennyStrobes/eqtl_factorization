@@ -467,6 +467,7 @@ for cell_type in cell_types:
 ###################
 distance=10000
 for cell_type in cell_types:
+	print(cell_type)
 	# Input files
 	cell_type_pseudobulk_expression_file = pseudobulk_eqtl_dir + cell_type + '_standardized_expression.txt'
 	cell_type_sample_covariate_file = pseudobulk_eqtl_dir + cell_type + '_sample_covariates.txt'

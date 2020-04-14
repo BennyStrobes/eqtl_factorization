@@ -23,7 +23,6 @@ fi
 # Run pseudobulk eqtl analysis in each cell type
 ###########################
 cell_type_file=$pseudobulk_eqtl_dir"cell_types.txt"
-if false; then
 while read cell_type; do
 	echo "eQTL analysis in "$cell_type
 	# Input files
@@ -36,5 +35,5 @@ while read cell_type; do
 	# Run pseudobulk eqtl analysis in this cell type
 	python run_eqtl_analysis.py $expression_file $genotype_file $test_names_file $covariate_file $output_root
 done <$cell_type_file
-fi
+
 

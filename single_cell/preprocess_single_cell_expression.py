@@ -201,7 +201,7 @@ gene_annotation_file = sys.argv[3]
 #######################
 min_genes = 400
 # Min fraction of expressed cells for a gene
-min_fraction_of_cells = .05
+min_fraction_of_cells = .01
 # Random subset
 random_subset = False
 np.random.seed(0)
@@ -243,9 +243,11 @@ adata.var['protein_coding_known_autosomal'] = gene_indices
 adata = adata[:, adata.var.protein_coding_known_autosomal==True]
 
 # Filter rows and columns
+print(adata.X.shape)
 sc.pp.filter_cells(adata, min_genes=min_genes)
+print(adata.X.shape)
 sc.pp.filter_genes(adata, min_cells=(adata.X.shape[0])*min_fraction_of_cells)
-
+print(adata.X.shape)
 #######################
 # Save un-normalized expression data
 #######################

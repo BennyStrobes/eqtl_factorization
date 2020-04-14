@@ -60,6 +60,7 @@ def train_eqtl_factorization_model(sample_overlap_file, expression_training_file
 	############################
 	# Load in data
 	############################
+	print('start loading')
 	# Load in expression data (dimension: num_samplesXnum_tests)
 	if expression_training_file.endswith('.txt'):
 		Y = np.transpose(np.loadtxt(expression_training_file, delimiter='\t'))
@@ -79,19 +80,20 @@ def train_eqtl_factorization_model(sample_overlap_file, expression_training_file
 
 	max_it = 1000
 	print('datA loaded')
+	print(G.shape)
 
 
 	############################
 	# RUN MODEL
 	#############################
 	if model_name == 'eqtl_factorization_vi_spike_and_slab':
-		eqtl_vi = eqtl_factorization_vi_spike_and_slab.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-16, beta=1e-16, a=1, b=1, gamma_v=1.0, max_iter=max_it, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean, sample_batch_fraction=.1)
+		eqtl_vi = eqtl_factorization_vi_spike_and_slab.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-16, beta=1e-16, a=1, b=1, gamma_v=1.0, max_iter=max_it, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean, sample_batch_fraction=.2)
 		eqtl_vi.fit(G=G, Y=Y, z=Z)
 		# pickle.dump(eqtl_vi, open(output_root + '_model', 'wb'))
 		#eqtl_vi = pickle.load(open(output_root + '_model', 'rb'))
 		shared_ve, factor_ve = eqtl_vi.compute_variance_explained_of_factors()
 		ordered_indices = np.argsort(-eqtl_vi.theta_U_a/(eqtl_vi.theta_U_b + eqtl_vi.theta_U_a))
-		num_indices = sum(eqtl_vi.theta_U_a/(eqtl_vi.theta_U_b + eqtl_vi.theta_U_a) > .05)
+		num_indices = sum(eqtl_vi.theta_U_a/(eqtl_vi.theta_U_b + eqtl_vi.theta_U_a) > .025)
 		ordered_filtered_indices = ordered_indices[:(num_indices)]
 		if svi_boolean == False:
 			np.savetxt(output_root + '_U_S.txt', (eqtl_vi.U_mu*eqtl_vi.S_U)[:,ordered_filtered_indices], fmt="%s", delimiter='\t')
@@ -100,7 +102,7 @@ def train_eqtl_factorization_model(sample_overlap_file, expression_training_file
 		np.savetxt(output_root + '_V.txt', (eqtl_vi.V_mu)[ordered_filtered_indices, :], fmt="%s", delimiter='\t')
 		np.savetxt(output_root + '_F.txt', (eqtl_vi.F_mu), fmt="%s", delimiter='\t')
 		#np.savetxt(output_root + '_elbo.txt', eqtl_vi.elbo, fmt="%s", delimiter='\n')
-		pickle.dump(eqtl_vi, open(output_root + '_model', 'wb'))
+		# pickle.dump(eqtl_vi, open(output_root + '_model', 'wb'))
 		#eqtl_vi = pickle.load(open(output_root + '_model', 'rb'))
 	elif model_name == 'eqtl_factorization_vi_spike_and_slab_loadings_ard_factors':
 		print('ard')
@@ -133,17 +135,23 @@ def debug_eqtl_factorization_model(sample_overlap_file, expression_training_file
 	test_names = np.loadtxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_input/pseudobulk_sig_tests_50_pc_variant_gene_pairs_in_known_cell_types.txt',dtype=str,delimiter='\t')
 	gene_names = test_names[1:,0]
 	variant_names = test_names[1:,1]
-	factor_num = 7
-	factor_weights = np.abs(eqtl_vi.V_mu[factor_num,:])
-	loading_weights = (eqtl_vi.U_mu*eqtl_vi.S_U)[:, factor_num]
+	ordered_indices = np.argsort(-eqtl_vi.theta_U_a/(eqtl_vi.theta_U_b + eqtl_vi.theta_U_a))
+	V = eqtl_vi.V_mu[ordered_indices, :]
+	S_U = (eqtl_vi.U_mu*eqtl_vi.S_U)[:, ordered_indices]
+	factor_num = 0
+
+
+	factor_weights = np.abs(V[factor_num,:])
+	loading_weights = (S_U)[:, factor_num]
+	print(np.mean(factor_weights))
 	ordered_tests = np.argsort(-factor_weights)
 	geno1 = eqtl_vi.Y_full[:, ordered_tests[0]]
-	counter = 0
+	counter = 1
 	for test_num in ordered_tests:
 		print('###########')
 		print(counter)
 		print(gene_names[test_num])
-		print(eqtl_vi.V_mu[factor_num,test_num])
+		print(V[factor_num,test_num])
 		print(np.corrcoef(geno1,  eqtl_vi.Y_full[:, test_num])[0,1])
 		pdb.set_trace()
 		if counter < 5:
@@ -152,7 +160,7 @@ def debug_eqtl_factorization_model(sample_overlap_file, expression_training_file
 			plt.scatter(eqtl_vi.G_full[:, test_num], loading_weights,c=eqtl_vi.Y_full[:, test_num], s=.1)
 			plt.xlabel('Normalized Genotype (' + variant_names[test_num] + ')')
 			plt.ylabel('Loading ' + str(factor_num))
-			plt.title('Factor ' + str(factor_num) + ' / Test weight: ' + str(np.round(eqtl_vi.V_mu[factor_num,test_num], decimals=2)))
+			plt.title('Factor ' + str(factor_num) + ' / Test weight: ' + str(np.round(V[factor_num,test_num], decimals=2)))
 			cbar = plt.colorbar()
 			cbar.set_label(gene_names[test_num] + ' Expression')
 			fig.savefig('factor_' + str(factor_num) + '_test_' + str(counter) + '_genotype_vs_loading.png')
@@ -161,16 +169,17 @@ def debug_eqtl_factorization_model(sample_overlap_file, expression_training_file
 			plt.scatter(eqtl_vi.G_full[:, test_num]*loading_weights, eqtl_vi.Y_full[:, test_num], s=.1)
 			plt.xlabel('Loading' + str(factor_num) + '*Normalized Genotype (' + variant_names[test_num] + ')')
 			plt.ylabel(gene_names[test_num] + ' Expression')
-			plt.title('Factor ' + str(factor_num) + ' / Test weight: ' + str(np.round(eqtl_vi.V_mu[factor_num,test_num], decimals=2)))
+			plt.title('Factor ' + str(factor_num) + ' / Test weight: ' + str(np.round(V[factor_num,test_num], decimals=2)))
 			fig.savefig('factor_' + str(factor_num) + '_test_' + str(counter) + '_loading_times_genotype_vs_expression.png')
 			
 			fig = plt.figure()
-			plt.scatter(eqtl_vi.G_full[:, test_num], eqtl_vi.Y_full[:, test_num], c=loading_weights, s=.1)
+	
+			plt.scatter(eqtl_vi.G_full[:, test_num], eqtl_vi.Y_full[:, test_num], c=loading_weights, s=.5, cmap="Blues")
 			plt.xlabel('Normalized Genotype (' + variant_names[test_num] + ')')
 			plt.ylabel(gene_names[test_num] + ' Expression')
 			cbar = plt.colorbar()
 			cbar.set_label('Loading ' + str(factor_num))
-			plt.title('Factor ' + str(factor_num) + ' / Test weight: ' + str(np.round(eqtl_vi.V_mu[factor_num,test_num], decimals=2)))
+			plt.title('Factor ' + str(factor_num) + ' / Test weight: ' + str(np.round(V[factor_num,test_num], decimals=2)))
 			fig.savefig('factor_' + str(factor_num) + '_test_' + str(counter) + '_genotype_vs_expression.png')
 		counter = counter + 1
 
@@ -225,9 +234,9 @@ output_root = eqtl_results_dir + file_stem
 #########################
 # Train model
 #########################
-#train_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, random_effects, svi_boolean, parrallel_boolean)
+train_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, random_effects, svi_boolean, parrallel_boolean)
 
 
-debug_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, random_effects, svi_boolean, parrallel_boolean)
+#debug_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, random_effects, svi_boolean, parrallel_boolean)
 
 

@@ -621,7 +621,7 @@ def extract_sig_variant_gene_pairs_from_known_cell_types(known_cell_type_file, p
 	t.write('Gene_id\tvariant_id\tchrom_num\tgene_tss\tvariant_position\n')
 	# Add test keys to tests one cell type at a time
 	for cell_type in cell_types:
-		cell_type_sig_file = pseudobulk_eqtl_dir + cell_type + '_pseudobulk_eqtl_analysis_multiple_testing_bf_bh.txt'
+		cell_type_sig_file = pseudobulk_eqtl_dir + cell_type + '_pseudobulk_eqtl_analysis_multiple_testing_bf_top_800_genes.txt'
 		f = open(cell_type_sig_file)
 		arr = []
 		head_count = 0
@@ -670,7 +670,7 @@ def prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, 
 	ld_prune_variant_gene_pair_file(variant_gene_pair_file, ld_pruned_variant_gene_pair_file, r_squared_threshold, genotype_data_dir, max_variants_per_gene, random_seed)
 	'''
 	ld_pruned_variant_gene_pair_file = output_root + '_variant_gene_pairs_in_known_cell_types.txt'
-	num_tests_per_cell_type = 400
+	num_tests_per_cell_type = 800
 	extract_sig_variant_gene_pairs_from_known_cell_types(known_cell_type_file, pseudobulk_eqtl_dir, num_tests_per_cell_type, ld_pruned_variant_gene_pair_file, random_seed)
 
 	########################
@@ -790,9 +790,35 @@ random_seed=1
 # Output root
 output_root = eqtl_input_dir + 'pseudobulk_sig_tests_50_pc'
 
+# prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, distance, genotype_data_dir, gene_file, expression_file, r_squared_threshold, max_variants_per_gene, num_pcs, covariate_file, cell_level_info_file, known_cell_type_file, pseudobulk_eqtl_dir, random_seed)
+
+
+
+
+# Variant must be within $distance BP from TSS of gene
+distance = 10000
+# File containing availible genes
+gene_file = processed_expression_dir + 'single_cell_expression_sle_individuals_gene_ids.txt'
+# Input file containing expression
+expression_file = processed_expression_dir + 'single_cell_expression_sle_individuals_standardized.txt'
+# Covariate file
+covariate_file = processed_expression_dir + 'pca_scores_sle_individuals.txt'
+# File containing mapping from cell index to individual id
+cell_level_info_file = processed_expression_dir + 'cell_covariates_sle_individuals.txt'
+# known cell types
+known_cell_type_file = pseudobulk_eqtl_dir + 'cell_types.txt'
+# Only allow snps with r_squared threshold less than this
+r_squared_threshold=0.5
+# Maximum number of variants per gene
+max_variants_per_gene=2
+# Number of PCs to regress out
+num_pcs = 50
+# random seed used for ld pruning
+random_seed=1
+# Output root
+output_root = eqtl_input_dir + 'single_cell_sig_tests_50_pc'
+
 prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, distance, genotype_data_dir, gene_file, expression_file, r_squared_threshold, max_variants_per_gene, num_pcs, covariate_file, cell_level_info_file, known_cell_type_file, pseudobulk_eqtl_dir, random_seed)
-
-
 
 
 
