@@ -613,8 +613,16 @@ def save_as_h5_file(input_text_file):
 	h5f.create_dataset('data', data=mat)
 	h5f.close()
 
-def extract_sig_variant_gene_pairs_from_known_cell_types(known_cell_type_file, pseudobulk_eqtl_dir, num_tests_per_cell_type, ld_pruned_variant_gene_pair_file, random_seed):
+def extract_sig_variant_gene_pairs_from_known_cell_types(known_cell_type_file, pseudobulk_eqtl_dir, num_tests_per_cell_type, ld_pruned_variant_gene_pair_file, gene_file, random_seed):
 	np.random.seed(random_seed)
+	# First extract genes we have expression for
+	genes = {}
+	f = open(gene_file)
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		genes[data[0]] = 1
+	f.close()
 	cell_types = np.loadtxt(known_cell_type_file, dtype=str)
 	tests = {}
 	t = open(ld_pruned_variant_gene_pair_file, 'w')
@@ -641,15 +649,18 @@ def extract_sig_variant_gene_pairs_from_known_cell_types(known_cell_type_file, p
 			indices = np.random.choice(range(num_genes),size=num_tests_per_cell_type,replace=False)
 		new_mat = mat[indices,:]
 		nrows = new_mat.shape[0]
-		print(nrows)
 		for row_num in range(nrows):
 			gene_id = new_mat[row_num, 0]
 			variant_id = new_mat[row_num, 1]
 			test_name = gene_id + '_' + variant_id
 			if test_name in tests:
 				continue
+			if gene_id not in genes:
+				print('miss')
+				continue
 			tests[test_name] = 1
 			t.write('\t'.join(new_mat[row_num, :5]) + '\n')
+	print(len(tests))
 	t.close()
 
 def prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, distance, genotype_data_dir, gene_file, expression_file, r_squared_threshold, max_variants_per_gene, num_pcs, covariate_file, cell_level_info_file, known_cell_type_file, pseudobulk_eqtl_dir, random_seed):
@@ -671,7 +682,7 @@ def prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, 
 	'''
 	ld_pruned_variant_gene_pair_file = output_root + '_variant_gene_pairs_in_known_cell_types.txt'
 	num_tests_per_cell_type = 800
-	extract_sig_variant_gene_pairs_from_known_cell_types(known_cell_type_file, pseudobulk_eqtl_dir, num_tests_per_cell_type, ld_pruned_variant_gene_pair_file, random_seed)
+	extract_sig_variant_gene_pairs_from_known_cell_types(known_cell_type_file, pseudobulk_eqtl_dir, num_tests_per_cell_type, ld_pruned_variant_gene_pair_file, gene_file, random_seed)
 
 	########################
 	# Step 3: Generate expression matrix
@@ -764,9 +775,9 @@ output_root = eqtl_input_dir + 'single_cell_random_subset'
 prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, distance, genotype_data_dir, gene_file, expression_file, r_squared_threshold, max_variants_per_gene, num_pcs, covariate_file, cell_level_info_file, random_seed)
 '''
 
-
-
-
+################
+# Pseudobulk
+#############
 # Variant must be within $distance BP from TSS of gene
 distance = 10000
 # File containing availible genes
@@ -794,7 +805,9 @@ output_root = eqtl_input_dir + 'pseudobulk_sig_tests_50_pc'
 
 
 
-
+################
+# Full single cell
+#############
 # Variant must be within $distance BP from TSS of gene
 distance = 10000
 # File containing availible genes
@@ -818,8 +831,36 @@ random_seed=1
 # Output root
 output_root = eqtl_input_dir + 'single_cell_sig_tests_50_pc'
 
-prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, distance, genotype_data_dir, gene_file, expression_file, r_squared_threshold, max_variants_per_gene, num_pcs, covariate_file, cell_level_info_file, known_cell_type_file, pseudobulk_eqtl_dir, random_seed)
+#prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, distance, genotype_data_dir, gene_file, expression_file, r_squared_threshold, max_variants_per_gene, num_pcs, covariate_file, cell_level_info_file, known_cell_type_file, pseudobulk_eqtl_dir, random_seed)
 
+
+################
+# single cell randm subset
+#############
+# Variant must be within $distance BP from TSS of gene
+distance = 10000
+# File containing availible genes
+gene_file = processed_expression_dir + 'single_cell_expression_sle_individuals_random_subset_gene_ids.txt'
+# Input file containing expression
+expression_file = processed_expression_dir + 'single_cell_expression_sle_individuals_random_subset_standardized.txt'
+# Covariate file
+covariate_file = processed_expression_dir + 'pca_scores_sle_individuals_random_subset.txt'
+# File containing mapping from cell index to individual id
+cell_level_info_file = processed_expression_dir + 'cell_covariates_sle_individuals_random_subset.txt'
+# known cell types
+known_cell_type_file = pseudobulk_eqtl_dir + 'cell_types.txt'
+# Only allow snps with r_squared threshold less than this
+r_squared_threshold=0.5
+# Maximum number of variants per gene
+max_variants_per_gene=2
+# Number of PCs to regress out
+num_pcs = 50
+# random seed used for ld pruning
+random_seed=1
+# Output root
+output_root = eqtl_input_dir + 'single_cell_random_subset_sig_tests_50_pc'
+
+prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, distance, genotype_data_dir, gene_file, expression_file, r_squared_threshold, max_variants_per_gene, num_pcs, covariate_file, cell_level_info_file, known_cell_type_file, pseudobulk_eqtl_dir, random_seed)
 
 
 

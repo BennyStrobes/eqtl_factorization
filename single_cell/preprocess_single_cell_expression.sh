@@ -2,6 +2,8 @@
 
 #SBATCH
 #SBATCH --time=10:00:00
+#SBATCH --mem=80GB
+#SBATCH --partition=lrgmem
 #SBATCH --nodes=1
 
 input_h5py_file="$1"

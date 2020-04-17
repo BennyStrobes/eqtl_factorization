@@ -5,6 +5,7 @@ import pdb
 import h5py
 from sklearn.decomposition import PCA
 import scanpy as sc
+from anndata import AnnData
 
 
 
@@ -88,6 +89,7 @@ def generate_pseudobulk_covariate_file(adata, pseudobulk_covariate_file):
 	# Loop through cell covariate file to create  list of individual-cell_type pairs (these are our samples)
 	samples = {}
 	num_cells = adata.obs.shape[0]
+	sample_counts = {}
 	for cell_num in range(num_cells):
 		# Extract relevent fields
 		cell_type = adata.obs.ct_cov[cell_num]
@@ -101,9 +103,12 @@ def generate_pseudobulk_covariate_file(adata, pseudobulk_covariate_file):
 		else:  # Simple error checking making sure ever individual was mapped to the same race
 			if samples[sample_name] != race:
 				print('assumption errro')
+		if sample_name not in sample_counts:
+			sample_counts[sample_name] = 0
+		sample_counts[sample_name] = sample_counts[sample_name] + 1
 	# Print to output file
 	t = open(pseudobulk_covariate_file, 'w')
-	t.write('sample_name\tct_cov\tpop_cov\tind_cov\n')
+	t.write('sample_name\tct_cov\tpop_cov\tind_cov\tnum_cells\tct_cov_readable\n')
 	# Loop through samples and print to output file
 	for sample_name in samples.keys():
 		# Extract relevent fields
@@ -111,7 +116,7 @@ def generate_pseudobulk_covariate_file(adata, pseudobulk_covariate_file):
 		ct_cov = ' '.join(sample_name.split(':')[1].split('_'))
 		pop_cov = samples[sample_name]
 		# Print to output file
-		t.write(sample_name + '\t' + ct_cov + '\t' + pop_cov + '\t' + ind_cov + '\n')
+		t.write(sample_name + '\t' + ct_cov + '\t' + pop_cov + '\t' + ind_cov + '\t' + str(sample_counts[sample_name]) + '\t' + sample_name.split(':')[1] + '\n')
 	t.close()
 
 # Generate summed pseudobulk counts
@@ -187,6 +192,29 @@ def generate_pseudobulk_expression_data_wrapper(adata, raw_pseudobulk_expression
 	# Standardize summed pseudobulk counts (samples X genes)
 	standardize_pseudobulk_counts(raw_pseudobulk_expression_file, standardized_pseudobulk_expression_file)
 
+def generate_cell_type_sc_expression_data_wrapper(cell_type, adata, standardized_cell_type_expression_file, standardized_cell_type_covariate_file):
+	############################
+	# Filter to cells of this cell type
+	###############################
+	ct_data = adata[adata.obs.ct_cov == cell_type, :]
+
+	############################
+	# Save covariates to output file
+	###############################
+	np.savetxt(standardized_cell_type_covariate_file, ct_data.obs, fmt="%s", delimiter='\t', header='\t'.join(ct_data.obs.columns), comments='')
+
+	######################	
+	# Normalize data
+	#######################
+	ct_data_clean = AnnData(ct_data.raw.X.toarray())
+	sc.pp.normalize_total(ct_data_clean, target_sum=1e4)
+	sc.pp.log1p(ct_data_clean)
+	sc.pp.scale(ct_data_clean, max_value=10)
+	############################
+	# Save expression to output
+	###########################
+	np.savetxt(standardized_cell_type_expression_file, ct_data_clean.X, fmt="%s", delimiter='\t')
+
 #####################
 # Command line args
 ######################
@@ -206,6 +234,7 @@ min_fraction_of_cells = .01
 random_subset = False
 np.random.seed(0)
 
+'''
 ######################
 # Load in ScanPy data
 #######################
@@ -320,10 +349,41 @@ else:
 	h5_output_file = processed_expression_dir + 'scanpy_processed_single_cell_data.h5ad'
 adata.write(h5_output_file)
 
+'''
 
 
+#######################
+# Make cell type specific expression data
+#######################
+# Load in data
+if random_subset == True:
+	processed_single_cell_h5_file = processed_expression_dir + 'scanpy_processed_single_cell_data_random_subset.h5ad'
+else:
+	processed_single_cell_h5_file = processed_expression_dir + 'scanpy_processed_single_cell_data.h5ad'
+adata = sc.read_h5ad(processed_single_cell_h5_file)
+# Get unique cell types
+unique_cell_types = np.unique(adata.obs.ct_cov)
+np.savetxt(processed_expression_dir + 'cell_types.txt', unique_cell_types, fmt="%s")
+# Loop through cell types
+for cell_type in unique_cell_types:
+	print(cell_type)
+	printible_cell_type = '_'.join(cell_type.split(' '))
+	if random_subset == False:
+		standardized_cell_type_expression_file = processed_expression_dir + printible_cell_type + '_single_cell_expression_sle_individuals_standardized.txt'
+		standardized_cell_type_covariate_file = processed_expression_dir + printible_cell_type + '_cell_covariates_sle_individuals.txt'
+		cell_type_pca_file = processed_expression_dir + printible_cell_type + '_pca_scores_sle_individuals.txt'
+		cell_type_pca_pve_file = processed_expression_dir + printible_cell_type + '_pca_variance_explained_sle_individuals.txt'
+	else:
+		standardized_cell_type_expression_file = processed_expression_dir + printible_cell_type + '_single_cell_expression_sle_individuals_random_subset_standardized.txt'
+		standardized_cell_type_covariate_file = processed_expression_dir + printible_cell_type + '_cell_covariates_sle_individuals_random_subset.txt'
+		cell_type_pca_file = processed_expression_dir + printible_cell_type + '_pca_scores_sle_individuals_random_subset.txt'
+		cell_type_pca_pve_file = processed_expression_dir + printible_cell_type + '_pca_variance_explained_sle_individuals_random_subset.txt'
+	#generate_cell_type_sc_expression_data_wrapper(cell_type, adata, standardized_cell_type_expression_file, standardized_cell_type_covariate_file)
+	num_pcs=200
+	generate_pca_scores_and_variance_explained(standardized_cell_type_expression_file, num_pcs, cell_type_pca_file, cell_type_pca_pve_file)
 
 
+'''
 #######################
 # Make Pseudo-bulk expression data
 #######################
@@ -355,7 +415,7 @@ else:
 	filtered_cells_pca_ve_file = processed_expression_dir + 'pca_variance_pseudobulk_explained_sle_individuals.txt'
 generate_pca_scores_and_variance_explained(standardized_pseudobulk_expression_file, num_pcs, filtered_cells_pca_file, filtered_cells_pca_ve_file)
 
-
+'''
 
 
 
