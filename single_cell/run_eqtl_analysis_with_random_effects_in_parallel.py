@@ -17,6 +17,7 @@ def run_eqtl_one_test_lm(expression, genotype, covariates):
 	X = np.vstack((genotype,covariates.T)).T
 	# Add intercept
 	X2 = sm.add_constant(X)
+
 	est = sm.OLS(expression, X2)
 	est2 = est.fit()
 
@@ -34,10 +35,14 @@ def run_eqtl_one_test_lmm(expression, genotype, covariates, groups):
 	# Create column names
 	cov_names = ['cov'+str(i) for i in range(num_cov)]
 	col_names = ['y', 'group', 'g'] + cov_names
+
 	# Make df
 	df = pd.DataFrame(X, columns=col_names)
 	# Make formula for LMM
-	formula = 'y ~ g + ' + ' + '.join(cov_names) + ' + (1 | group)'
+	if num_cov > 0:
+		formula = 'y ~ g + ' + ' + '.join(cov_names) + ' + (1 | group)'
+	else:
+		formula = 'y ~ g + ' + '(1 | group)'
 
 	model = Lmer(formula, data=df)
 	model.fit()
@@ -102,6 +107,8 @@ def eqtl_analysis(covariate_file, test_names_file, expression_file, genotype_fil
 			continue
 		if counter < start_number or counter > end_number:
 			counter = counter + 1
+			temp_e = expression_handle.readline()
+			temp_g = genotype_handle.readline()
 			continue
 		counter = counter + 1
 		expression = np.asarray(expression_handle.readline().rstrip().split('\t')).astype(float)

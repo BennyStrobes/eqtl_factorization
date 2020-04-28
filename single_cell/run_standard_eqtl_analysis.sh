@@ -52,9 +52,9 @@ fi
 # Run single-cell eqtl analysis in each cell type
 ###########################
 cell_type="B_cells"
-num_pcs="15"
+num_pcs="50"
 # How many nodes to run in parallel
-total_jobs="50"
+total_jobs="200"
 echo "single-cell eQTL analysis in "$cell_type" with "$num_pcs" PCs"
 # Input files
 expression_file=$single_cell_eqtl_dir$cell_type"_eqtl_input_expression.txt"
@@ -64,16 +64,18 @@ covariate_file=$processed_expression_dir$cell_type"_pca_scores_sle_individuals.t
 sample_overlap_file=$single_cell_eqtl_dir$cell_type"_eqtl_input_sample_overlap.txt"
 # Output root
 output_root=$single_cell_eqtl_dir$cell_type"_sc_eqtl_analysis_"$num_pcs"_pcs_"
-
 if false; then
 for job_number in $(seq 0 `expr $total_jobs - "1"`); do
 	sbatch run_eqtl_analysis_with_random_effects_in_parallel.sh $expression_file $genotype_file $test_names_file $covariate_file $sample_overlap_file $num_pcs $output_root $job_number $total_jobs
 done
 fi
 
+if false; then
+python merge_parallelized_eqtl_calls.py $output_root"all_variant_gene_pairs_" $total_jobs
+fi
 ###########################
 # Visualize pseudobulk eqtl results
-###########################
+###########################`
 if false; then
-Rscript visualize_pseudobulk_eqtls.R $processed_expression_dir $pseudobulk_eqtl_dir $visualize_pseudobulk_eqtl_dir
+Rscript visualize_pseudobulk_eqtls.R $processed_expression_dir $pseudobulk_eqtl_dir $single_cell_eqtl_dir $visualize_pseudobulk_eqtl_dir
 fi

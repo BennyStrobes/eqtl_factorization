@@ -280,6 +280,17 @@ def create_mapping_from_gene_names_to_expression_vectors(sc_expression_file, gen
 	mapping = {}
 	for index, gene_name in enumerate(gene_names):
 		mapping[gene_name] = expression_matrix[:, index]
+	return 
+
+def create_mapping_from_gene_names_to_expression_vector_float(sc_expression_file, gene_names_file):
+	# Get gene names
+	gene_names = np.loadtxt(gene_names_file,dtype=str, delimiter='\t')[:,0]
+	# Load in expression matrix (every column corresponds to a gene)
+	expression_matrix = np.loadtxt(sc_expression_file, dtype=str, delimiter='\t')
+	# Create mapping
+	mapping = {}
+	for index, gene_name in enumerate(gene_names):
+		mapping[gene_name] = np.asarray(expression_matrix[:, index]).astype(float)
 	return mapping
 
 def generate_single_cell_expression_eqtl_training_data(ld_pruned_variant_gene_pair_file, sc_expression_file, gene_names_file, single_cell_expression_eqtl_traing_data_file):
@@ -398,27 +409,55 @@ def construct_sample_overlap_file(cell_type_sc_sample_covariate_file, cell_type_
 	t.close() 
 
 
+def generate_test_level_covariate_file(cell_type_eqtl_variant_gene_pairs_file, cell_type_sc_raw_expression_file, gene_id_file, cell_type_test_info_file):
+	# Get ordered list of gene names (this will be the order that the output file will be saved in)
+	ordered_gene_names = get_ordered_list_of_gene_names(cell_type_eqtl_variant_gene_pairs_file)
+	# Create mapping from gene names to expression vectors
+	gene_name_to_expression_vector = create_mapping_from_gene_names_to_expression_vector_float(cell_type_sc_raw_expression_file, gene_id_file)
+	# print to output file
+	t = open(cell_type_test_info_file, 'w')
+	t.write('total_counts\tpercent_expressed_cells\n')
+	for gene_name in ordered_gene_names:
+		# Use map to get expression vector corresponding to this gene
+		expression_vector = gene_name_to_expression_vector[gene_name]
+		total_counts = np.sum(expression_vector)
+		fraction_expressed = float(np.sum(expression_vector != 0.0))/len(expression_vector)
+		# Print to output file
+		t.write(str(total_counts) + '\t' + str(fraction_expressed) + '\n')
+	t.close()
+
 # For each cell type generate eqtl input files
-def generate_cell_type_eqtl_input_files(cell_type, genotype_data_dir, cell_type_sc_expression_file, cell_type_sc_sample_covariate_file, cell_type_eqtl_variant_gene_pairs_file, cell_type_eqtl_expression_file, cell_type_eqtl_genotype_file, distance, gene_annotation_file, gene_id_file, cell_type_sample_overlap_file):
+def generate_cell_type_eqtl_input_files(cell_type, genotype_data_dir, cell_type_sc_expression_file, cell_type_sc_sample_covariate_file, cell_type_eqtl_variant_gene_pairs_file, cell_type_eqtl_expression_file, cell_type_eqtl_genotype_file, distance, gene_annotation_file, gene_id_file, cell_type_sample_overlap_file, cell_type_sc_raw_expression_file, cell_type_eqtl_raw_expression_file, cell_type_test_info_file):
 	########################
 	# Step 1: Create file with all variant gene pairs such that gene is within $distanceKB of gene
 	########################
-	extract_variant_gene_pairs_for_eqtl_testing(gene_id_file, gene_annotation_file, distance, genotype_data_dir, cell_type_eqtl_variant_gene_pairs_file)
+	#extract_variant_gene_pairs_for_eqtl_testing(gene_id_file, gene_annotation_file, distance, genotype_data_dir, cell_type_eqtl_variant_gene_pairs_file)
 
 	########################
 	# Step 3: Generate expression matrix
 	########################
-	generate_single_cell_expression_eqtl_training_data(cell_type_eqtl_variant_gene_pairs_file, cell_type_sc_expression_file, gene_id_file, cell_type_eqtl_expression_file)
+	#generate_single_cell_expression_eqtl_training_data(cell_type_eqtl_variant_gene_pairs_file, cell_type_sc_expression_file, gene_id_file, cell_type_eqtl_expression_file)
+
+	#######################
+	# Step 3: Generate raw expression matrix
+	########################
+	#generate_single_cell_expression_eqtl_training_data(cell_type_eqtl_variant_gene_pairs_file, cell_type_sc_raw_expression_file, gene_id_file, cell_type_eqtl_raw_expression_file)
+	
+	#######################
+	# Step 4: Create covariate matrix describing each test
+	########################
+	generate_test_level_covariate_file(cell_type_eqtl_variant_gene_pairs_file, cell_type_sc_raw_expression_file, gene_id_file, cell_type_test_info_file)
+
 
 	########################
 	# Step 5: Generate Genotype matrix
 	########################
-	construct_genotype_matrix(cell_type_eqtl_variant_gene_pairs_file, genotype_data_dir, cell_type_sc_sample_covariate_file, cell_type_eqtl_genotype_file)
+	#construct_genotype_matrix(cell_type_eqtl_variant_gene_pairs_file, genotype_data_dir, cell_type_sc_sample_covariate_file, cell_type_eqtl_genotype_file)
 
 	########################
 	# Step 5: Generate sample overlap file
 	########################
-	construct_sample_overlap_file(cell_type_sc_sample_covariate_file, cell_type_sample_overlap_file)
+	#construct_sample_overlap_file(cell_type_sc_sample_covariate_file, cell_type_sample_overlap_file)
 
 
 def get_cell_types(cell_type_file):
@@ -468,15 +507,19 @@ if len(np.unique(ensamble_ids)) != len(ensamble_ids):
 # For each cell type generate eqtl input files
 ###################
 distance=10000
+cell_types = ['B_cells']
 for cell_type in cell_types:
 	print(cell_type)
 	# Input files
 	cell_type_sc_expression_file = processed_expression_dir + cell_type + '_single_cell_expression_sle_individuals_standardized.txt'
+	cell_type_sc_raw_expression_file = processed_expression_dir + cell_type + '_single_cell_expression_sle_individuals_raw.txt'
 	cell_type_sc_sample_covariate_file = processed_expression_dir + cell_type + '_cell_covariates_sle_individuals.txt'
 	# Output files
 	cell_type_eqtl_variant_gene_pairs_file = single_cell_eqtl_dir + cell_type + '_eqtl_input_variant_gene_pairs.txt'
 	cell_type_eqtl_expression_file = single_cell_eqtl_dir + cell_type + '_eqtl_input_expression.txt'
+	cell_type_eqtl_raw_expression_file = single_cell_eqtl_dir + cell_type + '_eqtl_input_raw_expression.txt'
 	cell_type_eqtl_genotype_file = single_cell_eqtl_dir + cell_type + '_eqtl_input_genotype.txt'
 	cell_type_sample_overlap_file = single_cell_eqtl_dir + cell_type + '_eqtl_input_sample_overlap.txt'
-	generate_cell_type_eqtl_input_files(cell_type, genotype_data_dir, cell_type_sc_expression_file, cell_type_sc_sample_covariate_file, cell_type_eqtl_variant_gene_pairs_file, cell_type_eqtl_expression_file, cell_type_eqtl_genotype_file, distance, gene_annotation_file, gene_id_file, cell_type_sample_overlap_file)
+	cell_type_test_info_file = single_cell_eqtl_dir + cell_type + '_eqtl_input_test_info.txt'
+	generate_cell_type_eqtl_input_files(cell_type, genotype_data_dir, cell_type_sc_expression_file, cell_type_sc_sample_covariate_file, cell_type_eqtl_variant_gene_pairs_file, cell_type_eqtl_expression_file, cell_type_eqtl_genotype_file, distance, gene_annotation_file, gene_id_file, cell_type_sample_overlap_file, cell_type_sc_raw_expression_file, cell_type_eqtl_raw_expression_file, cell_type_test_info_file)
 

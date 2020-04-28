@@ -219,10 +219,10 @@ eqtl_visualization_dir <- args[4]
 print("Hello")
 
 # Input files
-covariate_file <- paste0(processed_expression_dir, "pseudobulk_covariates_sle_individuals.txt")
+covariate_file <- paste0(processed_expression_dir, "cell_covariates_sle_individuals_random_subset.txt")
 
-eqtl_factorization_loading_file <- paste0(eqtl_results_dir, "eqtl_factorization_pseudobulk_data_20_factors_eqtl_factorization_vi_spike_and_slab_model_True_re_False_svi_0_seed_U_S.txt")
-#eqtl_factorization_loading_file <- "/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_U_S.txt"
+#eqtl_factorization_loading_file <- paste0(eqtl_results_dir, "eqtl_factorization_pseudobulk_data_20_factors_eqtl_factorization_vi_spike_and_slab_model_True_re_False_svi_0_seed_U_S.txt")
+eqtl_factorization_loading_file <- "/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_U_S_v4.txt"
 
 # Load in data
 covariates <- read.table(covariate_file, header=TRUE, sep="\t")

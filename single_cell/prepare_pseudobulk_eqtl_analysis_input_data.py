@@ -387,7 +387,7 @@ def construct_genotype_matrix(ld_pruned_variant_gene_pair_file, genotype_data_di
 	t.close()
 
 # For each cell type generate eqtl input files
-def generate_cell_type_eqtl_input_files(cell_type, genotype_data_dir, cell_type_pseudobulk_expression_file, cell_type_sample_covariate_file, cell_type_eqtl_variant_gene_pairs_file, cell_type_eqtl_expression_file, cell_type_eqtl_genotype_file, distance, gene_annotation_file, gene_id_file):
+def generate_cell_type_eqtl_input_files(cell_type, genotype_data_dir, cell_type_raw_pseudobulk_expression_file, cell_type_pseudobulk_expression_file, cell_type_sample_covariate_file, cell_type_eqtl_variant_gene_pairs_file, cell_type_eqtl_expression_file, cell_type_eqtl_genotype_file, distance, gene_annotation_file, gene_id_file, cell_type_eqtl_raw_expression_file):
 	########################
 	# Step 1: Create file with all variant gene pairs such that gene is within $distanceKB of gene
 	########################
@@ -397,6 +397,11 @@ def generate_cell_type_eqtl_input_files(cell_type, genotype_data_dir, cell_type_
 	# Step 3: Generate expression matrix
 	########################
 	generate_single_cell_expression_eqtl_training_data(cell_type_eqtl_variant_gene_pairs_file, cell_type_pseudobulk_expression_file, gene_id_file, cell_type_eqtl_expression_file)
+
+	########################
+	# Step 3: Generate raw expression matrix
+	########################
+	generate_single_cell_expression_eqtl_training_data(cell_type_eqtl_variant_gene_pairs_file, cell_type_raw_pseudobulk_expression_file, gene_id_file, cell_type_eqtl_raw_expression_file)
 
 	########################
 	# Step 5: Generate Genotype matrix
@@ -448,7 +453,7 @@ if len(np.unique(ensamble_ids)) != len(ensamble_ids):
 	pdb.set_trace()
 
 
-
+'''
 ###################
 # For each cell type generate pseudobulk expression data
 ###################
@@ -461,7 +466,7 @@ for cell_type in cell_types:
 	cell_type_pca_loading_file = pseudobulk_eqtl_dir + cell_type + '_pca_scores.txt'
 	cell_type_pca_ve_file = pseudobulk_eqtl_dir + cell_type + '_pca_variance_explained.txt'
 	generate_cell_type_pseudobulk_expression_data(cell_type, raw_pseudobulk_expression, pseudobulk_covariate_file, cell_type_raw_pseudobulk_expression_file, cell_type_pseudobulk_expression_file, cell_type_sample_covariate_file, cell_type_pca_loading_file, cell_type_pca_ve_file)
-
+'''
 ###################
 # For each cell type generate eqtl input files
 ###################
@@ -470,10 +475,12 @@ for cell_type in cell_types:
 	print(cell_type)
 	# Input files
 	cell_type_pseudobulk_expression_file = pseudobulk_eqtl_dir + cell_type + '_standardized_expression.txt'
+	cell_type_raw_pseudobulk_expression_file = pseudobulk_eqtl_dir + cell_type + '_raw_expression.txt'
 	cell_type_sample_covariate_file = pseudobulk_eqtl_dir + cell_type + '_sample_covariates.txt'
 	# Output files
 	cell_type_eqtl_variant_gene_pairs_file = pseudobulk_eqtl_dir + cell_type + '_eqtl_input_variant_gene_pairs.txt'
 	cell_type_eqtl_expression_file = pseudobulk_eqtl_dir + cell_type + '_eqtl_input_expression.txt'
+	cell_type_eqtl_raw_expression_file = pseudobulk_eqtl_dir + cell_type + '_eqtl_input_raw_expression.txt'
 	cell_type_eqtl_genotype_file = pseudobulk_eqtl_dir + cell_type + '_eqtl_input_genotype.txt'
-	generate_cell_type_eqtl_input_files(cell_type, genotype_data_dir, cell_type_pseudobulk_expression_file, cell_type_sample_covariate_file, cell_type_eqtl_variant_gene_pairs_file, cell_type_eqtl_expression_file, cell_type_eqtl_genotype_file, distance, gene_annotation_file, gene_id_file)
+	generate_cell_type_eqtl_input_files(cell_type, genotype_data_dir, cell_type_raw_pseudobulk_expression_file, cell_type_pseudobulk_expression_file, cell_type_sample_covariate_file, cell_type_eqtl_variant_gene_pairs_file, cell_type_eqtl_expression_file, cell_type_eqtl_genotype_file, distance, gene_annotation_file, gene_id_file, cell_type_eqtl_raw_expression_file)
 

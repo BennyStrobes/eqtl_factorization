@@ -192,7 +192,7 @@ def generate_pseudobulk_expression_data_wrapper(adata, raw_pseudobulk_expression
 	# Standardize summed pseudobulk counts (samples X genes)
 	standardize_pseudobulk_counts(raw_pseudobulk_expression_file, standardized_pseudobulk_expression_file)
 
-def generate_cell_type_sc_expression_data_wrapper(cell_type, adata, standardized_cell_type_expression_file, standardized_cell_type_covariate_file):
+def generate_cell_type_sc_expression_data_wrapper(cell_type, adata, standardized_cell_type_expression_file, standardized_cell_type_covariate_file, raw_cell_type_expression_file):
 	############################
 	# Filter to cells of this cell type
 	###############################
@@ -203,6 +203,11 @@ def generate_cell_type_sc_expression_data_wrapper(cell_type, adata, standardized
 	###############################
 	np.savetxt(standardized_cell_type_covariate_file, ct_data.obs, fmt="%s", delimiter='\t', header='\t'.join(ct_data.obs.columns), comments='')
 
+	############################
+	# Save raw expression to output file
+	###############################
+	np.savetxt(raw_cell_type_expression_file, ct_data.raw.X.toarray(), fmt="%s", delimiter='\t')
+	
 	######################	
 	# Normalize data
 	#######################
@@ -370,17 +375,19 @@ for cell_type in unique_cell_types:
 	printible_cell_type = '_'.join(cell_type.split(' '))
 	if random_subset == False:
 		standardized_cell_type_expression_file = processed_expression_dir + printible_cell_type + '_single_cell_expression_sle_individuals_standardized.txt'
+		raw_cell_type_expression_file = processed_expression_dir + printible_cell_type + '_single_cell_expression_sle_individuals_raw.txt'
 		standardized_cell_type_covariate_file = processed_expression_dir + printible_cell_type + '_cell_covariates_sle_individuals.txt'
 		cell_type_pca_file = processed_expression_dir + printible_cell_type + '_pca_scores_sle_individuals.txt'
 		cell_type_pca_pve_file = processed_expression_dir + printible_cell_type + '_pca_variance_explained_sle_individuals.txt'
 	else:
 		standardized_cell_type_expression_file = processed_expression_dir + printible_cell_type + '_single_cell_expression_sle_individuals_random_subset_standardized.txt'
+		raw_cell_type_expression_file = processed_expression_dir + printible_cell_type + '_single_cell_expression_sle_individuals_random_subset_raw.txt'
 		standardized_cell_type_covariate_file = processed_expression_dir + printible_cell_type + '_cell_covariates_sle_individuals_random_subset.txt'
 		cell_type_pca_file = processed_expression_dir + printible_cell_type + '_pca_scores_sle_individuals_random_subset.txt'
 		cell_type_pca_pve_file = processed_expression_dir + printible_cell_type + '_pca_variance_explained_sle_individuals_random_subset.txt'
-	#generate_cell_type_sc_expression_data_wrapper(cell_type, adata, standardized_cell_type_expression_file, standardized_cell_type_covariate_file)
+	generate_cell_type_sc_expression_data_wrapper(cell_type, adata, standardized_cell_type_expression_file, standardized_cell_type_covariate_file, raw_cell_type_expression_file)
 	num_pcs=200
-	generate_pca_scores_and_variance_explained(standardized_cell_type_expression_file, num_pcs, cell_type_pca_file, cell_type_pca_pve_file)
+	#generate_pca_scores_and_variance_explained(standardized_cell_type_expression_file, num_pcs, cell_type_pca_file, cell_type_pca_pve_file)
 
 
 '''
