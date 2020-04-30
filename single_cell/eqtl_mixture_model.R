@@ -34,10 +34,10 @@ sample_overlap_file = args[3]
 num_latent_factors = as.numeric(args[4])
 output_root = args[5]
 
-print(num_latent_factors)
+#print(num_latent_factors)
 
 
-
+if (FALSE) {
 G = read.table(genotype_training_file, header=FALSE)
 Y = read.table(expression_training_file, header=FALSE)
 
@@ -49,4 +49,16 @@ flex_result <- run_flexmix(eqtl_mixture_input_df, num_tests, num_latent_factors)
 
 output_file <- paste0(output_root, "flexmix_model.RDS")
 saveRDS(flex_result, file=output_file)
+}
+output_file <- paste0(output_root, "flexmix_model.RDS")
+
+flex_result <- readRDS(output_file)
+
+
+posterior_probs <- posterior(flex_result)
+output_file <- paste0(output_root, "flexmix_model_posterior_prob.txt")
+
+write.table(posterior_probs, file=output_file, quote=FALSE, sep="\t", row.names=FALSE, col.names=FALSE)
+
+print(summary(posterior(flex_result)))
 

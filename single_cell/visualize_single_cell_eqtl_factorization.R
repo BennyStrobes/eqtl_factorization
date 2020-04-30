@@ -208,21 +208,137 @@ make_covariate_loading_correlation_heatmap <- function(covariates, loadings) {
     return(heatmap)
 
 }
+
+
+make_mixture_model_loading_proportion_plot <- function(loadings, covariates, title) {
+	K <- dim(loadings)[2]
+	cell_types <- c()
+	factor_num <- c()
+	counts <- c()
+
+	ct_vec <- as.character(covariates$ct_cov)
+	unique_cell_types <- as.character(unique(ct_vec))
+	num_cell_types <- length(unique_cell_types)
+
+	print(head(ct_vec[loadings[,1] > .5]))
+	print(head(ct_vec[loadings$V1 > .5]))
+
+	for (k in 1:K) {
+		#factor_indices = loadings[, k] > .5
+		#print(length)
+
+		for (cell_type_num in 1:num_cell_types) {
+			cell_type <- as.character(unique_cell_types[cell_type_num])
+
+			tot <- sum(ct_vec[loadings[,k] > .5] == cell_type)
+			print(tot)
+
+			cell_types <- c(cell_types, cell_type)
+			factor_num <- c(factor_num, k)
+			counts <- c(counts, tot)
+		}
+	}
+
+	df <- data.frame(cell_type=factor(cell_types), factor_num=factor(factor_num), counts=counts)
+	print(df)
+	plotter <- ggplot(df,aes(x=factor_num, y=counts, fill=cell_type)) + 
+    	geom_bar(stat="identity", position="fill") +
+    	labs(x="Factor num",y="Num samples",fill="", title=title) + 
+    	gtex_v8_figure_theme() +
+    	theme(legend.position="bottom")
+    return(plotter)
+
+}
+
 #############################
 # Command line args
 #############################
 processed_expression_dir <- args[1]
 eqtl_input_dir <- args[2]
 eqtl_results_dir <- args[3]
-eqtl_visualization_dir <- args[4]
+eqtl_mixture_results_dir <- args[4]
+eqtl_visualization_dir <- args[5]
+
+
+if (FALSE) {
+# Input files
+covariate_file <- paste0(processed_expression_dir, "pseudobulk_covariates_sle_individuals.txt")
+covariates <- read.table(covariate_file, header=TRUE, sep="\t")
+
+print(covariate_file)
+type = "pseudobulk"
+num_components <- "3"
+loading_file <- paste0(eqtl_mixture_results_dir, type, "_mixture_", num_components, "_components_flexmix_model_posterior_prob.txt")
+print(loading_file)
+loadings <- read.table(loading_file, header=FALSE)
+
+output_file <- paste0(eqtl_visualization_dir, "eqtl_mixture_", type, "_", num_components, "_loading_cell_type_proportions.pdf")
+plotter <- make_mixture_model_loading_proportion_plot(loadings, covariates, paste0("Pseudo-bulk /", num_components, " components"))
+ggsave(plotter, file=output_file, width=7.2, height=6, units="in")
+
+
+type = "pseudobulk"
+num_components <- "5"
+loading_file <- paste0(eqtl_mixture_results_dir, type, "_mixture_", num_components, "_components_flexmix_model_posterior_prob.txt")
+print(loading_file)
+loadings <- read.table(loading_file, header=FALSE)
+
+output_file <- paste0(eqtl_visualization_dir, "eqtl_mixture_", type, "_", num_components, "_loading_cell_type_proportions.pdf")
+plotter <- make_mixture_model_loading_proportion_plot(loadings, covariates, paste0("Pseudo-bulk /", num_components, " components"))
+ggsave(plotter, file=output_file, width=7.2, height=6, units="in")
+
+
+
+type = "pseudobulk"
+num_components <- "7"
+loading_file <- paste0(eqtl_mixture_results_dir, type, "_mixture_", num_components, "_components_flexmix_model_posterior_prob.txt")
+print(loading_file)
+loadings <- read.table(loading_file, header=FALSE)
+
+output_file <- paste0(eqtl_visualization_dir, "eqtl_mixture_", type, "_", num_components, "_loading_cell_type_proportions.pdf")
+plotter <- make_mixture_model_loading_proportion_plot(loadings, covariates, paste0("Pseudo-bulk /", num_components, " components"))
+ggsave(plotter, file=output_file, width=7.2, height=6, units="in")
+
+# Input files
+covariate_file <- paste0(processed_expression_dir, "cell_covariates_sle_individuals_random_subset.txt")
+covariates <- read.table(covariate_file, header=TRUE, sep="\t")
+
+
+type = "sc_random_subset"
+num_components <- "3"
+loading_file <- paste0(eqtl_mixture_results_dir, type, "_mixture_", num_components, "_components_flexmix_model_posterior_prob.txt")
+print(loading_file)
+loadings <- read.table(loading_file, header=FALSE)
+
+output_file <- paste0(eqtl_visualization_dir, "eqtl_mixture_", type, "_", num_components, "_loading_cell_type_proportions.pdf")
+plotter <- make_mixture_model_loading_proportion_plot(loadings, covariates, paste0("single-cell /", num_components, " components"))
+ggsave(plotter, file=output_file, width=7.2, height=6, units="in")
+
+
+
+type = "sc_random_subset"
+num_components <- "5"
+loading_file <- paste0(eqtl_mixture_results_dir, type, "_mixture_", num_components, "_components_flexmix_model_posterior_prob.txt")
+#print(loading_file)
+loadings <- read.table(loading_file, header=FALSE)
+
+output_file <- paste0(eqtl_visualization_dir, "eqtl_mixture_", type, "_", num_components, "_loading_cell_type_proportions.pdf")
+plotter <- make_mixture_model_loading_proportion_plot(loadings, covariates, paste0("single-cell /", num_components, " components"))
+ggsave(plotter, file=output_file, width=7.2, height=6, units="in")
+
+
+
+}
+
 
 print("Hello")
 
 # Input files
 covariate_file <- paste0(processed_expression_dir, "cell_covariates_sle_individuals_random_subset.txt")
+#covariate_file <- paste0(processed_expression_dir, "pseudobulk_covariates_sle_individuals.txt")
 
 #eqtl_factorization_loading_file <- paste0(eqtl_results_dir, "eqtl_factorization_pseudobulk_data_20_factors_eqtl_factorization_vi_spike_and_slab_model_True_re_False_svi_0_seed_U_S.txt")
-eqtl_factorization_loading_file <- "/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_U_S_v4.txt"
+eqtl_factorization_loading_file <- "/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_U_S_v5.txt"
 
 # Load in data
 covariates <- read.table(covariate_file, header=TRUE, sep="\t")
@@ -345,3 +461,4 @@ output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_c
 output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_number_of_genes.pdf")
 #umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$n_genes, umap_loadings, "Number of genes")
 #ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+

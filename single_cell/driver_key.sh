@@ -71,7 +71,7 @@ sh prepare_eqtl_input.sh $gene_annotation_file $processed_expression_dir $eqtl_i
 fi
 
 ######################
-# Run eqtl-factorization on single cell data
+# Run eqtl-factorization on pseudobulk data
 ######################
 # eqtl factorization input files (generated in 'prepare_eqtl_input.sh')
 sample_overlap_file=$eqtl_input_dir"pseudobulk_sig_tests_individual_id.txt"
@@ -84,17 +84,17 @@ genotype_testing_file=$eqtl_input_dir"pseudobulk_sig_tests_50_pc_standardized_ge
 
 
 # Paramaters
-model_name="eqtl_factorization_vi_spike_and_slab_loadings_ard_loadings"
-num_latent_factors="30"
-random_effects="True"
+model_name="eqtl_factorization_vi_dirichlet_simplex"
+num_latent_factors="5"
+random_effects="False"
 svi="False"
 parrallel="False"
 
-seeds=("0" )
 if false; then
+seeds=("0")
 for seed in "${seeds[@]}"; do
 	echo "Seed: "$seed
-	file_stem="eqtl_factorization_pseudobulk_sig_tests_50_pc_data_v4_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed"
+	file_stem="eqtl_factorization_pseudobulk_sig_tests_50_pc_data_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed"
 	sbatch eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_factorization_results_dir $seed $model_name $random_effects $svi $parrallel
 done
 fi
@@ -114,8 +114,8 @@ expression_testing_file=$eqtl_input_dir"single_cell_random_subset_sig_tests_50_p
 genotype_testing_file=$eqtl_input_dir"single_cell_random_subset_sig_tests_50_pc_standardized_genotype_training_data_corrected_r_squared_pruned.h5"
 
 # Paramaters
-model_name="eqtl_factorization_vi_spike_and_slab_tied_residuals"
-num_latent_factors="20"
+model_name="eqtl_factorization_vi_dirichlet_simplex"
+num_latent_factors="5"
 random_effects="False"
 svi="True"
 parrallel="True"
@@ -129,9 +129,6 @@ for seed in "${seeds[@]}"; do
 done
 fi
 
-if false; then
-Rscript visualize_single_cell_eqtl_factorization.R $processed_expression_dir $eqtl_input_dir $eqtl_factorization_results_dir $eqtl_visualization_dir
-fi
 
 
 
@@ -147,24 +144,25 @@ genotype_training_file=$eqtl_input_dir"pseudobulk_sig_tests_50_pc_standardized_g
 if false; then
 k="3"
 output_root=$eqtl_mixture_results_dir"pseudobulk_mixture_"$k"_components_"
-sbatch eqtl_mixture_model.sh $genotype_training_file $expression_training_file $sample_overlap_file $k $output_root
-fi
+sh eqtl_mixture_model.sh $genotype_training_file $expression_training_file $sample_overlap_file $k $output_root
+
+
 k="4"
 output_root=$eqtl_mixture_results_dir"pseudobulk_mixture_"$k"_components_"
-sbatch eqtl_mixture_model.sh $genotype_training_file $expression_training_file $sample_overlap_file $k $output_root
+sh eqtl_mixture_model.sh $genotype_training_file $expression_training_file $sample_overlap_file $k $output_root
 
 k="5"
 output_root=$eqtl_mixture_results_dir"pseudobulk_mixture_"$k"_components_"
-sbatch eqtl_mixture_model.sh $genotype_training_file $expression_training_file $sample_overlap_file $k $output_root
+sh eqtl_mixture_model.sh $genotype_training_file $expression_training_file $sample_overlap_file $k $output_root
 
 k="6"
 output_root=$eqtl_mixture_results_dir"pseudobulk_mixture_"$k"_components_"
-sbatch eqtl_mixture_model.sh $genotype_training_file $expression_training_file $sample_overlap_file $k $output_root
+sh eqtl_mixture_model.sh $genotype_training_file $expression_training_file $sample_overlap_file $k $output_root
 
 k="7"
 output_root=$eqtl_mixture_results_dir"pseudobulk_mixture_"$k"_components_"
-sbatch eqtl_mixture_model.sh $genotype_training_file $expression_training_file $sample_overlap_file $k $output_root
-
+sh eqtl_mixture_model.sh $genotype_training_file $expression_training_file $sample_overlap_file $k $output_root
+fi
 
 
 ######################
@@ -175,20 +173,22 @@ sample_overlap_file=$eqtl_input_dir"single_cell_random_subset_sig_tests_50_pc_in
 # TRAINING
 expression_training_file=$eqtl_input_dir"single_cell_random_subset_sig_tests_50_pc_expression_training_data_corrected_r_squared_pruned.txt"
 genotype_training_file=$eqtl_input_dir"single_cell_random_subset_sig_tests_50_pc_standardized_genotype_training_data_corrected_r_squared_pruned.txt"
-
 if false; then
+
 k="3"
+echo $k
 output_root=$eqtl_mixture_results_dir"sc_random_subset_mixture_"$k"_components_"
-sbatch eqtl_mixture_model.sh $genotype_training_file $expression_training_file $sample_overlap_file $k $output_root
+sh eqtl_mixture_model.sh $genotype_training_file $expression_training_file $sample_overlap_file $k $output_root
 
 
 k="4"
 output_root=$eqtl_mixture_results_dir"sc_random_subset_mixture_"$k"_components_"
 sbatch eqtl_mixture_model.sh $genotype_training_file $expression_training_file $sample_overlap_file $k $output_root
+ 
 
 k="5"
 output_root=$eqtl_mixture_results_dir"sc_random_subset_mixture_"$k"_components_"
-sbatch eqtl_mixture_model.sh $genotype_training_file $expression_training_file $sample_overlap_file $k $output_root
+sh eqtl_mixture_model.sh $genotype_training_file $expression_training_file $sample_overlap_file $k $output_root
 
 
 k="6"
@@ -198,16 +198,16 @@ sbatch eqtl_mixture_model.sh $genotype_training_file $expression_training_file $
 
 k="7"
 output_root=$eqtl_mixture_results_dir"sc_random_subset_mixture_"$k"_components_"
-sbatch eqtl_mixture_model.sh $genotype_training_file $expression_training_file $sample_overlap_file $k $output_root
+sh eqtl_mixture_model.sh $genotype_training_file $expression_training_file $sample_overlap_file $k $output_root
 fi
 
 
 
 
 
-
-
-
+if false; then
+Rscript visualize_single_cell_eqtl_factorization.R $processed_expression_dir $eqtl_input_dir $eqtl_factorization_results_dir $eqtl_mixture_results_dir $eqtl_visualization_dir
+fi
 
 
 

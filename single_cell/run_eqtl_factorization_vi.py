@@ -3,6 +3,7 @@ import os
 import sys
 import pdb
 import eqtl_factorization_vi_spike_and_slab
+import eqtl_factorization_vi_dirichlet_simplex
 import eqtl_factorization_vi_spike_and_slab_tied_residuals
 import eqtl_factorization_vi_spike_and_slab_loadings_ard_factors
 import eqtl_factorization_vi_spike_and_slab_loadings_ard_loadings
@@ -80,7 +81,7 @@ def train_eqtl_factorization_model(sample_overlap_file, expression_training_file
 	num_samples = Y.shape[0]
 	num_tests = Y.shape[1]
 
-	max_it = 1000
+	max_it = 400
 	print('datA loaded')
 	print(G.shape)
 
@@ -106,9 +107,20 @@ def train_eqtl_factorization_model(sample_overlap_file, expression_training_file
 		#np.savetxt(output_root + '_elbo.txt', eqtl_vi.elbo, fmt="%s", delimiter='\n')
 		# pickle.dump(eqtl_vi, open(output_root + '_model', 'wb'))
 		#eqtl_vi = pickle.load(open(output_root + '_model', 'rb'))
+	if model_name == 'eqtl_factorization_vi_dirichlet_simplex':
+		eqtl_vi = eqtl_factorization_vi_dirichlet_simplex.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-16, beta=1e-16, a=1, b=1, gamma_v=1.0, max_iter=max_it, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean, sample_batch_fraction=.2)
+		eqtl_vi.fit(G=G, Y=Y, z=Z)
+		# pickle.dump(eqtl_vi, open(output_root + '_model', 'wb'))
+		#eqtl_vi = pickle.load(open(output_root + '_model', 'rb'))
+		# shared_ve, factor_ve = eqtl_vi.compute_variance_explained_of_factors()
+		if svi_boolean == False:
+			np.savetxt(output_root + '_U_S.txt', (eqtl_vi.U_mu), fmt="%s", delimiter='\t')
+		elif svi_boolean == True:
+			np.savetxt(output_root + '_U_S.txt', (eqtl_vi.U_mu_full), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_V.txt', (eqtl_vi.V_mu), fmt="%s", delimiter='\t')
 	if model_name == 'eqtl_factorization_vi_spike_and_slab_tied_residuals':
 		print('tied resid')
-		eqtl_vi = eqtl_factorization_vi_spike_and_slab_tied_residuals.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-3, beta=1e-3, a=1, b=1, gamma_v=10000, max_iter=max_it, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean, sample_batch_fraction=.1)
+		eqtl_vi = eqtl_factorization_vi_spike_and_slab_tied_residuals.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-3, beta=1e-3, a=1, b=1, gamma_v=1, max_iter=max_it, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean, sample_batch_fraction=.2)
 		eqtl_vi.fit(G=G, Y=Y, z=Z)
 		# pickle.dump(eqtl_vi, open(output_root + '_model', 'wb'))
 		#eqtl_vi = pickle.load(open(output_root + '_model', 'rb'))
@@ -172,24 +184,22 @@ def debug_eqtl_factorization_model(sample_overlap_file, expression_training_file
 	# Plot distribution of factor weights (are some stronger than others?)
 	# raw_expression = np.transpose(np.asarray(h5py.File('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_input/sc_raw_expression_training_data_uncorrected_10000_bp_0.5_r_squared_pruned.h5','r')['data']))
 	# raw_genotype = np.transpose(np.asarray(h5py.File('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_input/sc_genotype_training_data_uncorrected_10000_bp_0.5_r_squared_pruned.h5','r')['data']))
-	theta = np.loadtxt('/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_theta_U_v4.txt')
-	V_full = np.loadtxt('/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_V_v4.txt')
-	U_full = np.loadtxt('/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_U_S_v4.txt')
+	V_full = np.loadtxt('/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_V_v3.txt')
+	U_full = np.loadtxt('/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_U_S_v3.txt')
 	test_names = np.loadtxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_input/single_cell_random_subset_sig_tests_50_pc_variant_gene_pairs_in_known_cell_types.txt',dtype=str,delimiter='\t')
 	Y_full = np.transpose(np.asarray(h5py.File(expression_training_file,'r')['data']))
 	G_full = np.transpose(np.asarray(h5py.File(genotype_training_file,'r')['data']))
 
 	gene_names = test_names[1:,0]
 	variant_names = test_names[1:,1]
-	ordered_indices = np.argsort(-theta)
-	V = V_full[ordered_indices, :]
-	S_U = U_full[:, ordered_indices]
+	#ordered_indices = np.argsort(-theta)
+	V = V_full
+	S_U = U_full
 	factor_num = 4
 
 	factor_weights = np.abs(V[factor_num,:])
 	loading_weights = (S_U)[:, factor_num]
 	print(np.mean(factor_weights))
-	print(theta[ordered_indices[factor_num]])
 	ordered_tests = np.argsort(-factor_weights)
 	geno1 = Y_full[:, ordered_tests[0]]
 	counter = 1
@@ -283,6 +293,6 @@ output_root = eqtl_results_dir + file_stem
 train_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, random_effects, svi_boolean, parrallel_boolean)
 
 
-# debug_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, random_effects, svi_boolean, parrallel_boolean)
+#debug_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, random_effects, svi_boolean, parrallel_boolean)
 
 
