@@ -184,31 +184,36 @@ def debug_eqtl_factorization_model(sample_overlap_file, expression_training_file
 	# Plot distribution of factor weights (are some stronger than others?)
 	# raw_expression = np.transpose(np.asarray(h5py.File('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_input/sc_raw_expression_training_data_uncorrected_10000_bp_0.5_r_squared_pruned.h5','r')['data']))
 	# raw_genotype = np.transpose(np.asarray(h5py.File('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_input/sc_genotype_training_data_uncorrected_10000_bp_0.5_r_squared_pruned.h5','r')['data']))
-	V_full = np.loadtxt('/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_V_v3.txt')
-	U_full = np.loadtxt('/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_U_S_v3.txt')
+	V_full = np.loadtxt('/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_V_v6.txt')
+	U_full = np.loadtxt('/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_U_S_v6.txt')
+	tau = np.loadtxt('/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_tau_v6.txt')
 	test_names = np.loadtxt('/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_input/single_cell_random_subset_sig_tests_50_pc_variant_gene_pairs_in_known_cell_types.txt',dtype=str,delimiter='\t')
 	Y_full = np.transpose(np.asarray(h5py.File(expression_training_file,'r')['data']))
 	G_full = np.transpose(np.asarray(h5py.File(genotype_training_file,'r')['data']))
+
 
 	gene_names = test_names[1:,0]
 	variant_names = test_names[1:,1]
 	#ordered_indices = np.argsort(-theta)
 	V = V_full
 	S_U = U_full
-	factor_num = 4
+	factor_num = 3
 
 	factor_weights = np.abs(V[factor_num,:])
 	loading_weights = (S_U)[:, factor_num]
 	print(np.mean(factor_weights))
 	ordered_tests = np.argsort(-factor_weights)
-	geno1 = Y_full[:, ordered_tests[0]]
+	geno1 = G_full[:, ordered_tests[0]]
+	expr1 = Y_full[:, ordered_tests[0]]
 	counter = 1
 	for test_num in ordered_tests:
 		print('###########')
 		print(counter)
 		print(gene_names[test_num])
 		print(V[factor_num,test_num])
-		print(np.corrcoef(geno1,  Y_full[:, test_num])[0,1])
+		print(tau[test_num])
+		print(np.corrcoef(geno1,  G_full[:, test_num])[0,1])
+		print(np.corrcoef(expr1,  Y_full[:, test_num])[0,1])
 		pdb.set_trace()
 		if counter < 5:
 

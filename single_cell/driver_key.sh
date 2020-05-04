@@ -203,12 +203,9 @@ fi
 
 
 
-
-
 if false; then
 Rscript visualize_single_cell_eqtl_factorization.R $processed_expression_dir $eqtl_input_dir $eqtl_factorization_results_dir $eqtl_mixture_results_dir $eqtl_visualization_dir
 fi
-
 
 
 
