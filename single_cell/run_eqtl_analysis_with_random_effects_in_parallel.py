@@ -25,7 +25,19 @@ def run_eqtl_one_test_lm(expression, genotype, covariates):
 	standard_error = est2.bse[1]
 	pvalue = est2.pvalues[1]
 	residual_scale = est2.scale
-	return beta, standard_error, pvalue, residual_scale
+	ll_full = est2.llf
+
+
+	# FIT NULL MODEL
+	X3 = sm.add_constant(covariates)
+	model = sm.OLS(expression, X3)
+	fit = model.fit()
+	ll_null = fit.llf
+
+
+	pseudo_r_squared = 1.0 - (ll_full/ll_null)
+
+	return beta, standard_error, pvalue, residual_scale, pseudo_r_squared
 
 # Generate eqtl effect size (beta) and p-value for one test
 def run_eqtl_one_test_lmm(expression, genotype, covariates, groups):
@@ -103,7 +115,7 @@ def eqtl_analysis(covariate_file, test_names_file, expression_file, genotype_fil
 		# Skip header
 		if head_count == 0:
 			head_count = head_count + 1
-			t.write(test_name_line + '\tbeta\tstandard_error\tpvalue\tresidual_scale\tbeta_lm\tstandard_error_lm\tpvalue_lm\tresidual_scale_lm\n')
+			t.write(test_name_line + '\tbeta\tstandard_error\tpvalue\tresidual_scale\tbeta_lm\tstandard_error_lm\tpvalue_lm\tresidual_scale_lm\tpseudo_r_squared_lm\n')
 			continue
 		if counter < start_number or counter > end_number:
 			counter = counter + 1
@@ -114,8 +126,8 @@ def eqtl_analysis(covariate_file, test_names_file, expression_file, genotype_fil
 		expression = np.asarray(expression_handle.readline().rstrip().split('\t')).astype(float)
 		genotype = np.asarray(genotype_handle.readline().rstrip().split('\t')).astype(float)
 		beta, std_err, pvalue, residual_scale = run_eqtl_one_test_lmm(expression, genotype, covariates, individuals)
-		beta_lm, std_err_lm, pvalue_lm, residual_scale_lm = run_eqtl_one_test_lm(expression, genotype, covariates)
-		t.write(test_name_line + '\t' + str(beta) + '\t' + str(std_err) + '\t' + str(pvalue) + '\t' + str(residual_scale) + '\t' + str(beta_lm) + '\t' + str(std_err_lm) + '\t' + str(pvalue_lm) + '\t' + str(residual_scale_lm) + '\n')
+		beta_lm, std_err_lm, pvalue_lm, residual_scale_lm, pseudo_r_squared_lm = run_eqtl_one_test_lm(expression, genotype, covariates)
+		t.write(test_name_line + '\t' + str(beta) + '\t' + str(std_err) + '\t' + str(pvalue) + '\t' + str(residual_scale) + '\t' + str(beta_lm) + '\t' + str(std_err_lm) + '\t' + str(pvalue_lm) + '\t' + str(residual_scale_lm) + '\t' + str(pseudo_r_squared_lm) + '\n')
 		if np.mod(counter, 20) == 0:
 			t.flush()
 	t.close()

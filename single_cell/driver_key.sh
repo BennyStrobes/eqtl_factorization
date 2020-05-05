@@ -59,9 +59,8 @@ fi
 ######################
 # Run eQTL analysis at pseudobulk level and at single cell level
 ######################
-if false; then
 sh run_standard_eqtl_analysis.sh $processed_expression_dir $gene_annotation_file $genotype_data_dir $pseudobulk_eqtl_dir $single_cell_eqtl_dir $visualize_pseudobulk_eqtl_dir
-fi
+
 
 ######################
 # Get single cell expression and genotype data into a format to run eqtl-factorization
