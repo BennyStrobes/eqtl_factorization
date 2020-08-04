@@ -12,9 +12,10 @@ visualize_processed_expression_dir="$3"
 gene_annotation_file="$4"
 
 module load python/3.7.4-anaconda
-python preprocess_single_cell_expression.py $input_h5py_file $processed_expression_dir $gene_annotation_file
 
-
+min_fraction_cells=".05"
+transformation_type="log_transform"
+python preprocess_single_cell_expression.py $input_h5py_file $processed_expression_dir $gene_annotation_file $min_fraction_cells $transformation_type
 
 if false; then
 Rscript visualize_processed_single_cell_expression.R $processed_expression_dir $visualize_processed_expression_dir

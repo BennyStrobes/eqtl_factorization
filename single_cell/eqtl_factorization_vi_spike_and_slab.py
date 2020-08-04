@@ -952,7 +952,7 @@ class EQTL_FACTORIZATION_VI(object):
 			pca.fit(np.random.randn(self.N, 9999).T)
 			self.U_mu = pca.components_.T
 			for k in range(self.K):
-				self.U_mu[:,k] = .1*((self.U_mu[:,k]-np.mean(self.U_mu[:,k]))/np.std(self.U_mu[:,k]))
+				self.U_mu[:,k] = ((self.U_mu[:,k]-np.mean(self.U_mu[:,k]))/np.std(self.U_mu[:,k]))
 			#self.U_mu = np.random.randn(self.N, self.K)
 			self.U_var = np.ones((self.N, self.K))*(1.0/self.gamma_v) 
 			self.U_var_s_0 = np.ones((self.N, self.K))*(1.0/self.gamma_v)
@@ -1049,6 +1049,7 @@ class EQTL_FACTORIZATION_VI(object):
 
 		# Initialize other variables based around U
 		self.step_size = 1.0
+		pdb.set_trace()
 		self.update_V()
 		# self.update_alpha()
 		self.update_intercept()

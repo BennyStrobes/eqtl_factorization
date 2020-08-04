@@ -51,26 +51,33 @@ make_number_of_egenes_per_cell_type_bar_plot <- function(cell_types, pseudobulk_
   	return(p)
 }
 
-summary_stat_scatter_plot <- function(title, pseudobulk_stat, sc_stat, cov, summary_stat_name, color_label) {
+summary_stat_scatter_plot <- function(title, pseudobulk_stat, sc_stat, cov, x_axis_label, y_axis_label, color_label) {
 	df <- data.frame(pseudo=pseudobulk_stat, sc=sc_stat, cov=cov)
-	corry = cor(df$pseudo, df$sc)
+
+	missing <- !is.na(df$sc) 
+
+	corry = cor(df$pseudo[missing], df$sc[missing])
 	# Basic scatter plot
 	scatter <- ggplot(df, aes(x=pseudo, y=sc, color=cov)) + geom_point(size=.1) +
-		labs(x=paste0("Pseudo-bulk ", summary_stat_name), y=paste0("Single-cell ", summary_stat_name), color=color_label) + 
+		labs(x=x_axis_label, y=y_axis_label, color=color_label) + 
 		labs(title=paste0(title, " / Pearson rho: ", corry)) +
 		figure_theme() + 
 		geom_hline(yintercept=0, color = "grey", size=.1) + 
-		geom_vline(xintercept=0, color = "grey", size=.1)
+		geom_vline(xintercept=0, color = "grey", size=.1) + 
+		geom_abline(color="grey", size=.1)
 
 	return(scatter)
 }
 
-pvalue_scatter_plot <- function(title, pseudobulk_stat, sc_stat, cov, summary_stat_name, color_label) {
+pvalue_scatter_plot <- function(title, pseudobulk_stat, sc_stat, cov, x_axis_label, y_axis_label, color_label) {
+	pseudobulk_stat[pseudobulk_stat < 0.0] = 0.0
+	sc_stat[sc_stat < 0.0] = 0.0
 	df <- data.frame(pseudo=pseudobulk_stat, sc=sc_stat, cov=cov)
-	corry = cor(df$pseudo, df$sc)
+	missing <- !is.na(df$sc) 
+	corry = cor(df$pseudo[missing], df$sc[missing])
 	# Basic scatter plot
 	scatter <- ggplot(df, aes(x=pseudo, y=sc, color=cov)) + geom_point(size=.1) +
-		labs(x=paste0("Pseudo-bulk ", summary_stat_name), y=paste0("Single-cell ", summary_stat_name), color=color_label) + 
+		labs(x=x_axis_label, y=y_axis_label, color=color_label) + 
 		labs(title=paste0(title, " / Pearson rho: ", corry)) +
 		figure_theme() + 
 		geom_abline(color = "grey", size=.1)
@@ -107,11 +114,19 @@ cell_type <- "B_cells"
 pseudobulk_eqtl_file <- paste0(pseudobulk_eqtl_dir, cell_type, "_pseudobulk_eqtl_analysis_all_variant_gene_pairs.txt")
 sc_eqtl_0_pc_file <- paste0(single_cell_eqtl_dir, cell_type, "_sc_eqtl_analysis_0_pcs_all_variant_gene_pairs_merged.txt")
 sc_eqtl_25_pc_file <- paste0(single_cell_eqtl_dir, cell_type, "_sc_eqtl_analysis_25_pcs_all_variant_gene_pairs_merged.txt")
+sc_nb_eqtl_25_pc_file <- paste0(single_cell_eqtl_dir, cell_type, "_sc_nb_eqtl_analysis_25_pcs_all_variant_gene_pairs_merged.txt")
+
 test_info_file <- paste0(single_cell_eqtl_dir, cell_type, "_eqtl_input_test_info.txt")
 
 ct_pseudobulk_eqtls <- read.table(pseudobulk_eqtl_file, header=TRUE)
 ct_sc_0_pc_eqtls <- read.table(sc_eqtl_0_pc_file, header=TRUE)
 ct_sc_25_pc_eqtls <- read.table(sc_eqtl_25_pc_file, header=TRUE)
+ct_nb_sc_25_pc_eqtls <- read.table(sc_nb_eqtl_25_pc_file, header=TRUE)
+
+ct_nb_sc_25_pc_eqtls$beta[ct_nb_sc_25_pc_eqtls$beta > 1.5] = 1.5
+ct_nb_sc_25_pc_eqtls$beta[ct_nb_sc_25_pc_eqtls$beta < -1.5] = -1.5
+ct_nb_sc_25_pc_eqtls$pseudo_r_squared[ct_nb_sc_25_pc_eqtls$pseudo_r_squared < 0] = 0
+ct_nb_sc_25_pc_eqtls$pseudo_r_squared[ct_nb_sc_25_pc_eqtls$pseudo_r_squared > 1] = 1
 
 ct_test_info <- read.table(test_info_file, header=TRUE)
 
@@ -121,22 +136,22 @@ ct_test_info <- read.table(test_info_file, header=TRUE)
 ########################################
 output_file <- paste0(visualize_pseudobulk_eqtl_dir, cell_type, "_pseudobulk_sc_beta_comparison_scatter_colored_by_percent_expressed.pdf")
 title <- paste0(cell_type, " 0 PCs")
-scatter_plot <- summary_stat_scatter_plot(title, ct_pseudobulk_eqtls$beta, ct_sc_0_pc_eqtls$beta, ct_test_info$percent_expressed_cells, "beta", "Fraction\nexpressed cells")
+scatter_plot <- summary_stat_scatter_plot(title, ct_pseudobulk_eqtls$beta, ct_sc_0_pc_eqtls$beta, ct_test_info$percent_expressed_cells, "pseudobulk beta", "sc beta", "Fraction\nexpressed cells")
 ggsave(scatter_plot, file=output_file, width=7.2, height=6.0, units="in")
 
 output_file <- paste0(visualize_pseudobulk_eqtl_dir, cell_type, "_pseudobulk_sc_beta_comparison_scatter_colored_by_total_counts.pdf")
 title <- paste0(cell_type, " 0 PCs")
-scatter_plot <- summary_stat_scatter_plot(title, ct_pseudobulk_eqtls$beta, ct_sc_0_pc_eqtls$beta, log(ct_test_info$total_counts), "beta", "log(test depth)")
+scatter_plot <- summary_stat_scatter_plot(title, ct_pseudobulk_eqtls$beta, ct_sc_0_pc_eqtls$beta, log(ct_test_info$total_counts), "pseudobulk beta", "sc beta", "log(test depth)")
 ggsave(scatter_plot, file=output_file, width=7.2, height=6.0, units="in")
 
 output_file <- paste0(visualize_pseudobulk_eqtl_dir, cell_type, "_pseudobulk_sc_25_pc_beta_comparison_scatter_colored_by_percent_expressed.pdf")
 title <- paste0(cell_type, " 25 PCs")
-scatter_plot <- summary_stat_scatter_plot(title, ct_pseudobulk_eqtls$beta, ct_sc_25_pc_eqtls$beta, ct_test_info$percent_expressed_cells, "beta", "Fraction\nexpressed cells")
+scatter_plot <- summary_stat_scatter_plot(title, ct_pseudobulk_eqtls$beta, ct_sc_25_pc_eqtls$beta, ct_test_info$percent_expressed_cells, "pseudobulk beta", "sc beta", "Fraction\nexpressed cells")
 ggsave(scatter_plot, file=output_file, width=7.2, height=6.0, units="in")
 
 output_file <- paste0(visualize_pseudobulk_eqtl_dir, cell_type, "_pseudobulk_sc_25_pc_beta_comparison_scatter_colored_by_total_counts.pdf")
 title <- paste0(cell_type, " 25 PCs")
-scatter_plot <- summary_stat_scatter_plot(title, ct_pseudobulk_eqtls$beta, ct_sc_25_pc_eqtls$beta, log(ct_test_info$total_counts), "beta", "log(test depth)")
+scatter_plot <- summary_stat_scatter_plot(title, ct_pseudobulk_eqtls$beta, ct_sc_25_pc_eqtls$beta, log(ct_test_info$total_counts), "pseudobulk beta", "sc beta", "log(test depth)")
 ggsave(scatter_plot, file=output_file, width=7.2, height=6.0, units="in")
 
 #########################################
@@ -144,33 +159,92 @@ ggsave(scatter_plot, file=output_file, width=7.2, height=6.0, units="in")
 ########################################
 output_file <- paste0(visualize_pseudobulk_eqtl_dir, cell_type, "_pseudobulk_sc_pvalue_comparison_scatter_colored_by_percent_expressed.pdf")
 title <- paste0(cell_type, " 0 PCs")
-scatter_plot <- pvalue_scatter_plot(title, -log10(ct_pseudobulk_eqtls$pvalue + 1e-15), -log10(ct_sc_0_pc_eqtls$pvalue + 1e-15), ct_test_info$percent_expressed_cells, "-log10(pvalue)", "Fraction\nexpressed cells")
+scatter_plot <- pvalue_scatter_plot(title, -log10(ct_pseudobulk_eqtls$pvalue + 1e-15), -log10(ct_sc_0_pc_eqtls$pvalue + 1e-15), ct_test_info$percent_expressed_cells, "pseudobulk -log10(pvalue)", "sc -log10(pvalue)", "Fraction\nexpressed cells")
 ggsave(scatter_plot, file=output_file, width=7.2, height=6.0, units="in")
 
 output_file <- paste0(visualize_pseudobulk_eqtl_dir, cell_type, "_pseudobulk_sc_pvalue_comparison_scatter_colored_by_total_counts.pdf")
 title <- paste0(cell_type, " 0 PCs")
-scatter_plot <- pvalue_scatter_plot(title, -log10(ct_pseudobulk_eqtls$pvalue + 1e-15), -log10(ct_sc_0_pc_eqtls$pvalue + 1e-15), log(ct_test_info$total_counts), "-log10(pvalue)", "log(test depth)")
+scatter_plot <- pvalue_scatter_plot(title, -log10(ct_pseudobulk_eqtls$pvalue + 1e-15), -log10(ct_sc_0_pc_eqtls$pvalue + 1e-15), log(ct_test_info$total_counts), "pseudobulk -log10(pvalue)", "sc -log10(pvalue)", "log(test depth)")
 ggsave(scatter_plot, file=output_file, width=7.2, height=6.0, units="in")
-
-indices <- ct_pseudobulk_eqtls$pvalue < 1e-5
-
-new = ct_sc_0_pc_eqtls$pvalue[indices]
-
-print(sum(new<1e-3)/length(new))
-
 
 output_file <- paste0(visualize_pseudobulk_eqtl_dir, cell_type, "_pseudobulk_sc_25_pc_pvalue_comparison_scatter_colored_by_percent_expressed.pdf")
 title <- paste0(cell_type, " 25 PCs")
-scatter_plot <- pvalue_scatter_plot(title, -log10(ct_pseudobulk_eqtls$pvalue + 1e-15), -log10(ct_sc_25_pc_eqtls$pvalue + 1e-15), ct_test_info$percent_expressed_cells, "-log10(pvalue)", "Fraction\nexpressed cells")
+scatter_plot <- pvalue_scatter_plot(title, -log10(ct_pseudobulk_eqtls$pvalue + 1e-15), -log10(ct_sc_25_pc_eqtls$pvalue + 1e-15), ct_test_info$percent_expressed_cells, "pseudobulk -log10(pvalue)", "sc -log10(pvalue)", "Fraction\nexpressed cells")
 ggsave(scatter_plot, file=output_file, width=7.2, height=6.0, units="in")
 
 output_file <- paste0(visualize_pseudobulk_eqtl_dir, cell_type, "_pseudobulk_sc_25_pc_pvalue_comparison_scatter_colored_by_total_counts.pdf")
 title <- paste0(cell_type, " 25 PCs")
-scatter_plot <- pvalue_scatter_plot(title, -log10(ct_pseudobulk_eqtls$pvalue + 1e-15), -log10(ct_sc_25_pc_eqtls$pvalue + 1e-15), log(ct_test_info$total_counts), "-log10(pvalue)", "log(test depth)")
+scatter_plot <- pvalue_scatter_plot(title, -log10(ct_pseudobulk_eqtls$pvalue + 1e-15), -log10(ct_sc_25_pc_eqtls$pvalue + 1e-15), log(ct_test_info$total_counts), "pseudobulk -log10(pvalue)", "sc -log10(pvalue)", "log(test depth)")
 ggsave(scatter_plot, file=output_file, width=7.2, height=6.0, units="in")
 
-indices <- ct_pseudobulk_eqtls$pvalue < 1e-5
 
-new = ct_sc_25_pc_eqtls$pvalue[indices]
+#########################################
+# Pseudo-bulk-NB beta comparison scatter
+########################################
+output_file <- paste0(visualize_pseudobulk_eqtl_dir, cell_type, "_pseudobulk_sc_nb_25_pc_beta_comparison_scatter_colored_by_percent_expressed.pdf")
+title <- paste0(cell_type, " 25 PCs")
+scatter_plot <- summary_stat_scatter_plot(title, ct_pseudobulk_eqtls$beta, ct_nb_sc_25_pc_eqtls$beta, ct_test_info$percent_expressed_cells, "pseudobulk beta", "sc nb beta", "Fraction\nexpressed cells")
+ggsave(scatter_plot, file=output_file, width=7.2, height=6.0, units="in")
 
-print(sum(new<1e-3)/length(new))
+output_file <- paste0(visualize_pseudobulk_eqtl_dir, cell_type, "_pseudobulk_sc_nb_25_pc_beta_comparison_scatter_colored_by_total_counts.pdf")
+title <- paste0(cell_type, " 25 PCs")
+scatter_plot <- summary_stat_scatter_plot(title, ct_pseudobulk_eqtls$beta, ct_nb_sc_25_pc_eqtls$beta, log(ct_test_info$total_counts), "pseudobulk beta", "sc nb beta", "log(test depth)")
+ggsave(scatter_plot, file=output_file, width=7.2, height=6.0, units="in")
+
+
+#########################################
+# sc_gaussian-sc_NB beta comparison scatter
+########################################
+output_file <- paste0(visualize_pseudobulk_eqtl_dir, cell_type, "_sc_gaussian_sc_nb_25_pc_beta_comparison_scatter_colored_by_percent_expressed.pdf")
+title <- paste0(cell_type, " 25 PCs")
+scatter_plot <- summary_stat_scatter_plot(title, ct_sc_25_pc_eqtls$beta, ct_nb_sc_25_pc_eqtls$beta, ct_test_info$percent_expressed_cells, "sc gaussian beta", "sc nb beta", "Fraction\nexpressed cells")
+ggsave(scatter_plot, file=output_file, width=7.2, height=6.0, units="in")
+
+output_file <- paste0(visualize_pseudobulk_eqtl_dir, cell_type, "_sc_gaussian_sc_nb_25_pc_beta_comparison_scatter_colored_by_total_counts.pdf")
+title <- paste0(cell_type, " 25 PCs")
+scatter_plot <- summary_stat_scatter_plot(title, ct_sc_25_pc_eqtls$beta, ct_nb_sc_25_pc_eqtls$beta, log(ct_test_info$total_counts), "sc gaussian beta", "sc nb beta", "log(test depth)")
+ggsave(scatter_plot, file=output_file, width=7.2, height=6.0, units="in")
+
+
+
+if (FALSE) {
+#########################################
+# pseudobulk-sc_gaussian pseudo-r^2 comparison scatter
+########################################
+output_file <- paste0(visualize_pseudobulk_eqtl_dir, cell_type, "_pseudobulk_sc_gaussian_25_pc_pseudo_rsquared_comparison_scatter_colored_by_percent_expressed.pdf")
+title <- paste0(cell_type, " 25 PCs")
+scatter_plot <- pvalue_scatter_plot(title, ct_pseudobulk_eqtls$pseudo_r_squared, ct_sc_25_pc_eqtls$pseudo_r_squared_lm, ct_test_info$percent_expressed_cells, "pseudobulk pseudo R^2", "sc gaussian pseudo R^2", "Fraction\nexpressed cells")
+ggsave(scatter_plot, file=output_file, width=7.2, height=6.0, units="in")
+
+output_file <- paste0(visualize_pseudobulk_eqtl_dir, cell_type, "_pseudobulk_sc_gaussian_25_pc_pseudo_rsquared_comparison_scatter_colored_by_total_counts.pdf")
+title <- paste0(cell_type, " 25 PCs")
+scatter_plot <- pvalue_scatter_plot(title, ct_pseudobulk_eqtls$pseudo_r_squared, ct_sc_25_pc_eqtls$pseudo_r_squared_lm, log(ct_test_info$total_counts), "pseudobulk pseudo R^2", "sc gaussian pseudo R^2", "log(test depth)")
+ggsave(scatter_plot, file=output_file, width=7.2, height=6.0, units="in")
+
+#########################################
+# pseudobulk-sc_nb pseudo-r^2 comparison scatter
+########################################
+output_file <- paste0(visualize_pseudobulk_eqtl_dir, cell_type, "_pseudobulk_sc_nb_25_pc_pseudo_rsquared_comparison_scatter_colored_by_percent_expressed.pdf")
+title <- paste0(cell_type, " 25 PCs")
+scatter_plot <- pvalue_scatter_plot(title, ct_pseudobulk_eqtls$pseudo_r_squared, ct_nb_sc_25_pc_eqtls$pseudo_r_squared, ct_test_info$percent_expressed_cells, "pseudobulk pseudo R^2", "sc nb pseudo R^2", "Fraction\nexpressed cells")
+ggsave(scatter_plot, file=output_file, width=7.2, height=6.0, units="in")
+
+output_file <- paste0(visualize_pseudobulk_eqtl_dir, cell_type, "_pseudobulk_sc_nb_25_pc_pseudo_rsquared_comparison_scatter_colored_by_total_counts.pdf")
+title <- paste0(cell_type, " 25 PCs")
+scatter_plot <- pvalue_scatter_plot(title, ct_pseudobulk_eqtls$pseudo_r_squared, ct_nb_sc_25_pc_eqtls$pseudo_r_squared, log(ct_test_info$total_counts), "pseudobulk pseudo R^2", "sc nb pseudo R^2", "log(test depth)")
+ggsave(scatter_plot, file=output_file, width=7.2, height=6.0, units="in")
+
+
+#########################################
+# sc_gaussian-sc_NB pseudo-r^2 comparison scatter
+########################################
+output_file <- paste0(visualize_pseudobulk_eqtl_dir, cell_type, "_sc_gaussian_sc_nb_25_pc_pseudo_rsquared_comparison_scatter_colored_by_percent_expressed.pdf")
+title <- paste0(cell_type, " 25 PCs")
+scatter_plot <- pvalue_scatter_plot(title, ct_sc_25_pc_eqtls$pseudo_r_squared_lm, ct_nb_sc_25_pc_eqtls$pseudo_r_squared, ct_test_info$percent_expressed_cells, "sc gaussian pseudo R^2", "sc nb pseudo R^2", "Fraction\nexpressed cells")
+ggsave(scatter_plot, file=output_file, width=7.2, height=6.0, units="in")
+
+output_file <- paste0(visualize_pseudobulk_eqtl_dir, cell_type, "_sc_gaussian_sc_nb_25_pc_pseudo_rsquared_comparison_scatter_colored_by_total_counts.pdf")
+title <- paste0(cell_type, " 25 PCs")
+scatter_plot <- pvalue_scatter_plot(title, ct_sc_25_pc_eqtls$pseudo_r_squared_lm, ct_nb_sc_25_pc_eqtls$pseudo_r_squared, log(ct_test_info$total_counts), "sc gaussian pseudo R^2", "sc nb pseudo R^2", "log(test depth)")
+ggsave(scatter_plot, file=output_file, width=7.2, height=6.0, units="in")
+}

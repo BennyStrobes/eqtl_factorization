@@ -122,6 +122,7 @@ def eqtl_analysis(covariate_file, test_names_file, expression_file, genotype_fil
 			temp_e = expression_handle.readline()
 			temp_g = genotype_handle.readline()
 			continue
+		print(counter)
 		counter = counter + 1
 		expression = np.asarray(expression_handle.readline().rstrip().split('\t')).astype(float)
 		genotype = np.asarray(genotype_handle.readline().rstrip().split('\t')).astype(float)
@@ -270,6 +271,7 @@ total_jobs = int(sys.argv[9])
 #For parallelization purposes
 number_of_tests = get_number_of_tests(test_names_file)
 start_number, end_number = parallelization_start_and_end(number_of_tests, job_number, total_jobs)
+print(end_number-start_number)
 
 ####################
 # Run eQTL analysis

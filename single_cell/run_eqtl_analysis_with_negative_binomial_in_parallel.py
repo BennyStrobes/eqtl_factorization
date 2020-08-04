@@ -32,22 +32,26 @@ def run_eqtl_one_test_nb_lm(expression, genotype, covariates, lib_size):
 	# Add intercept
 	X2 = sm.add_constant(X)
 
-	model = sm.NegativeBinomial(expression, X2, exposure=lib_size)
-	fit = model.fit()
-	beta = fit.params[1]
-	standard_error = fit.bse[1]
-	pvalue = fit.pvalues[1]
-	ll_full = fit.llf
+	try:
+		model = sm.NegativeBinomial(expression, X2, exposure=lib_size)
+		fit = model.fit()
+		beta = fit.params[1]
+		standard_error = fit.bse[1]
+		pvalue = fit.pvalues[1]
+		ll_full = fit.llf
 
+		# FIT NULL MODEL
+		X3 = sm.add_constant(covariates)
+		model = sm.NegativeBinomial(expression, X3, exposure=lib_size)
+		fit = model.fit()
+		ll_null = fit.llf
 
-	# FIT NULL MODEL
-	X3 = sm.add_constant(covariates)
-	model = sm.NegativeBinomial(expression, X3, exposure=lib_size)
-	fit = model.fit()
-	ll_null = fit.llf
-
-
-	pseudo_r_squared = 1.0 - (ll_full/ll_null)
+		pseudo_r_squared = 1.0 - (ll_full/ll_null)
+	except:
+		beta="nan"
+		standard_error="nan"
+		pvalue="nan"
+		pseudo_r_squared="nan"
 
 	return beta, standard_error, pvalue, pseudo_r_squared
 

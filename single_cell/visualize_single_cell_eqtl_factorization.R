@@ -333,12 +333,16 @@ ggsave(plotter, file=output_file, width=7.2, height=6, units="in")
 
 print("Hello")
 
+frac_expressed = "0.1"
 # Input files
-covariate_file <- paste0(processed_expression_dir, "cell_covariates_sle_individuals_random_subset.txt")
+covariate_file <- paste0(processed_expression_dir, "cell_covariates_sle_individuals_random_subset_min_expressed_cells_", frac_expressed, ".txt")
+#covariate_file <- paste0(processed_expression_dir, "cell_covariates_sle_individuals.txt")
 #covariate_file <- paste0(processed_expression_dir, "pseudobulk_covariates_sle_individuals.txt")
 
 #eqtl_factorization_loading_file <- paste0(eqtl_results_dir, "eqtl_factorization_pseudobulk_data_20_factors_eqtl_factorization_vi_spike_and_slab_model_True_re_False_svi_0_seed_U_S.txt")
-eqtl_factorization_loading_file <- "/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_U_S_v6.txt"
+#eqtl_factorization_loading_file <- "/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_U_als.txt"
+#eqtl_factorization_loading_file <- paste0(eqtl_results_dir, "eqtl_factorization_single_cell_sig_tests_50_pc_min_expressed_cells_", frac_expressed, "_data_uncorrected_genotype_5_factors_eqtl_factorization_als_model_False_re_False_svi_0_seed_U.txt")
+eqtl_factorization_loading_file <- "/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/temp_output/temper_U_als.txt"
 
 # Load in data
 covariates <- read.table(covariate_file, header=TRUE, sep="\t")
@@ -351,10 +355,10 @@ loadings <- read.table(eqtl_factorization_loading_file, header=FALSE)
 umap_loadings = umap(loadings)$layout
 saveRDS( umap_loadings, "umap_loadings.rds")
 print("UMAP DONE")
-umap_loadings <- readRDS("umap_loadings.rds")
+#umap_loadings <- readRDS("umap_loadings.rds")
 
 
-
+eqtl_visualization_dir <- paste0(eqtl_visualization_dir, frac_expressed, "_")
 ######################################
 # Make scatter-plot of loading1 vs loading2 colored by known cell type
 #######################################
@@ -396,7 +400,7 @@ output_file <- paste0(eqtl_visualization_dir, "loading_boxplot_with_row_for_ever
 output_file <- paste0(eqtl_visualization_dir, "loading_boxplot_colored_by_cell_type.pdf")
 boxplot <- make_loading_boxplot_plot_by_categorical_covariate(covariates$ct_cov, loadings, "Known cell type")
 ggsave(boxplot, file=output_file, width=10.2, height=5.5, units="in")
-
+print("done")
 ######################################
 # Make loading boxplot colored by Ancestry
 #######################################

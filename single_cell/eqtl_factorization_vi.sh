@@ -1,8 +1,9 @@
 #!/bin/bash -l
 
 #SBATCH
-#SBATCH --time=30:00:00
-#SBATCH --partition=lrgmem
+#SBATCH --time=25:00:00
+#SBATCH --partition=shared
+#SBATCH --mem=30GB
 #SBATCH --nodes=1
 
 
@@ -19,8 +20,8 @@ model_name="${10}"
 random_effects="${11}"
 svi="${12}"
 parrallel="${13}"
+lasso_param_v="${14}"
 
-module load python/3.6-anaconda
+module load python/3.7-anaconda
 
-
-python run_eqtl_factorization_vi.py $sample_overlap_file $expression_testing_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name $random_effects $svi $parrallel
+python run_eqtl_factorization_vi.py $sample_overlap_file $expression_testing_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name $random_effects $svi $parrallel $lasso_param_v

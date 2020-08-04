@@ -280,7 +280,7 @@ def create_mapping_from_gene_names_to_expression_vectors(sc_expression_file, gen
 	mapping = {}
 	for index, gene_name in enumerate(gene_names):
 		mapping[gene_name] = expression_matrix[:, index]
-	return 
+	return mapping
 
 def create_mapping_from_gene_names_to_expression_vector_float(sc_expression_file, gene_names_file):
 	# Get gene names
@@ -302,6 +302,8 @@ def generate_single_cell_expression_eqtl_training_data(ld_pruned_variant_gene_pa
 	t = open(single_cell_expression_eqtl_traing_data_file, 'w')
 	for gene_name in ordered_gene_names:
 		# Use map to get expression vector corresponding to this gene
+		if gene_name not in gene_name_to_expression_vector:
+			pdb.set_trace()
 		expression_vector = gene_name_to_expression_vector[gene_name]
 		# Print to output file
 		t.write('\t'.join(expression_vector) + '\n')
@@ -442,7 +444,6 @@ def construct_library_size_file(cell_type_sc_sample_covariate_file, cell_type_li
 
 # For each cell type generate eqtl input files
 def generate_cell_type_eqtl_input_files(cell_type, genotype_data_dir, cell_type_sc_expression_file, cell_type_sc_sample_covariate_file, cell_type_eqtl_variant_gene_pairs_file, cell_type_eqtl_expression_file, cell_type_eqtl_genotype_file, distance, gene_annotation_file, gene_id_file, cell_type_sample_overlap_file, cell_type_sc_raw_expression_file, cell_type_eqtl_raw_expression_file, cell_type_test_info_file, cell_type_library_size_file):
-	'''
 	########################
 	# Step 1: Create file with all variant gene pairs such that gene is within $distanceKB of gene
 	########################
@@ -473,7 +474,6 @@ def generate_cell_type_eqtl_input_files(cell_type, genotype_data_dir, cell_type_
 	# Step 5: Generate sample overlap file
 	########################
 	construct_sample_overlap_file(cell_type_sc_sample_covariate_file, cell_type_sample_overlap_file)
-	'''
 	########################
 	# Step 6: Generate library size file
 	########################
@@ -501,10 +501,11 @@ single_cell_eqtl_dir = sys.argv[4]  # Output dir
 # Input files
 ###################
 # Pseudobulk gene names (in same order as raw_pseudobulk_expression_file)
-gene_id_file = processed_expression_dir + 'single_cell_expression_sle_individuals_gene_ids.txt'
+gene_id_file = processed_expression_dir + 'single_cell_expression_sle_individuals_min_expressed_cells_0.05_log_transform_transform_gene_ids.txt'
 cell_type_file = processed_expression_dir + 'cell_types.txt'
 
 cell_types = get_cell_types(cell_type_file)
+print(cell_types)
 
 ###################
 # Extract gene ids
@@ -526,13 +527,12 @@ if len(np.unique(ensamble_ids)) != len(ensamble_ids):
 # For each cell type generate eqtl input files
 ###################
 distance=10000
-cell_types = ['B_cells']
 for cell_type in cell_types:
 	print(cell_type)
 	# Input files
-	cell_type_sc_expression_file = processed_expression_dir + cell_type + '_single_cell_expression_sle_individuals_standardized.txt'
-	cell_type_sc_raw_expression_file = processed_expression_dir + cell_type + '_single_cell_expression_sle_individuals_raw.txt'
-	cell_type_sc_sample_covariate_file = processed_expression_dir + cell_type + '_cell_covariates_sle_individuals.txt'
+	cell_type_sc_expression_file = processed_expression_dir + cell_type + '_single_cell_expression_sle_individuals_min_expressed_cells_0.05_log_transform_transform_standardized.txt'
+	cell_type_sc_raw_expression_file = processed_expression_dir + cell_type + '_single_cell_expression_sle_individuals_min_expressed_cells_0.05_log_transform_transform_raw.txt'
+	cell_type_sc_sample_covariate_file = processed_expression_dir + cell_type + '_cell_covariates_sle_individuals_min_expressed_cells_0.05_log_transform_transform.txt'
 	# Output files
 	cell_type_eqtl_variant_gene_pairs_file = single_cell_eqtl_dir + cell_type + '_eqtl_input_variant_gene_pairs.txt'
 	cell_type_eqtl_expression_file = single_cell_eqtl_dir + cell_type + '_eqtl_input_expression.txt'

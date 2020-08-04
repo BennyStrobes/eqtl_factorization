@@ -232,13 +232,60 @@ def generate_cell_type_sc_expression_data_wrapper(cell_type, adata, standardized
 	###########################
 	np.savetxt(standardized_cell_type_expression_file, ct_data_clean.X, fmt="%s", delimiter='\t')
 
+def calculate_deviance_residuals(adata):
+	adata.X = adata.X.toarray()
+	num_cells, num_genes = adata.X.shape
+	total_cell_counts = np.sum(adata.X,axis=1)
+	total_gene_counts = np.sum(adata.X, axis=0)
+	gene_frac = total_gene_counts/np.sum(total_gene_counts)
+
+
+	'''
+	for j in range(num_genes):
+		# Observed count for gene, individual pair
+		y_j = adata.X[:,j]
+		# Compute predicted fraction assigned to gene (according to MLE)
+		pi_j = gene_frac[j]
+
+		# Compute predicted fraction assigned to gene, individual pair
+		mu_j = total_cell_counts*pi_j
+
+		# Compute deviance residual
+		term_1 = 2.0*y_j*np.log(y_j/mu_j) 
+		term_1[np.isnan(term_1)] = 0.0
+
+		term_2 = 2.0*(total_cell_counts - y_j)*np.log((total_cell_counts - y_j)/(total_cell_counts - mu_j))
+
+		deviance_residual_j = np.sign(y_j - mu_j)*np.sqrt(term_1 + term_2)
+	'''
+	# Doing pearson resid instead
+	for j in range(num_genes):
+		# Observed count for gene, individual pair
+		y_j = adata.X[:,j]
+		# Compute predicted fraction assigned to gene (according to MLE)
+		pi_j = gene_frac[j]
+
+		# Compute predicted fraction assigned to gene, individual pair
+		mu_j = total_cell_counts*pi_j
+
+		# Compute pearson resid
+		numerator_term = y_j - mu_j
+
+		denomenator_term= mu_j - ((1.0/total_cell_counts)*np.square(mu_j))
+
+		pearson_resid_j = numerator_term/np.sqrt(denomenator_term)
+		adata.X[:, j] = pearson_resid_j
+		standardized_pearson_resid = (pearson_resid_j - np.mean(pearson_resid_j))/np.std(pearson_resid_j)
+		adata.X[:, j] = standardized_pearson_resid
+	return adata
 #####################
 # Command line args
 ######################
 input_h5py_file = sys.argv[1]
 processed_expression_dir = sys.argv[2]
 gene_annotation_file = sys.argv[3]
-
+min_fraction_of_cells = float(sys.argv[4])
+transformation_type = sys.argv[5]  # Either deviance_residual or log_transform
 
 
 ######################
@@ -246,12 +293,11 @@ gene_annotation_file = sys.argv[3]
 #######################
 min_genes = 400
 # Min fraction of expressed cells for a gene
-min_fraction_of_cells = .01
+#min_fraction_of_cells = .1
 # Random subset
-random_subset = False
+random_subset = True
 np.random.seed(0)
 
-'''
 ######################
 # Load in ScanPy data
 #######################
@@ -266,7 +312,7 @@ adata = adata[adata.obs.disease_cov == "sle", :]
 
 if random_subset == True:
 	num_cells = adata.X.shape[0]
-	adata.obs['random_subset'] = np.random.uniform(size=num_cells) < (1/8)
+	adata.obs['random_subset'] = np.random.uniform(size=num_cells) < (1/5)
 	adata = adata[adata.obs.random_subset == True, :]
 
 
@@ -298,9 +344,9 @@ print(adata.X.shape)
 # Save un-normalized expression data
 #######################
 if random_subset == True:
-	expression_output_file = processed_expression_dir + 'single_cell_raw_expression_sle_individuals_random_subset.txt'
+	expression_output_file = processed_expression_dir + 'single_cell_raw_expression_sle_individuals_random_subset_min_expressed_cells_' + str(min_fraction_of_cells) + '.txt'
 else:
-	expression_output_file = processed_expression_dir + 'single_cell_raw_expression_sle_individuals.txt'
+	expression_output_file = processed_expression_dir + 'single_cell_raw_expression_sle_individuals_min_expressed_cells_' + str(min_fraction_of_cells) + '.txt'
 np.savetxt(expression_output_file, adata.X.toarray(), fmt="%s", delimiter='\t')
 
 adata.raw = adata
@@ -308,9 +354,15 @@ adata.raw = adata
 ######################
 # Normalize data
 #######################
-sc.pp.normalize_total(adata, target_sum=1e4)
-sc.pp.log1p(adata)
-sc.pp.scale(adata, max_value=10)
+if transformation_type == 'log_transform':
+	sc.pp.normalize_total(adata, target_sum=1e4)
+	sc.pp.log1p(adata)
+	sc.pp.scale(adata, max_value=10)
+elif transformation_type == 'pearson_residual':
+	adata = calculate_deviance_residuals(adata)
+else:
+	print('transformation type: ' + transformation_type + 'currently not implemented')
+	pdb.set_trace()
 
 ######################
 # Run PCA on data
@@ -322,18 +374,18 @@ sc.tl.pca(adata, svd_solver='arpack')
 # Save Gene IDs
 #######################
 if random_subset == True:
-	gene_id_output_file = processed_expression_dir + 'single_cell_expression_sle_individuals_random_subset_gene_ids.txt'
+	gene_id_output_file = processed_expression_dir + 'single_cell_expression_sle_individuals_random_subset_min_expressed_cells_' + str(min_fraction_of_cells) + '_' + transformation_type + '_transform' + '_gene_ids.txt'
 else:
-	gene_id_output_file = processed_expression_dir + 'single_cell_expression_sle_individuals_gene_ids.txt'
+	gene_id_output_file = processed_expression_dir + 'single_cell_expression_sle_individuals_min_expressed_cells_' + str(min_fraction_of_cells) + '_' + transformation_type + '_transform'  + '_gene_ids.txt'
 np.savetxt(gene_id_output_file, np.vstack((adata.var.index, adata.var[adata.var.columns[0]])).T, fmt="%s", delimiter='\t')
 
 #######################
 # Save expression data
 #######################
 if random_subset == True:
-	expression_output_file = processed_expression_dir + 'single_cell_expression_sle_individuals_random_subset_standardized.txt'
+	expression_output_file = processed_expression_dir + 'single_cell_expression_sle_individuals_random_subset_min_expressed_cells_' + str(min_fraction_of_cells) + '_' + transformation_type + '_transform'  + '_standardized.txt'
 else:
-	expression_output_file = processed_expression_dir + 'single_cell_expression_sle_individuals_standardized.txt'
+	expression_output_file = processed_expression_dir + 'single_cell_expression_sle_individuals_min_expressed_cells_' + str(min_fraction_of_cells) + '_' + transformation_type + '_transform'  + '_standardized.txt'
 np.savetxt(expression_output_file, adata.X, fmt="%s", delimiter='\t')
 
 #######################
@@ -341,9 +393,9 @@ np.savetxt(expression_output_file, adata.X, fmt="%s", delimiter='\t')
 #######################
 adata.obs['cell_id'] = adata.obs.index
 if random_subset == True:
-	covariate_output_file = processed_expression_dir + 'cell_covariates_sle_individuals_random_subset.txt'
+	covariate_output_file = processed_expression_dir + 'cell_covariates_sle_individuals_random_subset_min_expressed_cells_' + str(min_fraction_of_cells) + '_' + transformation_type + '_transform'  + '.txt'
 else:
-	covariate_output_file = processed_expression_dir + 'cell_covariates_sle_individuals.txt'
+	covariate_output_file = processed_expression_dir + 'cell_covariates_sle_individuals_min_expressed_cells_' + str(min_fraction_of_cells) + '_' + transformation_type + '_transform'  + '.txt'
 np.savetxt(covariate_output_file, adata.obs, fmt="%s", delimiter='\t', header='\t'.join(adata.obs.columns), comments='')
 
 #######################
@@ -351,22 +403,21 @@ np.savetxt(covariate_output_file, adata.obs, fmt="%s", delimiter='\t', header='\
 #######################
 num_pcs=200
 if random_subset == True:
-	filtered_cells_pca_file = processed_expression_dir + 'pca_scores_sle_individuals_random_subset.txt'
-	filtered_cells_pca_ve_file = processed_expression_dir + 'pca_variance_explained_sle_individuals_random_subset.txt'
+	filtered_cells_pca_file = processed_expression_dir + 'pca_scores_sle_individuals_random_subset_min_expressed_cells_' + str(min_fraction_of_cells) + '_' + transformation_type + '_transform'  + '.txt'
+	filtered_cells_pca_ve_file = processed_expression_dir + 'pca_variance_explained_sle_individuals_random_subset_min_expressed_cells_' + str(min_fraction_of_cells) + '_' + transformation_type + '_transform'  + '.txt'
 else:
-	filtered_cells_pca_file = processed_expression_dir + 'pca_scores_sle_individuals.txt'
-	filtered_cells_pca_ve_file = processed_expression_dir + 'pca_variance_explained_sle_individuals.txt'
+	filtered_cells_pca_file = processed_expression_dir + 'pca_scores_sle_individuals_min_expressed_cells_' + str(min_fraction_of_cells) + '_' + transformation_type + '_transform'  + '.txt'
+	filtered_cells_pca_ve_file = processed_expression_dir + 'pca_variance_explained_sle_individuals_min_expressed_cells_' + str(min_fraction_of_cells) + '_' + transformation_type + '_transform'  + '.txt'
 generate_pca_scores_and_variance_explained(expression_output_file, num_pcs, filtered_cells_pca_file, filtered_cells_pca_ve_file)
 #######################
 # Save Output h5 file
 #######################
 if random_subset == True:
-	h5_output_file = processed_expression_dir + 'scanpy_processed_single_cell_data_random_subset.h5ad'
+	h5_output_file = processed_expression_dir + 'scanpy_processed_single_cell_data_random_subset_min_expressed_cells_' + str(min_fraction_of_cells) + '_' + transformation_type + '_transform'  + '.h5ad'
 else:
-	h5_output_file = processed_expression_dir + 'scanpy_processed_single_cell_data.h5ad'
+	h5_output_file = processed_expression_dir + 'scanpy_processed_single_cell_data_min_expressed_cells_' + str(min_fraction_of_cells) + '_' + transformation_type + '_transform'  + '.h5ad'
 adata.write(h5_output_file)
 
-'''
 
 
 #######################
@@ -374,38 +425,39 @@ adata.write(h5_output_file)
 #######################
 # Load in data
 if random_subset == True:
-	processed_single_cell_h5_file = processed_expression_dir + 'scanpy_processed_single_cell_data_random_subset.h5ad'
+	processed_single_cell_h5_file = processed_expression_dir + 'scanpy_processed_single_cell_data_random_subset_min_expressed_cells_' + str(min_fraction_of_cells)+ '_' + transformation_type + '_transform'  + '.h5ad'
 else:
-	processed_single_cell_h5_file = processed_expression_dir + 'scanpy_processed_single_cell_data.h5ad'
+	processed_single_cell_h5_file = processed_expression_dir + 'scanpy_processed_single_cell_data_min_expressed_cells_' + str(min_fraction_of_cells) + '_' + transformation_type + '_transform'  + '.h5ad'
 adata = sc.read_h5ad(processed_single_cell_h5_file)
 # Get unique cell types
 unique_cell_types = np.unique(adata.obs.ct_cov)
 np.savetxt(processed_expression_dir + 'cell_types.txt', unique_cell_types, fmt="%s")
 # Loop through cell types
+
 for cell_type in unique_cell_types:
 	print(cell_type)
 	printible_cell_type = '_'.join(cell_type.split(' '))
 	if random_subset == False:
-		standardized_cell_type_expression_file = processed_expression_dir + printible_cell_type + '_single_cell_expression_sle_individuals_standardized.txt'
-		raw_cell_type_expression_file = processed_expression_dir + printible_cell_type + '_single_cell_expression_sle_individuals_raw.txt'
-		centered_raw_cell_type_expression_file = processed_expression_dir + printible_cell_type + '_single_cell_expression_sle_individuals_raw_centered.txt'
-		standardized_cell_type_covariate_file = processed_expression_dir + printible_cell_type + '_cell_covariates_sle_individuals.txt'
-		cell_type_pca_file = processed_expression_dir + printible_cell_type + '_pca_scores_sle_individuals.txt'
-		cell_type_pca_pve_file = processed_expression_dir + printible_cell_type + '_pca_variance_explained_sle_individuals.txt'
-		cell_type_raw_pca_file = processed_expression_dir + printible_cell_type + '_raw_pca_scores_sle_individuals.txt'
-		cell_type_raw_pca_pve_file = processed_expression_dir + printible_cell_type + '_raw_pca_variance_explained_sle_individuals.txt'
+		standardized_cell_type_expression_file = processed_expression_dir + printible_cell_type + '_single_cell_expression_sle_individuals_min_expressed_cells_' + str(min_fraction_of_cells)+ '_' + transformation_type + '_transform'  + '_standardized.txt'
+		raw_cell_type_expression_file = processed_expression_dir + printible_cell_type + '_single_cell_expression_sle_individuals_min_expressed_cells_' + str(min_fraction_of_cells)+ '_' + transformation_type + '_transform'  + '_raw.txt'
+		centered_raw_cell_type_expression_file = processed_expression_dir + printible_cell_type + '_single_cell_expression_sle_individuals_min_expressed_cells_' + str(min_fraction_of_cells)+ '_' + transformation_type + '_transform'  + '_raw_centered.txt'
+		standardized_cell_type_covariate_file = processed_expression_dir + printible_cell_type + '_cell_covariates_sle_individuals_min_expressed_cells_' + str(min_fraction_of_cells)+ '_' + transformation_type + '_transform'  + '.txt'
+		cell_type_pca_file = processed_expression_dir + printible_cell_type + '_pca_scores_sle_individuals_min_expressed_cells_' + str(min_fraction_of_cells)+ '_' + transformation_type + '_transform'  + '.txt'
+		cell_type_pca_pve_file = processed_expression_dir + printible_cell_type + '_pca_variance_explained_sle_individuals_min_expressed_cells_' + str(min_fraction_of_cells)+ '_' + transformation_type + '_transform'  + '.txt'
+		cell_type_raw_pca_file = processed_expression_dir + printible_cell_type + '_raw_pca_scores_sle_individuals_min_expressed_cells_' + str(min_fraction_of_cells)+ '_' + transformation_type + '_transform'  + '.txt'
+		cell_type_raw_pca_pve_file = processed_expression_dir + printible_cell_type + '_raw_pca_variance_explained_sle_individuals_min_expressed_cells_' + str(min_fraction_of_cells)+ '_' + transformation_type + '_transform'  + '.txt'
 	else:
-		standardized_cell_type_expression_file = processed_expression_dir + printible_cell_type + '_single_cell_expression_sle_individuals_random_subset_standardized.txt'
-		raw_cell_type_expression_file = processed_expression_dir + printible_cell_type + '_single_cell_expression_sle_individuals_random_subset_raw.txt'
-		centered_raw_cell_type_expression_file = processed_expression_dir + printible_cell_type + '_single_cell_expression_sle_individuals_random_subset_raw_centered.txt'
-		standardized_cell_type_covariate_file = processed_expression_dir + printible_cell_type + '_cell_covariates_sle_individuals_random_subset.txt'
-		cell_type_pca_file = processed_expression_dir + printible_cell_type + '_pca_scores_sle_individuals_random_subset.txt'
-		cell_type_pca_pve_file = processed_expression_dir + printible_cell_type + '_pca_variance_explained_sle_individuals_random_subset.txt'
-		cell_type_raw_pca_file = processed_expression_dir + printible_cell_type + '_raw_pca_scores_sle_individuals_random_subset.txt'
-		cell_type_raw_pca_pve_file = processed_expression_dir + printible_cell_type + '_raw_pca_variance_explained_sle_individuals_random_subset.txt'
+		standardized_cell_type_expression_file = processed_expression_dir + printible_cell_type + '_single_cell_expression_sle_individuals_random_subset_min_expressed_cells_' + str(min_fraction_of_cells)+ '_' + transformation_type + '_transform'  + '_standardized.txt'
+		raw_cell_type_expression_file = processed_expression_dir + printible_cell_type + '_single_cell_expression_sle_individuals_random_subset_min_expressed_cells_' + str(min_fraction_of_cells)+ '_' + transformation_type + '_transform'  + '_raw.txt'
+		centered_raw_cell_type_expression_file = processed_expression_dir + printible_cell_type + '_single_cell_expression_sle_individuals_random_subset_min_expressed_cells_' + str(min_fraction_of_cells)+ '_' + transformation_type + '_transform'  + '_raw_centered.txt'
+		standardized_cell_type_covariate_file = processed_expression_dir + printible_cell_type + '_cell_covariates_sle_individuals_random_subset_min_expressed_cells_' + str(min_fraction_of_cells)+ '_' + transformation_type + '_transform'  + '.txt'
+		cell_type_pca_file = processed_expression_dir + printible_cell_type + '_pca_scores_sle_individuals_random_subset_min_expressed_cells_' + str(min_fraction_of_cells)+ '_' + transformation_type + '_transform'  + '.txt'
+		cell_type_pca_pve_file = processed_expression_dir + printible_cell_type + '_pca_variance_explained_sle_individuals_random_subset_min_expressed_cells_' + str(min_fraction_of_cells)+ '_' + transformation_type + '_transform'  + '.txt'
+		cell_type_raw_pca_file = processed_expression_dir + printible_cell_type + '_raw_pca_scores_sle_individuals_random_subset_min_expressed_cells_' + str(min_fraction_of_cells)+ '_' + transformation_type + '_transform'  + '.txt'
+		cell_type_raw_pca_pve_file = processed_expression_dir + printible_cell_type + '_raw_pca_variance_explained_sle_individuals_random_subset_min_expressed_cells_' + str(min_fraction_of_cells)+ '_' + transformation_type + '_transform'  + '.txt'
 	generate_cell_type_sc_expression_data_wrapper(cell_type, adata, standardized_cell_type_expression_file, standardized_cell_type_covariate_file, raw_cell_type_expression_file, centered_raw_cell_type_expression_file)
 	num_pcs=200
-	#generate_pca_scores_and_variance_explained(standardized_cell_type_expression_file, num_pcs, cell_type_pca_file, cell_type_pca_pve_file)
+	generate_pca_scores_and_variance_explained(standardized_cell_type_expression_file, num_pcs, cell_type_pca_file, cell_type_pca_pve_file)
 	generate_pca_scores_and_variance_explained(centered_raw_cell_type_expression_file, num_pcs, cell_type_raw_pca_file, cell_type_raw_pca_pve_file)
 
 

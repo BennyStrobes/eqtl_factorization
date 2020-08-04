@@ -42,35 +42,46 @@ fi
 ###########################
 # Prepare input data for single-cell eqtl analysis
 ###########################
+date
 if false; then
 python prepare_single_cell_eqtl_analysis_input_data.py $processed_expression_dir $gene_annotation_file $genotype_data_dir $single_cell_eqtl_dir
 fi
+date
 
 
 ###########################
 # Run single-cell eqtl analysis in each cell type
 ###########################
 cell_type="B_cells"
-num_pcs="25"
+num_pcs="10"
 # How many nodes to run in parallel
-total_jobs="200"
-echo "single-cell eQTL analysis in "$cell_type" with "$num_pcs" PCs"
-# Input files
-expression_file=$single_cell_eqtl_dir$cell_type"_eqtl_input_expression.txt"
-genotype_file=$single_cell_eqtl_dir$cell_type"_eqtl_input_genotype.txt"
-test_names_file=$single_cell_eqtl_dir$cell_type"_eqtl_input_variant_gene_pairs.txt"
-covariate_file=$processed_expression_dir$cell_type"_pca_scores_sle_individuals.txt"
-sample_overlap_file=$single_cell_eqtl_dir$cell_type"_eqtl_input_sample_overlap.txt"
-# Output root
-output_root=$single_cell_eqtl_dir$cell_type"_sc_eqtl_analysis_"$num_pcs"_pcs_"
+total_jobs="30"
 if false; then
-for job_number in $(seq 0 `expr $total_jobs - "1"`); do
-	sh run_eqtl_analysis_with_random_effects_in_parallel.sh $expression_file $genotype_file $test_names_file $covariate_file $sample_overlap_file $num_pcs $output_root $job_number $total_jobs
-done
+while read cell_type; do
+
+	echo "single-cell eQTL analysis in "$cell_type" with "$num_pcs" PCs"
+	# Input files
+	expression_file=$single_cell_eqtl_dir$cell_type"_eqtl_input_expression.txt"
+	genotype_file=$single_cell_eqtl_dir$cell_type"_eqtl_input_genotype.txt"
+	test_names_file=$single_cell_eqtl_dir$cell_type"_eqtl_input_variant_gene_pairs.txt"
+	covariate_file=$processed_expression_dir$cell_type"_pca_scores_sle_individuals_min_expressed_cells_0.05_log_transform_transform.txt"
+	sample_overlap_file=$single_cell_eqtl_dir$cell_type"_eqtl_input_sample_overlap.txt"
+	# Output root
+	output_root=$single_cell_eqtl_dir$cell_type"_sc_eqtl_analysis_"$num_pcs"_pcs_"
+
+
+	for job_number in $(seq 0 `expr $total_jobs - "1"`); do
+		sbatch run_eqtl_analysis_with_random_effects_in_parallel.sh $expression_file $genotype_file $test_names_file $covariate_file $sample_overlap_file $num_pcs $output_root $job_number $total_jobs
+	done
+done <$cell_type_file
 fi
 
 if false; then
-python merge_parallelized_eqtl_calls.py $output_root"all_variant_gene_pairs_" $total_jobs
+while read cell_type; do
+	echo $cell_type
+	output_root=$single_cell_eqtl_dir$cell_type"_sc_eqtl_analysis_"$num_pcs"_pcs_"
+	python merge_parallelized_eqtl_calls.py $output_root"all_variant_gene_pairs_" $total_jobs
+done <$cell_type_file
 fi
 
 ###########################
@@ -90,10 +101,11 @@ sample_overlap_file=$single_cell_eqtl_dir$cell_type"_eqtl_input_sample_overlap.t
 library_size_file=$single_cell_eqtl_dir$cell_type"_eqtl_input_library_size.txt"
 # Output root
 output_root=$single_cell_eqtl_dir$cell_type"_sc_nb_eqtl_analysis_"$num_pcs"_pcs_"
+if false; then
 for job_number in $(seq 0 `expr $total_jobs - "1"`); do
 	sbatch run_eqtl_analysis_with_negative_binomial_in_parallel.sh $expression_file $genotype_file $test_names_file $covariate_file $sample_overlap_file $library_size_file $num_pcs $output_root $job_number $total_jobs
 done
-
+fi
 
 if false; then
 python merge_parallelized_eqtl_calls.py $output_root"all_variant_gene_pairs_" $total_jobs

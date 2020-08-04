@@ -206,7 +206,18 @@ output_root = sys.argv[5]  # output root
 ####################
 # Output file
 variant_gene_pairs_eqtl_results_file = output_root + 'all_variant_gene_pairs.txt'
-eqtl_analysis(covariate_file, test_names_file, expression_file, genotype_file, variant_gene_pairs_eqtl_results_file)
+#eqtl_analysis(covariate_file, test_names_file, expression_file, genotype_file, variant_gene_pairs_eqtl_results_file)
+
+
+####################
+# Multiple-testing correction
+####################
+# Output file
+fdr_thresh=.01
+multple_testing_correction_results_file = output_root + 'multiple_testing_bf_bh_' + str(fdr_thresh) + '_fdr_' + '.txt'
+# Perform bonferonni correction at variant level (per gene) and then BH at gene level
+bf_fdr_multiple_testing_correction(variant_gene_pairs_eqtl_results_file, multple_testing_correction_results_file, fdr_thresh)
+
 
 ####################
 # Multiple-testing correction

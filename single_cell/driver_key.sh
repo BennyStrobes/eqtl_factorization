@@ -31,6 +31,10 @@ pseudobulk_eqtl_dir=$output_root"pseudobulk_eqtl/"
 # Directory containing single-cell eqtl data
 single_cell_eqtl_dir=$output_root"single_cell_eqtl/"
 
+
+# Directory debug sc-eqtl-factorization
+debug_sc_eqtl_factorization_dir=$output_root"debug_sc_eqtl_factorization/"
+
 # Directory containing visualizations of pseudobulk eqtls
 visualize_pseudobulk_eqtl_dir=$output_root"visualize_pseudobulk_eqtl/"
 
@@ -59,14 +63,15 @@ fi
 ######################
 # Run eQTL analysis at pseudobulk level and at single cell level
 ######################
+if false; then
 sh run_standard_eqtl_analysis.sh $processed_expression_dir $gene_annotation_file $genotype_data_dir $pseudobulk_eqtl_dir $single_cell_eqtl_dir $visualize_pseudobulk_eqtl_dir
-
+fi
 
 ######################
 # Get single cell expression and genotype data into a format to run eqtl-factorization
 ######################
 if false; then
-sh prepare_eqtl_input.sh $gene_annotation_file $processed_expression_dir $eqtl_input_dir $genotype_data_dir $pseudobulk_eqtl_dir
+sh prepare_eqtl_input.sh $gene_annotation_file $processed_expression_dir $eqtl_input_dir $genotype_data_dir $pseudobulk_eqtl_dir $single_cell_eqtl_dir
 fi
 
 ######################
@@ -103,36 +108,41 @@ fi
 ######################
 # Run eqtl-factorization on single cell data
 ######################
+min_fraction_of_cells="0.05"
+transformation_type="log_transform"
 # eqtl factorization input files (generated in 'prepare_eqtl_input.sh')
-sample_overlap_file=$eqtl_input_dir"single_cell_random_subset_sig_tests_50_pc_individual_id.txt"
+sample_overlap_file=$eqtl_input_dir"single_cell_random_subset_sig_tests_50_pc_min_expressed_cells_"$min_fraction_of_cells"_"$transformation_type"_transform_individual_id.txt"
 # TRAINING
-expression_training_file=$eqtl_input_dir"single_cell_random_subset_sig_tests_50_pc_expression_training_data_corrected_r_squared_pruned.h5"
-genotype_training_file=$eqtl_input_dir"single_cell_random_subset_sig_tests_50_pc_standardized_genotype_training_data_corrected_r_squared_pruned.h5"
+expression_training_file=$eqtl_input_dir"single_cell_random_subset_sig_tests_50_pc_min_expressed_cells_"$min_fraction_of_cells"_"$transformation_type"_transform_expression_training_data_corrected_zero_centered_r_squared_pruned.h5"
+genotype_training_file=$eqtl_input_dir"single_cell_random_subset_sig_tests_50_pc_min_expressed_cells_"$min_fraction_of_cells"_"$transformation_type"_transform_standardized_genotype_training_data_corrected_r_squared_pruned.h5"
 # TESTING
-expression_testing_file=$eqtl_input_dir"single_cell_random_subset_sig_tests_50_pc_expression_training_data_corrected_r_squared_pruned.h5"
-genotype_testing_file=$eqtl_input_dir"single_cell_random_subset_sig_tests_50_pc_standardized_genotype_training_data_corrected_r_squared_pruned.h5"
+expression_testing_file=$eqtl_input_dir"single_cell_random_subset_sig_tests_50_pc_min_expressed_cells_"$min_fraction_of_cells"_"$transformation_type"_transform_expression_training_data_corrected_zero_centered_r_squared_pruned.h5"
+genotype_testing_file=$eqtl_input_dir"single_cell_random_subset_sig_tests_50_pc_min_expressed_cells_"$min_fraction_of_cells"_"$transformation_type"_transform_standardized_genotype_training_data_corrected_r_squared_pruned.h5"
 
 # Paramaters
-model_name="eqtl_factorization_vi_dirichlet_simplex"
+model_name="eqtl_factorization_vi_zero_inflated"
 num_latent_factors="5"
 random_effects="False"
-svi="True"
-parrallel="True"
+svi="False"
+parrallel="False"
+lasso_param_v=".001"
 
-seeds=("0" )
-if false; then
+seeds=("0")
 for seed in "${seeds[@]}"; do
 	echo "Seed: "$seed
-	file_stem="eqtl_factorization_single_cell_sig_tests_50_pc_data_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed"
-	sh eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_factorization_results_dir $seed $model_name $random_effects $svi $parrallel
+	file_stem="eqtl_factorization_single_cell_sig_tests_50_pc_min_expressed_cells_"$min_fraction_of_cells"_"$transformation_type"_transform_data_corrected_genotype_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed"
+	sh eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_factorization_results_dir $seed $model_name $random_effects $svi $parrallel $lasso_param_v
 done
-fi
+
+
+
+
 
 
 
 
 ######################
-# Run eqtl-mixture on single cell data
+# Run eqtl-mixture on Pseudobulk data
 ######################
 # eqtl factorization input files (generated in 'prepare_eqtl_input.sh')
 sample_overlap_file=$eqtl_input_dir"pseudobulk_sig_tests_50_pc_individual_id.txt"
@@ -163,6 +173,9 @@ output_root=$eqtl_mixture_results_dir"pseudobulk_mixture_"$k"_components_"
 sh eqtl_mixture_model.sh $genotype_training_file $expression_training_file $sample_overlap_file $k $output_root
 fi
 
+if false; then
+sh debug_sc_eqtl_factorization.sh $debug_sc_eqtl_factorization_dir
+fi
 
 ######################
 # Run eqtl-mixture on single cell data
@@ -199,13 +212,10 @@ k="7"
 output_root=$eqtl_mixture_results_dir"sc_random_subset_mixture_"$k"_components_"
 sh eqtl_mixture_model.sh $genotype_training_file $expression_training_file $sample_overlap_file $k $output_root
 fi
-
-
-
 if false; then
 Rscript visualize_single_cell_eqtl_factorization.R $processed_expression_dir $eqtl_input_dir $eqtl_factorization_results_dir $eqtl_mixture_results_dir $eqtl_visualization_dir
-fi
 
+fi
 
 
 
