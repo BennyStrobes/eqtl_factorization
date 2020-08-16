@@ -335,14 +335,14 @@ print("Hello")
 
 frac_expressed = "0.1"
 # Input files
-covariate_file <- paste0(processed_expression_dir, "cell_covariates_sle_individuals_random_subset_min_expressed_cells_", frac_expressed, ".txt")
+covariate_file <- paste0(processed_expression_dir, "cell_covariates_sle_individuals_random_subset_min_expressed_cells_0.05_log_transform_transform.txt")
 #covariate_file <- paste0(processed_expression_dir, "cell_covariates_sle_individuals.txt")
 #covariate_file <- paste0(processed_expression_dir, "pseudobulk_covariates_sle_individuals.txt")
 
 #eqtl_factorization_loading_file <- paste0(eqtl_results_dir, "eqtl_factorization_pseudobulk_data_20_factors_eqtl_factorization_vi_spike_and_slab_model_True_re_False_svi_0_seed_U_S.txt")
 #eqtl_factorization_loading_file <- "/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_U_als.txt"
 #eqtl_factorization_loading_file <- paste0(eqtl_results_dir, "eqtl_factorization_single_cell_sig_tests_50_pc_min_expressed_cells_", frac_expressed, "_data_uncorrected_genotype_5_factors_eqtl_factorization_als_model_False_re_False_svi_0_seed_U.txt")
-eqtl_factorization_loading_file <- "/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/temp_output/temper_U_als.txt"
+eqtl_factorization_loading_file <- "/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell/eqtl_factorization_results/temper2_U_S.txt"
 
 # Load in data
 covariates <- read.table(covariate_file, header=TRUE, sep="\t")
@@ -352,10 +352,10 @@ loadings <- read.table(eqtl_factorization_loading_file, header=FALSE)
 #loadings <- loadings[,good_loadings]
 
 # Create UMAP factors
-umap_loadings = umap(loadings)$layout
-saveRDS( umap_loadings, "umap_loadings.rds")
+#umap_loadings = umap(loadings)$layout
+#saveRDS( umap_loadings, "umap_loadings.rds")
 print("UMAP DONE")
-#umap_loadings <- readRDS("umap_loadings.rds")
+umap_loadings <- readRDS("umap_loadings.rds")
 
 
 eqtl_visualization_dir <- paste0(eqtl_visualization_dir, frac_expressed, "_")
@@ -433,8 +433,8 @@ output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_g
 # Visualize UMAP scatter plot colored by batch
 #######################################
 output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_batch.pdf")
-#umap_scatter <- make_umap_loading_scatter_plot_colored_by_categorical_variable(covariates$batch_cov, umap_loadings, "Known batch")
-#ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+umap_scatter <- make_umap_loading_scatter_plot_colored_by_categorical_variable(covariates$batch_cov, umap_loadings, "Known batch")
+ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
 
 ######################################
 # Visualize UMAP scatter plot colored by individual
@@ -448,21 +448,21 @@ ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
 # Visualize UMAP scatter plot colored by known percent mito
 #######################################
 output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_percent_mito.pdf")
-#umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$percent_mito, umap_loadings, "Percent mito")
-#ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$percent_mito, umap_loadings, "Percent mito")
+ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
 
 ######################################
 # Visualize UMAP scatter plot colored by known cell counts
 #######################################
 output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_cell_counts.pdf")
-#umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$n_counts, umap_loadings, "Cell counts")
-#ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$n_counts, umap_loadings, "Cell counts")
+ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
 
 
 ######################################
 # Visualize UMAP scatter plot colored by known number of genes
 #######################################
 output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_number_of_genes.pdf")
-#umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$n_genes, umap_loadings, "Number of genes")
-#ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$n_genes, umap_loadings, "Number of genes")
+ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
 

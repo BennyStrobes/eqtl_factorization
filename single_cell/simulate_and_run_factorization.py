@@ -3,6 +3,8 @@ import os
 import sys
 import pdb
 import eqtl_factorization_vi_zero_inflated
+import eqtl_factorization_vi_zero_inflated2
+import eqtl_factorization_vi_zero_inflated3
 import pickle
 
 def string_to_boolean(stringer):
@@ -185,6 +187,41 @@ def simulate_data_for_eqtl_factorization3(I, Ni, T, K):
 	data['intercept'] = intercept
 	return Y, G, Z, data
 
+def simulate_data_for_eqtl_factorization4(I, Ni, T, K):
+	N = I*Ni
+	U_true = np.random.randn(N, K)
+	V_true = np.random.randn(K, T)
+	cov = np.random.randn(N, 3)
+	C = np.random.randn(3, T)
+
+	G = np.random.randn(N, T)
+	F_true = np.random.randn(1,T)
+	intercept = np.random.randn(1,T)
+
+
+
+	S = 1.0*(np.random.uniform(size=(N, T)) < .1)
+
+	Y = np.dot(cov,C) + G*np.dot(U_true, V_true) + G*np.dot(np.ones((N,1)),F_true) + np.dot(np.ones((N,1)),intercept)
+	gene_residual_sdevs = np.sqrt(np.random.exponential(size=T))/10.0
+	for m in range(T):
+		Y[:,m] = Y[:, m] + np.random.normal(0, gene_residual_sdevs[m],size=N)
+	sample_num = 0
+	Z = []
+	for individual_index in range(I):
+		for ni in range(Ni):
+			Z.append(str(individual_index))
+
+	data = {}
+	data['U'] = U_true
+	data['V'] = V_true
+	data['F'] = F_true
+	data['resid'] = gene_residual_sdevs
+	data['S'] = S
+	data['intercept'] = intercept
+	data['C'] = C
+	return Y*S, cov, G, Z, data
+
 
 #######################
 # Command line args
@@ -210,20 +247,31 @@ alpha_0 = 1e-16
 beta_0 = 1e-16
 a_0 = 1
 b_0 = 1
-max_iter=800
+max_iter=100
 gamma_v=1.0
 
-
+version = 'spike_and_slab_v3'
 ##########################
 # Simulate data
 ##########################
-Y, G, z, data = simulate_data_for_eqtl_factorization3(I, Ni, T, K)
+if version == 'spike_and_slab_v1':
+	Y, G, z, data = simulate_data_for_eqtl_factorization3(I, Ni, T, K)
+elif version == 'spike_and_slab_v2' or version == 'spike_and_slab_v3':
+	Y, cov, G, z, data = simulate_data_for_eqtl_factorization4(I, Ni, T, K)
+
 
 ##################
 # Fit eqtl factorization using home-built variational inference
 ##################
-eqtl_vi = eqtl_factorization_vi_zero_inflated.EQTL_FACTORIZATION_VI(K=K, alpha=alpha_0, beta=beta_0, a=a_0, b=b_0, max_iter=max_iter, gamma_v=gamma_v, gamma_u=gamma_v, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean)
-eqtl_vi.fit(G=G, Y=Y, z=z)
+if version == 'spike_and_slab_v1':
+	eqtl_vi = eqtl_factorization_vi_zero_inflated.EQTL_FACTORIZATION_VI(K=K, alpha=alpha_0, beta=beta_0, a=a_0, b=b_0, max_iter=max_iter, gamma_v=gamma_v, gamma_u=gamma_v, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean)
+	eqtl_vi.fit(G=G, Y=Y, z=z)
+elif version == 'spike_and_slab_v2':
+	eqtl_vi = eqtl_factorization_vi_zero_inflated2.EQTL_FACTORIZATION_VI(K=K, alpha=alpha_0, beta=beta_0, a=a_0, b=b_0, max_iter=max_iter, gamma_v=gamma_v, gamma_u=gamma_v, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean)
+	eqtl_vi.fit(G=G, Y=Y, cov=cov, z=z)
+elif version == 'spike_and_slab_v3':
+	eqtl_vi = eqtl_factorization_vi_zero_inflated3.EQTL_FACTORIZATION_VI(K=K, alpha=alpha_0, beta=beta_0, a=a_0, b=b_0, max_iter=max_iter, gamma_v=gamma_v, gamma_u=gamma_v, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean)
+	eqtl_vi.fit(G=G, Y=Y, cov=cov, z=z)
 pdb.set_trace()
 
 pickle.dump(eqtl_vi, open(output_root + '_model', 'wb'))

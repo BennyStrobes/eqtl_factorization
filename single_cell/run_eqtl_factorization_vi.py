@@ -8,6 +8,8 @@ import pdb
 #import eqtl_factorization_vi_spike_and_slab_loadings_ard_factors
 #import eqtl_factorization_vi_spike_and_slab_loadings_ard_loadings
 import eqtl_factorization_vi_zero_inflated
+import eqtl_factorization_vi_zero_inflated2
+import eqtl_factorization_vi_zero_inflated3
 #import eqtl_factorization_als
 #import eqtl_factorization_als_unconstrained
 #import eqtl_factorization_als_positive_loadings
@@ -66,7 +68,7 @@ def string_to_boolean(stringer):
 		print("BOOLEAN NOT RECOGNIZED")
 		return
 
-def train_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, random_effects, svi_boolean, parrallel_boolean, lasso_param):
+def train_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, random_effects, svi_boolean, parrallel_boolean, lasso_param, covariate_file):
 	############################
 	# Load in data
 	############################
@@ -88,7 +90,7 @@ def train_eqtl_factorization_model(sample_overlap_file, expression_training_file
 	num_samples = Y.shape[0]
 	num_tests = Y.shape[1]
 
-	max_it = 300
+	max_it = 600
 	print('datA loaded')
 	print(G.shape)
 
@@ -125,6 +127,45 @@ def train_eqtl_factorization_model(sample_overlap_file, expression_training_file
 		elif svi_boolean == True:
 			np.savetxt(output_root + '_U_S.txt', (eqtl_vi.U_mu_full), fmt="%s", delimiter='\t')
 		np.savetxt(output_root + '_V.txt', (eqtl_vi.V_mu), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_F.txt', (eqtl_vi.F_mu), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_intercept.txt', (eqtl_vi.intercept_mu), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_tau.txt', (eqtl_vi.tau_alpha/eqtl_vi.tau_beta), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_S.txt', (eqtl_vi.S), fmt="%s", delimiter='\t')
+	if model_name == 'eqtl_factorization_vi_zero_inflated2':
+		cov = np.loadtxt(covariate_file, delimiter='\t')
+		eqtl_vi = eqtl_factorization_vi_zero_inflated2.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-16, beta=1e-16, a=1, b=1, gamma_v=1.0, gamma_u=1.0, max_iter=max_it, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean, sample_batch_fraction=.2)
+		eqtl_vi.fit(G=G, Y=Y, cov=cov, z=Z)
+		# pickle.dump(eqtl_vi, open(output_root + '_model', 'wb'))
+		#eqtl_vi = pickle.load(open(output_root + '_model', 'rb'))
+		# shared_ve, factor_ve = eqtl_vi.compute_variance_explained_of_factors()
+		if svi_boolean == False:
+			np.savetxt(output_root + '_U_S.txt', (eqtl_vi.U_mu), fmt="%s", delimiter='\t')
+		elif svi_boolean == True:
+			np.savetxt(output_root + '_U_S.txt', (eqtl_vi.U_mu_full), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_V.txt', (eqtl_vi.V_mu), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_F.txt', (eqtl_vi.F_mu), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_intercept.txt', (eqtl_vi.intercept_mu), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_tau.txt', (eqtl_vi.tau_alpha/eqtl_vi.tau_beta), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_S.txt', (eqtl_vi.S), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_C.txt', (eqtl_vi.C_mu), fmt="%s", delimiter='\t')
+	if model_name == 'eqtl_factorization_vi_zero_inflated3':
+		cov = np.loadtxt(covariate_file, delimiter='\t')
+		eqtl_vi = eqtl_factorization_vi_zero_inflated3.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-16, beta=1e-16, a=1, b=1, gamma_v=1.0, gamma_u=1.0, max_iter=max_it, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean, sample_batch_fraction=.2)
+		eqtl_vi.fit(G=G, Y=Y, cov=cov, z=Z)
+		# pickle.dump(eqtl_vi, open(output_root + '_model', 'wb'))
+		#eqtl_vi = pickle.load(open(output_root + '_model', 'rb'))
+		# shared_ve, factor_ve = eqtl_vi.compute_variance_explained_of_factors()
+		if svi_boolean == False:
+			np.savetxt(output_root + '_U_S.txt', (eqtl_vi.U_mu), fmt="%s", delimiter='\t')
+		elif svi_boolean == True:
+			np.savetxt(output_root + '_U_S.txt', (eqtl_vi.U_mu_full), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_V.txt', (eqtl_vi.V_mu), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_F.txt', (eqtl_vi.F_mu), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_intercept.txt', (eqtl_vi.intercept_mu), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_tau.txt', (eqtl_vi.tau_alpha/eqtl_vi.tau_beta), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_S.txt', (eqtl_vi.S), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_C.txt', (eqtl_vi.C_mu), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_cov.txt', (eqtl_vi.cov_mu), fmt="%s", delimiter='\t')
 
 	if model_name == 'eqtl_factorization_vi_dirichlet_simplex':
 		eqtl_vi = eqtl_factorization_vi_dirichlet_simplex.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-16, beta=1e-16, a=1, b=1, gamma_v=1.0, max_iter=max_it, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean, sample_batch_fraction=.2)
@@ -392,6 +433,7 @@ random_effects = string_to_boolean(sys.argv[11])
 svi_boolean = string_to_boolean(sys.argv[12])
 parrallel_boolean = string_to_boolean(sys.argv[13])
 lasso_param_v = float(sys.argv[14])
+covariate_file = sys.argv[15]
 
 np.random.seed(seed)
 # What to save output files to
@@ -401,7 +443,7 @@ output_root = eqtl_results_dir + file_stem
 #########################
 # Train model
 #########################
-train_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, random_effects, svi_boolean, parrallel_boolean, lasso_param_v)
+train_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, random_effects, svi_boolean, parrallel_boolean, lasso_param_v, covariate_file)
 
 
 # debug_eqtl_factorization_model(sample_overlap_file, expression_training_file, genotype_training_file, num_latent_factors, output_root, model_name, random_effects, svi_boolean, parrallel_boolean, lasso_param_v)

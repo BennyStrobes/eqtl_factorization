@@ -21,7 +21,8 @@ random_effects="${11}"
 svi="${12}"
 parrallel="${13}"
 lasso_param_v="${14}"
+covariate_file="${15}"
 
 module load python/3.7-anaconda
 
-python run_eqtl_factorization_vi.py $sample_overlap_file $expression_testing_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name $random_effects $svi $parrallel $lasso_param_v
+python run_eqtl_factorization_vi.py $sample_overlap_file $expression_testing_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_results_dir $seed $model_name $random_effects $svi $parrallel $lasso_param_v $covariate_file

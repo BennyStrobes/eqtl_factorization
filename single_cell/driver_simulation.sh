@@ -11,7 +11,7 @@ visualize_simulated_results_dir="/work-zfs/abattle4/bstrober/single_cell_eqtl_fa
 # Parameters
 ##############
 num_individuals="110"
-num_samples_per_individual="100"
+num_samples_per_individual="10"
 num_tests="1000"
 num_latent_factors="7"
 

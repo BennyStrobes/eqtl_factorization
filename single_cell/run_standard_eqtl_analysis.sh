@@ -115,6 +115,5 @@ fi
 ###########################
 # Visualize pseudobulk eqtl results
 ###########################`
-if false; then
 Rscript visualize_pseudobulk_eqtls.R $processed_expression_dir $pseudobulk_eqtl_dir $single_cell_eqtl_dir $visualize_pseudobulk_eqtl_dir
-fi
+

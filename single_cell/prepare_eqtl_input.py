@@ -245,7 +245,7 @@ def get_list_of_eligable_variants(gene_mapped_variants, gene_mapped_ld_pruned_va
 			eligable_variants.append(variant)
 	return eligable_variants
 
-def get_list_of_pruned_gene_variant_pairs(gene_to_variant_mapping_unpruned, variants, r_squared_threshold, max_variants_per_gene):
+def get_list_of_pruned_gene_variant_pairs(gene_to_variant_mapping_unpruned, variants, r_squared_threshold):
 	# Initialize list
 	pruned_gene_variant_pairs = {}
 	# Loop through genes
@@ -264,7 +264,7 @@ def get_list_of_pruned_gene_variant_pairs(gene_to_variant_mapping_unpruned, vari
 			# Get list of variants not in high ld with any variant in gene_mapped_ld_pruned_variants
 			eligable_variants = get_list_of_eligable_variants(gene_mapped_variants, gene_mapped_ld_pruned_variants, variants, r_squared_threshold)
 			# End the loop
-			if len(eligable_variants) == 0 or len(gene_mapped_ld_pruned_variants) == max_variants_per_gene:
+			if len(eligable_variants) == 0:
 				more_variants = False
 			else:
 				gene_mapped_ld_pruned_variants.append(np.random.choice(eligable_variants))
@@ -279,7 +279,7 @@ def get_list_of_pruned_gene_variant_pairs(gene_to_variant_mapping_unpruned, vari
 ########################
 # Step 2: LD prune the above file in each gene (ie limit to only independent snps per gene)
 ########################
-def ld_prune_variant_gene_pair_file(variant_gene_pair_file, ld_pruned_variant_gene_pair_file, r_squared_threshold, genotype_data_dir, max_variants_per_gene, random_seed):
+def ld_prune_variant_gene_pair_file(variant_gene_pair_file, ld_pruned_variant_gene_pair_file, r_squared_threshold, genotype_data_dir, random_seed):
 	np.random.seed(random_seed)
 	# First extract list of variants
 	variant_list = extract_variants_from_variant_gene_pair_file(variant_gene_pair_file)
@@ -288,7 +288,7 @@ def ld_prune_variant_gene_pair_file(variant_gene_pair_file, ld_pruned_variant_ge
 	# Create mapping from variants in variat_list to genotype vectors
 	variants = create_mapping_from_variants_to_genotype(variant_list, genotype_data_dir)
 	# Create list of gene_variant pairs after pruning
-	gene_variant_pairs_pruned = get_list_of_pruned_gene_variant_pairs(gene_to_variant_mapping_unpruned, variants, r_squared_threshold, max_variants_per_gene)
+	gene_variant_pairs_pruned = get_list_of_pruned_gene_variant_pairs(gene_to_variant_mapping_unpruned, variants, r_squared_threshold)
 	
 	# Print to output file
 	f = open(variant_gene_pair_file)
@@ -613,6 +613,42 @@ def save_as_h5_file(input_text_file):
 	h5f.create_dataset('data', data=mat)
 	h5f.close()
 
+def extract_nominal_sig_variant_gene_pairs_from_known_cell_types(known_cell_type_file, single_cell_eqtl_dir, nominal_p, variant_gene_pair_file, gene_file):
+	genes = {}
+	f = open(gene_file)
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		genes[data[0]] = 1
+	f.close()
+	cell_types = ['Megakaryocytes', 'Dendritic_cells', 'NK_cells', 'CD8_T_cells', 'FCGR3A+_Monocytes', 'B_cells', 'CD4_T_cells', 'CD14+_Monocytes']
+	t = open(variant_gene_pair_file, 'w')
+	t.write('Gene_id\tvariant_id\tchrom_num\tgene_tss\tvariant_position\n')
+	used_variant_gene_pairs = {}
+	for cell_type in cell_types:
+		counter = 0
+		cell_type_sig_file = single_cell_eqtl_dir + cell_type + '_sc_eqtl_analysis_10_pcs_all_variant_gene_pairs_merged.txt'
+		if cell_type == 'B_cells':
+			cell_type_sig_file = single_cell_eqtl_dir + cell_type + '_sc_eqtl_analysis_25_pcs_all_variant_gene_pairs_merged.txt'
+		f = open(cell_type_sig_file)
+		head_count = 0
+		for line in f:
+			line = line.rstrip()
+			data = line.split()
+			if head_count == 0:
+				head_count = head_count + 1
+				continue
+			test_name = data[0] + '_' + data[1]
+			if data[0].startswith('HLA'):
+				continue
+			if data[0] in genes and float(data[7]) < nominal_p and test_name not in used_variant_gene_pairs:
+				t.write(data[0] + '\t' + data[1] + '\t' + data[2] + '\t' + data[3] + '\t' + data[4] + '\n')
+				used_variant_gene_pairs[test_name] = 1
+				counter = counter + 1
+		print(cell_type + '\t' + str(counter))
+		f.close()
+	t.close()
+
 def extract_sig_variant_gene_pairs_from_known_cell_types(known_cell_type_file, single_cell_eqtl_dir, num_tests_per_cell_type, ld_pruned_variant_gene_pair_file, gene_file, random_seed):
 	np.random.seed(random_seed)
 	# First extract genes we have expression for
@@ -690,6 +726,7 @@ def zero_center_expression_data(corrected_expression_file, raw_expression_file, 
 	t = open(output_file, 'w')
 	f = open(corrected_expression_file)
 	g = open(raw_expression_file)
+	maxy = []
 	for line in f:
 		line = line.rstrip()
 		corrected_expr = np.asarray(line.split('\t')).astype(float)
@@ -697,10 +734,22 @@ def zero_center_expression_data(corrected_expression_file, raw_expression_file, 
 		zero_indices = raw_expr == '0.0'
 		zero_mean = np.mean(corrected_expr[zero_indices])
 		expr_zeros_at_zero = corrected_expr - zero_mean
+		maxy.append(np.min(np.abs(expr_zeros_at_zero)))
 		t.write('\t'.join(expr_zeros_at_zero.astype(str)) + '\n')
 	t.close()
 	f.close()
 	f.close()
+
+def subset_covariates(covariate_file, subset_covariate_file, num_cov):
+	f = open(covariate_file)
+	t = open(subset_covariate_file, 'w')
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		t.write('\t'.join(data[:num_cov]) + '\n')
+	f.close()
+	t.close()
+
 
 
 def prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, distance, genotype_data_dir, gene_file,raw_expression_file, expression_file, r_squared_threshold, max_variants_per_gene, num_pcs, covariate_file, cell_level_info_file, known_cell_type_file, pseudobulk_eqtl_dir, random_seed):
@@ -746,6 +795,22 @@ def prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, 
 	single_cell_centered_expression_eqtl_traing_data_file = output_root + '_expression_training_data_centered_uncorrected_r_squared_pruned.txt'
 	center_data(single_cell_expression_eqtl_traing_data_file, single_cell_centered_expression_eqtl_traing_data_file)
 	save_as_h5_file(single_cell_centered_expression_eqtl_traing_data_file)
+
+	########################
+	# Step 3b: Get subset of covariates
+	########################
+	num_cov = 10
+	subset_covariate_file = output_root + '_covariate_subset_' + str(num_cov) + '.txt'
+	subset_covariates(covariate_file, subset_covariate_file, num_cov)
+
+
+	########################
+	# Step 3b: center zeros at zero
+	########################
+	# Residual expression file
+	single_cell_uncorrected_zero_centered_expression_eqtl_traing_data_file = output_root + '_expression_training_data_uncorrected_zero_centered_r_squared_pruned.txt'
+	zero_center_expression_data(single_cell_expression_eqtl_traing_data_file, single_raw_cell_expression_eqtl_traing_data_file, single_cell_uncorrected_zero_centered_expression_eqtl_traing_data_file)
+	save_as_h5_file(single_cell_uncorrected_zero_centered_expression_eqtl_traing_data_file)
 
 	########################
 	# Step 4: Generate residual expression
@@ -803,6 +868,79 @@ def prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, 
 	single_cell_individual_id_file = output_root + '_individual_id.txt'
 	generate_individual_id_file(cell_level_info_file, single_cell_individual_id_file)
 
+
+
+
+def prepare_eqtl_factorization_files_wrapper_v2(output_root, gene_annotation_file, distance, genotype_data_dir, gene_file,raw_expression_file, expression_file, nominal_p, r_squared_threshold, num_pcs, covariate_file, cell_level_info_file, known_cell_type_file, pseudobulk_eqtl_dir, random_seed):
+	########################
+	# Step 1: Extract variant gene pairs that reached nominal significance in cell type specific eqtl analyis (ignore hla genes)
+	########################
+	variant_gene_pair_file = output_root + '_nominal_sig_variant_gene_pairs_in_known_cell_types.txt'
+	#extract_nominal_sig_variant_gene_pairs_from_known_cell_types(known_cell_type_file, single_cell_eqtl_dir, nominal_p, variant_gene_pair_file, gene_file)
+
+
+	########################
+	# Step 2: LD prune the above file in each gene (ie limit to only independent snps per gene)
+	########################
+	# Output file containing list of (pruned) variant gene pairs
+	ld_pruned_variant_gene_pair_file = output_root + '_nominal_sig_variant_gene_pairs_in_known_cell_types_r_squared_pruned.txt'
+	#ld_prune_variant_gene_pair_file(variant_gene_pair_file, ld_pruned_variant_gene_pair_file, r_squared_threshold, genotype_data_dir, random_seed)
+
+	########################
+	# Step 3: Generate raw expression matrix
+	########################
+	# Output file
+	single_raw_cell_expression_eqtl_traing_data_file = output_root + '_raw_expression_training_data_uncorrected_r_squared_pruned.txt'
+	generate_single_cell_expression_eqtl_training_data(ld_pruned_variant_gene_pair_file, raw_expression_file, gene_file, single_raw_cell_expression_eqtl_traing_data_file)
+	save_as_h5_file(single_raw_cell_expression_eqtl_traing_data_file)
+
+	########################
+	# Step 4: Generate normalized expression matrix
+	########################
+	# Output file
+	single_cell_expression_eqtl_traing_data_file = output_root + '_expression_training_data_uncorrected_r_squared_pruned.txt'
+	generate_single_cell_expression_eqtl_training_data(ld_pruned_variant_gene_pair_file, expression_file, gene_file, single_cell_expression_eqtl_traing_data_file)
+
+
+	########################
+	# Step 5: center zeros at zero
+	########################
+	# Residual expression file
+	single_cell_uncorrected_zero_centered_expression_eqtl_traing_data_file = output_root + '_expression_training_data_uncorrected_zero_centered_r_squared_pruned.txt'
+	zero_center_expression_data(single_cell_expression_eqtl_traing_data_file, single_raw_cell_expression_eqtl_traing_data_file, single_cell_uncorrected_zero_centered_expression_eqtl_traing_data_file)
+	save_as_h5_file(single_cell_uncorrected_zero_centered_expression_eqtl_traing_data_file)
+
+	########################
+	# Step 6: Get subset of covariates
+	########################
+	subset_covariate_file = output_root + '_covariate_subset_' + str(num_pcs) + '.txt'
+	subset_covariates(covariate_file, subset_covariate_file, num_pcs)	
+
+
+	########################
+	# Step 7: Generate Genotype matrix
+	########################
+	# Output file
+	single_cell_genotype_eqtl_training_data_file = output_root + '_genotype_training_data_uncorrected_r_squared_pruned.txt'
+	construct_genotype_matrix(ld_pruned_variant_gene_pair_file, genotype_data_dir, cell_level_info_file, single_cell_genotype_eqtl_training_data_file)
+	save_as_h5_file(single_cell_genotype_eqtl_training_data_file)
+
+
+	########################
+	# Step 8: Generate standardized Genotype matrix
+	########################
+	# Output file
+	single_cell_genotype_eqtl_training_data_file = output_root + '_standardized_genotype_training_data_uncorrected_r_squared_pruned.txt'
+	construct_standardized_genotype_matrix(ld_pruned_variant_gene_pair_file, genotype_data_dir, cell_level_info_file, single_cell_genotype_eqtl_training_data_file)
+	save_as_h5_file(single_cell_genotype_eqtl_training_data_file)
+
+
+	########################
+	# Step 9: Generate individual id file (z matrix in eqtl factorization)
+	########################
+	# Output file
+	single_cell_individual_id_file = output_root + '_individual_id.txt'
+	generate_individual_id_file(cell_level_info_file, single_cell_individual_id_file)
 
 ######################
 # Command line args
@@ -931,8 +1069,44 @@ random_seed=1
 output_root = eqtl_input_dir + 'single_cell_random_subset_sig_tests_50_pc_min_expressed_cells_' + str(min_fraction_of_cells) + '_' + transformation_type + '_transform'
 
 
-prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, distance, genotype_data_dir, gene_file, raw_expression_file, expression_file, r_squared_threshold, max_variants_per_gene, num_pcs, covariate_file, cell_level_info_file, known_cell_type_file, single_cell_eqtl_dir, random_seed)
+#prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, distance, genotype_data_dir, gene_file, raw_expression_file, expression_file, r_squared_threshold, max_variants_per_gene, num_pcs, covariate_file, cell_level_info_file, known_cell_type_file, single_cell_eqtl_dir, random_seed)
 
+
+
+
+################
+# single cell randm subset
+#############
+# Variant must be within $distance BP from TSS of gene
+distance = 10000
+min_fraction_of_cells = float('.05')
+transformation_type='log_transform'
+
+# File containing availible genes
+gene_file = processed_expression_dir + 'single_cell_expression_sle_individuals_min_expressed_cells_' + str(min_fraction_of_cells) + '_' + transformation_type + '_transform'+ '_gene_ids.txt'
+# Input file containing expression
+raw_expression_file = processed_expression_dir + 'single_cell_raw_expression_sle_individuals_min_expressed_cells_' + str(min_fraction_of_cells) + '.txt'
+# Input file containing expression
+expression_file = processed_expression_dir + 'single_cell_expression_sle_individuals_min_expressed_cells_' + str(min_fraction_of_cells) + '_' + transformation_type + '_transform'+ '_standardized.txt'
+# Covariate file
+covariate_file = processed_expression_dir + 'pca_scores_sle_individuals_min_expressed_cells_' + str(min_fraction_of_cells) + '_' + transformation_type + '_transform'+ '.txt'
+# File containing mapping from cell index to individual id
+cell_level_info_file = processed_expression_dir + 'cell_covariates_sle_individuals_min_expressed_cells_' + str(min_fraction_of_cells) + '_' + transformation_type + '_transform'+ '.txt'
+# known cell types
+known_cell_type_file = pseudobulk_eqtl_dir + 'cell_types.txt'
+# Nominal p-value threshold
+nominal_p=.005
+# Only allow snps with r_squared threshold less than this
+r_squared_threshold=0.2
+# Number of PCs to use
+num_pcs = 10
+# random seed used for ld pruning
+random_seed=1
+# Output root
+output_root = eqtl_input_dir + 'single_cell_sig_tests_' + str(num_pcs) + '_pc_min_expressed_cells_' + str(min_fraction_of_cells) + '_' + transformation_type + '_transform_v2'
+
+
+prepare_eqtl_factorization_files_wrapper_v2(output_root, gene_annotation_file, distance, genotype_data_dir, gene_file, raw_expression_file, expression_file, nominal_p, r_squared_threshold, num_pcs, covariate_file, cell_level_info_file, known_cell_type_file, single_cell_eqtl_dir, random_seed)
 
 
 
