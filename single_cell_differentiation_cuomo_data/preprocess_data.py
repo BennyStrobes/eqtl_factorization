@@ -221,6 +221,7 @@ def reformat_genotype_file(genotype_file, reformatted_genotype_file, meta_data_f
 			t.write('\n')
 			continue
 		row_id = data[0].split('"')[1]
+		chrom_num = row_id.split('--')[0]
 		genotype = np.asarray(data[1:]).astype(int)
 		maf = compute_maf(genotype)
 		# Ignore variants with maf < .05
@@ -291,6 +292,23 @@ def generate_per_day_standardized_expression(recreated_normalized_gene_expressio
 	f.close()
 	t.close()
 
+def generate_per_day_cell_covariates(recreated_cell_covariates_file, day, per_day_cell_covariates_file):
+	f = open(recreated_cell_covariates_file)
+	t = open(per_day_cell_covariates_file, 'w')
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		if head_count == 0:
+			head_count = head_count + 1
+			t.write(line + '\n')
+			continue
+		if data[6] != 'day' + str(day):
+			continue
+		t.write(line + '\n')
+	f.close()
+	t.close()
+
 
 normalized_expression_file = sys.argv[1]
 meta_data_file = sys.argv[2]
@@ -306,39 +324,45 @@ pre_processed_data_dir = sys.argv[5]
 ##############################
 # Reformat genotype data and get list of individuals that we have genotype data for
 reformatted_genotype_file = pre_processed_data_dir + 'genotype.txt'
-#valid_individuals = reformat_genotype_file(genotype_file, reformatted_genotype_file, meta_data_file)
+valid_individuals = reformat_genotype_file(genotype_file, reformatted_genotype_file, meta_data_file)
 
-
+'''
 ###############################
 # Create mapping from cell-id to individual id
 # And filter cells to those for which we have genotype data for
 cell_to_individual_mapping_file = pre_processed_data_dir + 'cell_individual_mapping.txt'
-#make_cell_to_individual_mapping(meta_data_file, cell_to_individual_mapping_file, valid_individuals)
+make_cell_to_individual_mapping(meta_data_file, cell_to_individual_mapping_file, valid_individuals)
 
 
 ###############################
 # Re-create cell covariates
 # And filter cells to those for which we have genotype data for
 recreated_cell_covariates_file = pre_processed_data_dir + 'cell_covariates.txt'
-#valid_cell_indices = recreate_cell_covariates(meta_data_file, recreated_cell_covariates_file, valid_individuals)
+valid_cell_indices = recreate_cell_covariates(meta_data_file, recreated_cell_covariates_file, valid_individuals)
 
 
 ###############################
 # Re-create expression data
 # Also filter to only protein coding genes
 recreated_normalized_gene_expression_file = pre_processed_data_dir + 'normalized_expression_all_cells.txt'
-#recreate_expression(normalized_expression_file, recreated_normalized_gene_expression_file, valid_cell_indices, protein_coding_genes)
+recreate_expression(normalized_expression_file, recreated_normalized_gene_expression_file, valid_cell_indices, protein_coding_genes)
 
 
 ###############################
 # Generate standardized gene expression data in each day independently
+# And then create PCs
+num_pcs=50
 for day in range(4):
+	print(day)
 	per_day_expression_file = pre_processed_data_dir + 'standardized_normalized_per_day_' + str(day) + '_expression.txt'
 	generate_per_day_standardized_expression(recreated_normalized_gene_expression_file, recreated_cell_covariates_file, day, per_day_expression_file)
+	pca_loading_file = pre_processed_data_dir + 'standardized_normalized_per_day_' + str(day) + '_expression_pca_loadings.txt'
+	pca_pve_file = pre_processed_data_dir + 'standardized_normalized_per_day_' + str(day) + '_expression_pca_pve.txt'
+	generate_pca_scores_and_variance_explained(per_day_expression_file, num_pcs, pca_loading_file, pca_pve_file)
+	per_day_cell_covariates_file =  pre_processed_data_dir + 'cell_covariates_day_' + str(day) + '.txt'
+	generate_per_day_cell_covariates(recreated_cell_covariates_file, day, per_day_cell_covariates_file)
 
 
-
-'''
 ###############################
 # Center expression data
 centered_normalized_gene_expression_file = pre_processed_data_dir + 'centered_normalized_expression_all_cells.txt'
@@ -360,7 +384,6 @@ standardize_expression_for_top_nn_variable_genes(recreated_normalized_gene_expre
 nn = 2000
 top_n_variable_genes_standardized_gene_expression_file = pre_processed_data_dir + 'standardized_normalized_expression_all_cells_top_' + str(nn) + '_variable_genes.txt'
 standardize_expression_for_top_nn_variable_genes(recreated_normalized_gene_expression_file, top_n_variable_genes_standardized_gene_expression_file, nn)
-
 
 ###############################
 # Compute variance of each gene

@@ -9,8 +9,8 @@ normalized_expression_file="/work-zfs/abattle4/lab_data/sc_endo_diff/counts.tsv"
 # File containing meta-data for each cell
 meta_data_file="/work-zfs/abattle4/lab_data/sc_endo_diff/cell_metadata_cols.tsv"
 
-# File containing genotype data for each individual
-genotype_file="/work-zfs/abattle4/prashanthi/sc-endo/data/genotypes/genotypes_all.txt"
+# File containing vcf files for each individual
+genotype_dir="/work-zfs/abattle4/prashanthi/sc-endo/data/genotypes/"
 
 # Gencode hg19 gene annotation file
 gene_annotation_file="/work-zfs/abattle4/lab_data/annotation/gencode.v19/gencode.v19.annotation.gene.txt"
@@ -25,6 +25,8 @@ root_directory="/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/singl
 pre_processed_data_dir=$root_directory"preprocessed_data/"
 # Directory containing visualizations of pre-processed results
 visualize_pre_processed_data_dir=$root_directory"visualize_preprocessed_data/"
+# Directory containing input data for per-time step eQTL analysi
+per_time_step_eqtl_input_data_dir=$root_directory"per_time_step_eqtl_input_data/"
 
 
 
@@ -32,6 +34,17 @@ visualize_pre_processed_data_dir=$root_directory"visualize_preprocessed_data/"
 
 
 ################################
-# Run Analysis
+# Pre-process data
 ################################
-sh preprocess_data.sh $normalized_expression_file $meta_data_file $genotype_file $gene_annotation_file $pre_processed_data_dir $visualize_pre_processed_data_dir
+sh preprocess_data.sh $normalized_expression_file $meta_data_file $genotype_dir $gene_annotation_file $pre_processed_data_dir $visualize_pre_processed_data_dir
+
+
+
+################################
+# Run eQTL analysis in each day, seperately
+################################
+if false; then
+sh per_time_step_eqtl_analysis.sh $pre_processed_data_dir $gene_annotation_file $per_time_step_eqtl_input_data_dir
+fi
+
+
