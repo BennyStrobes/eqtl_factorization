@@ -15,8 +15,9 @@ gene_annotation_file="$4"
 pre_processed_data_dir="$5"
 visualize_pre_processed_data_dir="$6"
 
+if false; then
 python preprocess_genotype_data.py $genotype_dir $pre_processed_data_dir
-
+fi
 if false; then
 python preprocess_data.py $normalized_expression_file $meta_data_file $gene_annotation_file $pre_processed_data_dir
 fi
