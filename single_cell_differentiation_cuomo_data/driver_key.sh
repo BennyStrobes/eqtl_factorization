@@ -29,7 +29,8 @@ visualize_pre_processed_data_dir=$root_directory"visualize_preprocessed_data/"
 per_time_step_eqtl_input_data_dir=$root_directory"per_time_step_eqtl_input_data/"
 # Directory containing output for per-time step eqtl analysis
 per_time_step_eqtl_dir=$root_directory"per_time_step_eqtl_results/"
-
+# Directory containing eQTL Factorization input data
+eqtl_factorization_input_dir=$root_directory"eqtl_factorization_input/"
 
 
 
@@ -51,3 +52,10 @@ if false; then
 sh per_time_step_eqtl_analysis.sh $pre_processed_data_dir $gene_annotation_file $per_time_step_eqtl_input_data_dir $per_time_step_eqtl_dir
 fi
 
+
+################################
+# Prepare input for eqtl factorization
+################################
+if false; then
+sh prepare_eqtl_input.sh $gene_annotation_file $pre_processed_data_dir $eqtl_factorization_input_dir $per_time_step_eqtl_dir
+fi
