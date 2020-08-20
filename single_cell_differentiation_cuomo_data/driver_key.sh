@@ -27,6 +27,9 @@ pre_processed_data_dir=$root_directory"preprocessed_data/"
 visualize_pre_processed_data_dir=$root_directory"visualize_preprocessed_data/"
 # Directory containing input data for per-time step eQTL analysi
 per_time_step_eqtl_input_data_dir=$root_directory"per_time_step_eqtl_input_data/"
+# Directory containing output for per-time step eqtl analysis
+per_time_step_eqtl_dir=$root_directory"per_time_step_eqtl_results/"
+
 
 
 
@@ -36,15 +39,15 @@ per_time_step_eqtl_input_data_dir=$root_directory"per_time_step_eqtl_input_data/
 ################################
 # Pre-process data
 ################################
+if false; then
 sh preprocess_data.sh $normalized_expression_file $meta_data_file $genotype_dir $gene_annotation_file $pre_processed_data_dir $visualize_pre_processed_data_dir
-
+fi
 
 
 ################################
 # Run eQTL analysis in each day, seperately
 ################################
 if false; then
-sh per_time_step_eqtl_analysis.sh $pre_processed_data_dir $gene_annotation_file $per_time_step_eqtl_input_data_dir
+sh per_time_step_eqtl_analysis.sh $pre_processed_data_dir $gene_annotation_file $per_time_step_eqtl_input_data_dir $per_time_step_eqtl_dir
 fi
-
 

@@ -129,6 +129,7 @@ def make_cell_to_individual_mapping(meta_data_file, cell_to_individual_mapping_f
 			head_count = head_count + 1
 			continue
 		if data[85] in valid_individuals:
+			valid_individuals[data[85]] = 1
 			t.write(data[0] + '\t' + data[85] + '\n')
 	f.close()
 	t.close()
@@ -309,6 +310,22 @@ def generate_per_day_cell_covariates(recreated_cell_covariates_file, day, per_da
 	f.close()
 	t.close()
 
+def get_dictionary_list_of_individuals_that_we_have_genotype_for(genotype_file):
+	f = open(genotype_file)
+	individuals = {}
+	head_count = 0
+	for line in f:
+		if head_count == 0:
+			line = line.rstrip()
+			data = line.split()
+			indis = data[1:]
+			for indi in indis:
+				individuals[indi] = 0
+			head_count = head_count + 1
+			continue
+	f.close()
+	return individuals
+
 
 normalized_expression_file = sys.argv[1]
 meta_data_file = sys.argv[2]
@@ -318,15 +335,13 @@ pre_processed_data_dir = sys.argv[5]
 
 ##############################
 # Extract dictionary list of protein coding ensamble ids
-#protein_coding_genes = extract_dictionary_list_of_protein_coding_ensamble_ids(gene_annotation_file)
+protein_coding_genes = extract_dictionary_list_of_protein_coding_ensamble_ids(gene_annotation_file)
 
 
 ##############################
 # Reformat genotype data and get list of individuals that we have genotype data for
-reformatted_genotype_file = pre_processed_data_dir + 'genotype.txt'
-valid_individuals = reformat_genotype_file(genotype_file, reformatted_genotype_file, meta_data_file)
+valid_individuals = get_dictionary_list_of_individuals_that_we_have_genotype_for(genotype_file)
 
-'''
 ###############################
 # Create mapping from cell-id to individual id
 # And filter cells to those for which we have genotype data for
@@ -339,7 +354,6 @@ make_cell_to_individual_mapping(meta_data_file, cell_to_individual_mapping_file,
 # And filter cells to those for which we have genotype data for
 recreated_cell_covariates_file = pre_processed_data_dir + 'cell_covariates.txt'
 valid_cell_indices = recreate_cell_covariates(meta_data_file, recreated_cell_covariates_file, valid_individuals)
-
 
 ###############################
 # Re-create expression data
@@ -426,4 +440,3 @@ pca_loading_file = pre_processed_data_dir + 'standardized_normalized_top_' + str
 pca_pve_file = pre_processed_data_dir + 'standardized_normalized_top_' + str(nn) + '_variable_genes_expression_pca_pve.txt'
 top_n_variable_genes_standardized_gene_expression_file = pre_processed_data_dir + 'standardized_normalized_expression_all_cells_top_' + str(nn) + '_variable_genes.txt'
 generate_pca_scores_and_variance_explained(top_n_variable_genes_standardized_gene_expression_file, num_pcs, pca_loading_file, pca_pve_file)
-'''

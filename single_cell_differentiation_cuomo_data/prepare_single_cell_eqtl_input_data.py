@@ -75,7 +75,7 @@ def get_mapping_from_gene_to_chromosome_position(gene_annotation_file, genes):
 # Otherwise is a list of gene names
 def create_gene_chromsome(chrom_num, gene_mapping, distance):
 	# Initialize chromosome
-	chromosome = ['Null']*400000000
+	chromosome = ['Null']*250000000
 	# Loop through genes
 	for gene_id in gene_mapping.keys():
 		# Extract dictionary on position of gene
@@ -117,7 +117,7 @@ def extract_variant_gene_pairs_for_eqtl_testing(gene_file, gene_annotation_file,
 	t.write('Gene_id\tvariant_id\tchrom_num\tgene_tss\tvariant_position\n')
 	# Fill in file containing lists of variant gene pairs for each chromosome iteratively
 	for chrom_num in range(1,23):
-		print(chrom_num)
+		#print(chrom_num)
 		# Create array where each element is a BP in this chromosome
 		# 'Null' if no genes in distance BP of gene
 		# Otherwise is a list of gene names
@@ -133,29 +133,17 @@ def extract_variant_gene_pairs_for_eqtl_testing(gene_file, gene_annotation_file,
 			if head_count == 0:
 				head_count = head_count + 1
 				continue
-			if len(data) != 105:
+			if len(data) != 106:
 				print('assumption error!')
 				pdb.set_trace()
 			variant_id = data[0]
-			string_pos = variant_id.split('--')[1]
-			if len(string_pos.split('-')) > 1:
-				continue
-			variant_chrom = int(variant_id.split('--')[0])
-			variant_pos = int(variant_id.split('--')[1])
+			variant_chrom = int(variant_id.split(':')[0])
+			variant_pos = int(variant_id.split(':')[1])
 			# Ignore variants from other chromosomes
 			if variant_chrom != chrom_num:
 				continue
-			# No genes within 10KB of variant
-			if variant_pos > 400000000:
-				skipped = skipped + 1
-				pdb.set_trace()
-				continue
+			# No genes within distance of variant
 			if chromosome[variant_pos] == 'Null':
-				continue
-			genotype = np.asarray(data[1:]).astype(float)
-			maf = get_maf(genotype)
-			if maf < .05:
-				print('skipped variant')
 				continue
 			# List of genes that variant maps to
 			mapping_genes = chromosome[variant_pos].split(':')
@@ -164,9 +152,159 @@ def extract_variant_gene_pairs_for_eqtl_testing(gene_file, gene_annotation_file,
 				# PRINT TO OUTPUT
 				t.write(gene_id + '\t' + variant_id + '\t' + str(chrom_num) + '\t' + str(gene_mapping[gene_id][1]) + '\t' + str(variant_pos) + '\n')
 		f.close()
-		print(skipped)
 	t.close()
-	print(skipped)
+
+def get_ordered_list_of_gene_names(ld_pruned_variant_gene_pair_file):
+	gene_names = []
+	f = open(ld_pruned_variant_gene_pair_file)
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		gene_names.append(data[0])
+	return np.asarray(gene_names)
+
+def create_mapping_from_gene_names_to_expression_vectors(sc_expression_file, gene_names_file):
+	# Get gene names
+	gene_names = np.loadtxt(gene_names_file,dtype=str, delimiter='\t')[1:,0]
+	# Load in expression matrix (every column corresponds to a gene)
+	expression_matrix_full = np.loadtxt(sc_expression_file, dtype=str, delimiter='\t', comments='*')
+	expression_matrix = np.transpose(expression_matrix_full[1:,1:])
+	# Create mapping
+	mapping = {}
+	for index, gene_name in enumerate(gene_names):
+		mapping[gene_name] = expression_matrix[:, index]
+	return mapping
+
+def generate_single_cell_expression_eqtl_training_data(ld_pruned_variant_gene_pair_file, sc_expression_file, gene_names_file, single_cell_expression_eqtl_traing_data_file):
+	# Get ordered list of gene names (this will be the order that the output file will be saved in)
+	ordered_gene_names = get_ordered_list_of_gene_names(ld_pruned_variant_gene_pair_file)
+	# Create mapping from gene names to expression vectors
+	gene_name_to_expression_vector = create_mapping_from_gene_names_to_expression_vectors(sc_expression_file, gene_names_file)
+	# print to output file
+	t = open(single_cell_expression_eqtl_traing_data_file, 'w')
+	for gene_name in ordered_gene_names:
+		# Use map to get expression vector corresponding to this gene
+		if gene_name not in gene_name_to_expression_vector:
+			pdb.set_trace()
+		expression_vector = gene_name_to_expression_vector[gene_name]
+		# Print to output file
+		t.write('\t'.join(expression_vector) + '\n')
+	t.close()
+
+def get_ordered_list_of_variant_names(ld_pruned_variant_gene_pair_file):
+	variant_names = []
+	dicti = {}
+	f = open(ld_pruned_variant_gene_pair_file)
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		variant_names.append(data[1])
+		dicti[data[1]] = 1
+	return np.asarray(variant_names), dicti
+
+def get_cell_level_ordered_individaul_array(cell_level_info_file):
+	array = []
+	head_count = 0
+	f = open(cell_level_info_file)
+	for line in f:
+		line = line.rstrip()
+		data = line.split('\t')
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		array.append(data[85])
+	f.close()
+	return np.asarray(array)
+
+def get_genotype_level_ordered_individual_array(genotype_file):
+	f = open(genotype_file)
+	head_count = 0
+	for line in f:
+		if head_count == 0:
+			line = line.rstrip()
+			data = line.split()
+			indi = data[1:]
+			head_count = head_count + 1
+			continue
+	f.close()
+	return np.asarray(indi)
+
+# Create mapping from variants in variat_list to genotype vectors
+def create_mapping_from_variants_to_genotype(variant_list, genotype_file):
+	variants = {}
+	f = open(genotype_file)
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		# Skip header
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		# Simple error checking
+		if len(data) != 106:
+			print('assumption error!')
+		variant_id = data[0]
+		# Limit to variants in variant_list
+		if variant_id not in variant_list:
+			continue
+		variants[variant_id] = np.asarray(data[1:]).astype(float)
+	f.close()
+	if len(variants) != len(variant_list):
+		print('assumption error')
+		pdb.set_trace()
+	return variants
+
+
+def construct_genotype_matrix(ld_pruned_variant_gene_pair_file, genotype_file, cell_level_info_file, single_cell_genotype_eqtl_training_data_file):
+	variant_names, variant_list = get_ordered_list_of_variant_names(ld_pruned_variant_gene_pair_file)
+
+	ordered_individuals_cell_level = get_cell_level_ordered_individaul_array(cell_level_info_file)
+
+	ordered_individuals_genotype_level = get_genotype_level_ordered_individual_array(genotype_file)
+
+	# Create mapping from variant_id to genotype vectors
+	variant_to_genotype = create_mapping_from_variants_to_genotype(variant_list, genotype_file)
+
+	# Create array mapping from genotype-level array to single cell-level array
+	mapping_array = []
+	converter = {}
+	for i, indi in enumerate(ordered_individuals_genotype_level):
+		converter[indi] = i 
+	for indi in ordered_individuals_cell_level:
+		mapping_array.append(converter[indi])
+	mapping_array = np.asarray(mapping_array)
+	# Simple error checking
+	if np.array_equal(ordered_individuals_cell_level, ordered_individuals_genotype_level[mapping_array]) == False:
+		print('assumption error')
+		pdb.set_trace()
+
+	# print new genotype file
+	t = open(single_cell_genotype_eqtl_training_data_file, 'w')
+	for variant_id in variant_names:
+		genotype_vector = (variant_to_genotype[variant_id]).astype(str)
+		cell_level_genotype_vector = genotype_vector[mapping_array]
+		t.write('\t'.join(cell_level_genotype_vector) + '\n')
+	t.close()
+
+def construct_sample_overlap_file(cell_type_sc_sample_covariate_file, cell_type_sample_overlap_file):
+	ordered_individuals_cell_level = get_cell_level_ordered_individaul_array(cell_type_sc_sample_covariate_file)
+	unique_indis = np.unique(ordered_individuals_cell_level)
+	mapping_from_cell_to_number = {}
+	for i,indi in enumerate(unique_indis):
+		mapping_from_cell_to_number[indi] = i
+	t = open(cell_type_sample_overlap_file, 'w')
+	for indi in ordered_individuals_cell_level:
+		t.write(str(mapping_from_cell_to_number[indi]) + '\n')
+	t.close() 
 
 
 def generate_cell_type_eqtl_input_files(day, genotype_file, gene_names_file, cell_type_sc_expression_file, cell_type_sc_sample_covariate_file, cell_type_eqtl_variant_gene_pairs_file, cell_type_eqtl_expression_file, cell_type_eqtl_genotype_file, distance, gene_annotation_file, cell_type_sample_overlap_file):
@@ -174,8 +312,21 @@ def generate_cell_type_eqtl_input_files(day, genotype_file, gene_names_file, cel
 	# Step 1: Create file with all variant gene pairs such that gene is within $distanceKB of gene
 	########################
 	extract_variant_gene_pairs_for_eqtl_testing(gene_names_file, gene_annotation_file, distance, genotype_file, cell_type_eqtl_variant_gene_pairs_file)
+	
+	########################
+	# Step 2: Generate expression matrix
+	########################
+	generate_single_cell_expression_eqtl_training_data(cell_type_eqtl_variant_gene_pairs_file, cell_type_sc_expression_file, gene_names_file, cell_type_eqtl_expression_file)
+	
+	########################
+	# Step 3: Generate Genotype matrix
+	########################
+	construct_genotype_matrix(cell_type_eqtl_variant_gene_pairs_file, genotype_file, cell_type_sc_sample_covariate_file, cell_type_eqtl_genotype_file)
 
-
+	########################
+	# Step 4: Generate sample overlap file
+	########################
+	construct_sample_overlap_file(cell_type_sc_sample_covariate_file, cell_type_sample_overlap_file)
 
 #####################
 # Command line args
@@ -196,10 +347,10 @@ expression_file = pre_processed_data_dir + 'standardized_normalized_expression_a
 ###################
 # For each day generate eqtl input files
 ###################
-genotype_file = pre_processed_data_dir + 'genotype.txt'
-distance=10000
+genotype_file = pre_processed_data_dir + 'genotype_mean_inputed.txt'
+distance=25000
 #for day in range(4):
-for day in range(1):
+for day in range(4):
 	print(day)
 	# Input files
 	cell_type_sc_expression_file = pre_processed_data_dir + 'standardized_normalized_per_day_' + str(day) + '_expression.txt'
@@ -210,3 +361,5 @@ for day in range(1):
 	cell_type_eqtl_genotype_file = per_time_step_eqtl_input_data_dir + 'day_' + str(day) + '_eqtl_input_genotype.txt'
 	cell_type_sample_overlap_file = per_time_step_eqtl_input_data_dir +  'day_' + str(day) + '_eqtl_input_sample_overlap.txt'
 	generate_cell_type_eqtl_input_files(day, genotype_file, gene_names_file, cell_type_sc_expression_file, cell_type_sc_sample_covariate_file, cell_type_eqtl_variant_gene_pairs_file, cell_type_eqtl_expression_file, cell_type_eqtl_genotype_file, distance, gene_annotation_file, cell_type_sample_overlap_file)
+
+
