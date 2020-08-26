@@ -348,7 +348,7 @@ expression_file = pre_processed_data_dir + 'standardized_normalized_expression_a
 # For each day generate eqtl input files
 ###################
 genotype_file = pre_processed_data_dir + 'genotype_mean_inputed.txt'
-distance=25000
+distance=250000
 #for day in range(4):
 for day in range(4):
 	print(day)

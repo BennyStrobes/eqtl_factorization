@@ -96,7 +96,25 @@ def generate_pca_scores_and_variance_explained(filtered_standardized_sc_expressi
 	ve = (np.square(sss)/np.sum(np.square(sss)))[:num_pcs]
 	np.savetxt(filtered_cells_pca_ve_file, ve, fmt="%s", delimiter='\n')
 
-def recreate_cell_covariates(meta_data_file, recreated_cell_covariates_file, valid_individuals):
+def recreate_cell_covariates(meta_data_file, recreated_cell_covariates_file, valid_individuals, genotype_pc_file):
+	# Extract mapping from indi id to first n genotype pcs
+	n_pcs = 3
+	mapping = {}
+	f = open(genotype_pc_file)
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		if len(data) != 8:
+			print('assumption error')
+			pdb.set_trace()
+		donor_id = data[0].split('"')[1]
+		mapping[donor_id] = data[1:(1+n_pcs)]
+	f.close()
+	# Stream covariate file
 	f = open(meta_data_file)
 	t = open(recreated_cell_covariates_file, 'w')
 	valid_cells = []
@@ -106,10 +124,11 @@ def recreate_cell_covariates(meta_data_file, recreated_cell_covariates_file, val
 		data = line.split('\t')
 		if head_count == 0:
 			head_count = head_count + 1
-			t.write('cell_name_header\t' + '\t'.join(data) + '\n')
+			t.write('cell_name_header\t' + '\t'.join(data) + '\tgenotype_pc1\tgenotype_pc2\tgenotype_pc3' + '\n')
 			continue
 		if data[85] in valid_individuals:
-			t.write('\t'.join(data) + '\n')
+			genotype_pcs = mapping[data[85]]
+			t.write('\t'.join(data) + '\t' + '\t'.join(genotype_pcs) + '\n')
 			valid_cells.append(True)
 		else:
 			valid_cells.append(False)
@@ -331,7 +350,8 @@ normalized_expression_file = sys.argv[1]
 meta_data_file = sys.argv[2]
 genotype_file = sys.argv[3]
 gene_annotation_file = sys.argv[4]
-pre_processed_data_dir = sys.argv[5]
+genotype_pc_file = sys.argv[5]
+pre_processed_data_dir = sys.argv[6]
 
 ##############################
 # Extract dictionary list of protein coding ensamble ids
@@ -353,7 +373,7 @@ make_cell_to_individual_mapping(meta_data_file, cell_to_individual_mapping_file,
 # Re-create cell covariates
 # And filter cells to those for which we have genotype data for
 recreated_cell_covariates_file = pre_processed_data_dir + 'cell_covariates.txt'
-valid_cell_indices = recreate_cell_covariates(meta_data_file, recreated_cell_covariates_file, valid_individuals)
+valid_cell_indices = recreate_cell_covariates(meta_data_file, recreated_cell_covariates_file, valid_individuals, genotype_pc_file)
 
 ###############################
 # Re-create expression data

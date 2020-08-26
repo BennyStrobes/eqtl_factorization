@@ -12,11 +12,10 @@ pre_processed_data_dir="$1"
 gene_annotation_file="$2"
 per_time_step_eqtl_input_data_dir="$3"
 per_time_step_eqtl_dir="$4"
-
 if false; then
 python prepare_single_cell_eqtl_input_data.py $pre_processed_data_dir $gene_annotation_file $per_time_step_eqtl_input_data_dir
-fi
 
+fi
 
 
 ###########################
@@ -24,7 +23,7 @@ fi
 ###########################
 
 num_pcs="10"
-total_jobs="20"
+total_jobs="60"
 
 
 day_num="3"
@@ -36,13 +35,12 @@ test_names_file=$per_time_step_eqtl_input_data_dir"day_"$day_num"_eqtl_input_var
 sample_overlap_file=$per_time_step_eqtl_input_data_dir"day_"$day_num"_eqtl_input_sample_overlap.txt"
 covariate_file=$pre_processed_data_dir"standardized_normalized_per_day_"$day_num"_expression_pca_loadings.txt"
 # Output root
-output_root=$per_time_step_eqtl_dir"sc_per_time_step_eqtl_analysis_"$day_num"_day_"$num_pcs"_pcs_"
 if false; then
+output_root=$per_time_step_eqtl_dir"sc_per_time_step_eqtl_analysis_"$day_num"_day_"$num_pcs"_pcs_"
 for job_number in $(seq 0 `expr $total_jobs - "1"`); do
 	sbatch run_eqtl_analysis_with_random_effects_in_parallel.sh $expression_file $genotype_file $test_names_file $covariate_file $sample_overlap_file $num_pcs $output_root $job_number $total_jobs
 done
 fi
-
 
 if false; then
 for day in $(seq 0 3); do 
