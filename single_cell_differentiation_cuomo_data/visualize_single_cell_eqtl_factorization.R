@@ -129,11 +129,12 @@ make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate <- 
 	factor_number <- 4
 	factor_4_boxplot <- make_loading_boxplot_for_one_factor_by_categorical_covariate(covariate, loadings[,factor_number], factor_number, covariate_name)
 
-	factor_number <- 5
-	factor_5_boxplot <- make_loading_boxplot_for_one_factor_by_categorical_covariate(covariate, loadings[,factor_number], factor_number, covariate_name)
+	#factor_number <- 5
+	#factor_5_boxplot <- make_loading_boxplot_for_one_factor_by_categorical_covariate(covariate, loadings[,factor_number], factor_number, covariate_name)
 
 
-	combined <- plot_grid(factor_1_boxplot, factor_2_boxplot, factor_3_boxplot, factor_4_boxplot, factor_5_boxplot, ncol=1)
+	#combined <- plot_grid(factor_1_boxplot, factor_2_boxplot, factor_3_boxplot, factor_4_boxplot, factor_5_boxplot, ncol=1)
+	combined <- plot_grid(factor_1_boxplot, factor_2_boxplot, factor_3_boxplot, factor_4_boxplot, ncol=1)
 
 	return(combined)
 }
@@ -145,11 +146,13 @@ make_covariate_loading_correlation_heatmap <- function(covariates, loadings) {
 	# Covariates columns to consider
 	#print(summary(covariates[, valid_covariates]))
 	# Remove unimportant columns
+	covariates$experiment_day = factor(paste0(covariates$experiment, "_", covariates$day))
+
     loadings <- as.matrix(loadings)
     #valid_covariates <- 2:85
     #covs <- covariates[,valid_covariates]
-    valid_covariates <- c(6, 7, 8, 10, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 31, 32, 33, 36, 37, 38, 40, 41, 43, 44, 45,46, 47, 48, 49, 51, 52, 53, 54, 59, 60, 69, 71, 87, 95, 96, 97)
- 	covariate_type <- c("num", "cat", "cat", "cat", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "cat", "num", "num", "num", "num", "num", "num")
+    valid_covariates <- c(6, 7, 8, 10, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 31, 32, 33, 36, 37, 38, 40, 41, 43, 44, 45,46, 47, 48, 49, 51, 52, 53, 54, 59, 60, 69, 71, 87, 95, 96, 97, 98)
+ 	covariate_type <- c("num", "cat", "cat", "cat", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "cat", "num", "num", "num", "num", "num", "num", "cat")
 
  	cov_names <- colnames(covariates)[valid_covariates]
  	num <- length(cov_names)
@@ -175,8 +178,12 @@ make_covariate_loading_correlation_heatmap <- function(covariates, loadings) {
         for (num_cov in 1:num_covs) {
             pc_vec <- loadings[,num_pc]
             cov_vec <- covs[,num_cov]
+            if (covariate_type[num_cov] == "cat") {
             #print(cov_vec[1:10])
-            lin_model <- lm(pc_vec ~ cov_vec)
+            	lin_model <- lm(pc_vec ~ factor(cov_vec))
+        	} else {
+        		lin_model <- lm(pc_vec ~ cov_vec)
+        	}
             pve_map[num_cov, num_pc] <- summary(lin_model)$adj.r.squared
         }
     }
@@ -333,6 +340,15 @@ compute_pve_of_eqtl_factors <- function(loadings, factors, taus) {
 
 }
 
+make_pseudotime_factor_scatter <- function(pseudotime, loading, day) {
+	df <- data.frame(loading=loading, pseudotime=pseudotime, day=factor(day))
+	print(cor(pseudotime, loading))
+	p <- ggplot(df, aes(x=loading, y=pseudotime, colour=day)) + geom_point(size=.0001) +
+		gtex_v8_figure_theme() +
+		labs(y="Pseudotime", x="Loading")
+	return(p)
+}
+
 #############################
 # Command line args
 #############################
@@ -342,10 +358,10 @@ eqtl_factorization_results_dir <- args[3]
 eqtl_visualization_dir <- args[4]
 
 
-eqtl_factorization_stem <- "/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell_differentiation_cuomo_data/eqtl_factorization_results/eqtl_factorization_single_cell_sig_tests_50_pc_min_expressed_cells_5_factors_eqtl_factorization_vi_with_re_tied_variance_model_False_re_False_svi_0_seed_100_lasso_param_temper_"
+eqtl_factorization_stem <- "/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell_differentiation_cuomo_data/eqtl_factorization_results/eqtl_factorization_single_cell_sig_covariate_modulated_eqtls_top_2000_min_expressed_cells_5_factors_eqtl_factorization_vi_factor_loading_spike_and_slab_with_re_model_False_re_False_svi_0_seed_1_lasso_param_temper_"
 #eqtl_factorization_stem <- "/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell_differentiation_cuomo_data/eqtl_factorization_results/eqtl_factorization_single_cell_sig_tests_50_pc_min_expressed_cells_5_factors_eqtl_factorization_vi_with_re_model_False_re_False_svi_0_seed_100_lasso_param_temper_"
 #eqtl_factorization_stem <- "/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell_differentiation_cuomo_data/eqtl_factorization_results/eqtl_factorization_single_cell_sig_tests_50_pc_min_expressed_cells_5_factors_eqtl_factorization_vi_zero_inflated2_model_False_re_False_svi_0_seed_100_lasso_param_temper_"
-output_stem = "re_model_tied_variance_"
+output_stem = "sig_covariate_eqtls_top_2000_re_model_spike_and_slab_on_both_"
 #output_stem = "re_model_"
 #output_stem = "no_re_model_"
 
@@ -359,9 +375,12 @@ eqtl_visualization_dir <- paste0(eqtl_visualization_dir, output_stem)
 
 # Input files
 covariate_file <- paste0(pre_processed_data_dir, "cell_covariates.txt")
-
 # Load in data
 covariates <- read.table(covariate_file, comment.char="*", header=TRUE, sep="\t")
+
+model_covariates_file <- paste0(eqtl_factorization_input_dir, "single_cell_sig_covariate_modulated_eqtls_top_2000_covariate_subset_10.txt")
+expression_pcs = read.table(model_covariates_file, header=FALSE, sep="\t")
+print(summary(expression_pcs))
 
 eqtl_factorization_loading_file <- paste0(eqtl_factorization_stem, "U_S.txt")
 loadings <- read.table(eqtl_factorization_loading_file, header=FALSE)
@@ -373,9 +392,12 @@ eqtl_factorization_tau_file <- paste0(eqtl_factorization_stem, "tau.txt")
 taus <- read.table(eqtl_factorization_tau_file, header=FALSE)$V1
 
 
-print(eqtl_factorization_loading_file)
-print(eqtl_factorization_factor_file)
-print(eqtl_factorization_tau_file)
+######################################
+# Scatterplot of pseudotime with 1st factor
+#######################################
+output_file <- paste0(eqtl_visualization_dir, "pseudotime_factor1_scatterplot.pdf")
+#pseudotime_factor1_scatter <- make_pseudotime_factor_scatter(covariates$princ_curve_scaled01, loadings[,1], covariates$day)
+#ggsave(pseudotime_factor1_scatter, file=output_file, width=7.2, height=6.0, units="in")
 
 
 # Compute PVE of eqtl factors
@@ -414,6 +436,14 @@ ggsave(factor_histogram, file=output_file, width=7.2, height=7, units="in")
 
 
 ######################################
+# Make Heatmap correlating known covariates with Expression PCs
+#######################################
+output_file <- paste0(eqtl_visualization_dir, "expression_pc_covariate_heatmap.pdf")
+heatmap <- make_covariate_loading_correlation_heatmap(covariates, expression_pcs) 
+ggsave(heatmap, file=output_file, width=10.2, height=5.5, units="in")
+
+
+######################################
 # Make Heatmap correlating known covariates with eqtl factorization loadings
 #######################################
 output_file <- paste0(eqtl_visualization_dir, "loading_covariate_heatmap.pdf")
@@ -436,6 +466,19 @@ output_file <- paste0(eqtl_visualization_dir, "boxplot_colored_by_indi_id.pdf")
 indi_categorical_boxplot = make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate(covariates$donor_long_id, loadings, "Individual")
 ggsave(indi_categorical_boxplot, file=output_file, width=7.2, height=7.0, units="in")
 
+
+output_file <- paste0(eqtl_visualization_dir, "boxplot_colored_by_experiment_day.pdf")
+exp_day_categorical_boxplot = make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate(factor(paste0(covariates$experiment,"_",covariates$day)), loadings, "Experiment_day")
+ggsave(exp_day_categorical_boxplot, file=output_file, width=7.2, height=7.0, units="in")
+
+
+output_file <- paste0(eqtl_visualization_dir, "boxplot_colored_by_experiment.pdf")
+experiment_categorical_boxplot = make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate(covariates$experiment, loadings, "Experiment")
+ggsave(experiment_categorical_boxplot, file=output_file, width=7.2, height=7.0, units="in")
+
+output_file <- paste0(eqtl_visualization_dir, "boxplot_colored_by_plate_id.pdf")
+plate_id_categorical_boxplot = make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate(factor(covariates$plate_id), loadings, "plate_id")
+ggsave(plate_id_categorical_boxplot, file=output_file, width=7.2, height=7.0, units="in")
 
 ######################################
 # Visualize UMAP scatter plot colored by known percent mito

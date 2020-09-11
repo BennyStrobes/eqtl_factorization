@@ -381,7 +381,6 @@ valid_cell_indices = recreate_cell_covariates(meta_data_file, recreated_cell_cov
 recreated_normalized_gene_expression_file = pre_processed_data_dir + 'normalized_expression_all_cells.txt'
 recreate_expression(normalized_expression_file, recreated_normalized_gene_expression_file, valid_cell_indices, protein_coding_genes)
 
-
 ###############################
 # Generate standardized gene expression data in each day independently
 # And then create PCs

@@ -56,9 +56,9 @@ eqtl_mixture_results_dir=$output_root"eqtl_mixture_results/"
 ######################
 # Preprocess single cell expression
 ######################
-if false; then
+
 sh preprocess_single_cell_expression.sh $input_h5py_file $processed_expression_dir $visualize_processed_expression_dir $gene_annotation_file
-fi
+
 
 ######################
 # Run eQTL analysis at pseudobulk level and at single cell level
@@ -70,8 +70,9 @@ fi
 ######################
 # Get single cell expression and genotype data into a format to run eqtl-factorization
 ######################
+if false; then
 sh prepare_eqtl_input.sh $gene_annotation_file $processed_expression_dir $eqtl_input_dir $genotype_data_dir $pseudobulk_eqtl_dir $single_cell_eqtl_dir
-
+fi
 
 ######################
 # Run eqtl-factorization on pseudobulk data

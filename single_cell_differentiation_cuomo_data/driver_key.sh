@@ -32,6 +32,8 @@ visualize_pre_processed_data_dir=$root_directory"visualize_preprocessed_data/"
 per_time_step_eqtl_input_data_dir=$root_directory"per_time_step_eqtl_input_data/"
 # Directory containing output for per-time step eqtl analysis
 per_time_step_eqtl_dir=$root_directory"per_time_step_eqtl_results/"
+# Directory containing bootstrapped eqtl stability analysis
+bootstrapped_eqtl_stability_dir=$root_directory"bootstrapped_eqtl_stability/"
 # Directory containing eQTL Factorization input data
 eqtl_factorization_input_dir=$root_directory"eqtl_factorization_input/"
 # Directory containing eqtl factorization results
@@ -45,8 +47,9 @@ visualize_eqtl_factorization_results_dir=$root_directory"visualize_eqtl_factoriz
 ################################
 # Pre-process data
 ################################
+if false; then
 sh preprocess_data.sh $normalized_expression_file $meta_data_file $genotype_dir $gene_annotation_file $genotype_pc_file $pre_processed_data_dir $visualize_pre_processed_data_dir
-
+fi
 
 
 ################################
@@ -61,27 +64,28 @@ fi
 # Prepare input for eqtl factorization
 ################################
 if false; then
-sh prepare_eqtl_input.sh $gene_annotation_file $pre_processed_data_dir $eqtl_factorization_input_dir $per_time_step_eqtl_dir
+sh prepare_eqtl_input.sh $gene_annotation_file $pre_processed_data_dir $eqtl_factorization_input_dir $per_time_step_eqtl_dir $bootstrapped_eqtl_stability_dir
 fi
-
 
 ######################
 # Run eqtl-factorization on single cell data
 ######################
 # eqtl factorization input files (generated in 'prepare_eqtl_input.sh')
-sample_overlap_file=$eqtl_factorization_input_dir"single_cell_sig_tests_in_each_day_individual_id.txt"
+num_genes="2000"
+sample_overlap_file=$eqtl_factorization_input_dir"single_cell_sig_covariate_modulated_eqtls_top_"$num_genes"_individual_id.txt"
+sample_overlap_file=$eqtl_factorization_input_dir"single_cell_sig_covariate_modulated_eqtls_top_"$num_genes"_individual_id_and_plate_id.txt"
 # TRAINING
-expression_training_file=$eqtl_factorization_input_dir"single_cell_sig_tests_in_each_day_expression_training_data_uncorrected_zero_centered_r_squared_pruned.h5"
-genotype_training_file=$eqtl_factorization_input_dir"single_cell_sig_tests_in_each_day_standardized_genotype_training_data_uncorrected_r_squared_pruned.h5"
+expression_training_file=$eqtl_factorization_input_dir"single_cell_sig_covariate_modulated_eqtls_top_"$num_genes"_expression_training_data_uncorrected_zero_centered_r_squared_pruned.h5"
+genotype_training_file=$eqtl_factorization_input_dir"single_cell_sig_covariate_modulated_eqtls_top_"$num_genes"_standardized_genotype_training_data_uncorrected_r_squared_pruned.h5"
 # TESTING
-expression_testing_file=$eqtl_factorization_input_dir"single_cell_sig_tests_in_each_day_expression_training_data_uncorrected_zero_centered_r_squared_pruned.h5"
-genotype_testing_file=$eqtl_factorization_input_dir"single_cell_sig_tests_in_each_day_standardized_genotype_training_data_uncorrected_r_squared_pruned.h5"
+expression_testing_file=$eqtl_factorization_input_dir"single_cell_sig_covariate_modulated_eqtls_top_"$num_genes"_expression_training_data_uncorrected_zero_centered_r_squared_pruned.h5"
+genotype_testing_file=$eqtl_factorization_input_dir"single_cell_sig_covariate_modulated_eqtls_top_"$num_genes"_standardized_genotype_training_data_uncorrected_r_squared_pruned.h5"
 
-covariate_file=$eqtl_factorization_input_dir"single_cell_sig_tests_in_each_day_covariate_subset_10.txt"
+covariate_file=$eqtl_factorization_input_dir"single_cell_sig_covariate_modulated_eqtls_top_"$num_genes"_covariate_subset_10.txt"
 
 
 # Paramaters
-model_name="eqtl_factorization_vi_factor_loading_spike_and_slab_with_re"
+model_name="eqtl_factorization_vi_factor_loading_spike_and_slab_with_multiple_re"
 num_latent_factors="5"
 random_effects="False"
 svi="False"
@@ -89,13 +93,45 @@ parrallel="False"
 lasso_param_v="1"
 
 seeds=("0")
-if false; then
 for seed in "${seeds[@]}"; do
 	echo "Seed: "$seed
-	file_stem="eqtl_factorization_single_cell_sig_tests_50_pc_min_expressed_cells_$transformation_type_transform_data_corrected_genotype_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed_"$lasso_param_v"_lasso_param"
+	file_stem="eqtl_factorization_single_cell_sig_covariate_modulated_eqtls_top_"$num_genes"_min_expressed_cells_$transformation_type_transform_data_corrected_genotype_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed_"$lasso_param_v"_lasso_param"
 	sbatch eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_factorization_results_dir $seed $model_name $random_effects $svi $parrallel $lasso_param_v $covariate_file
 done
-fi
+
+
+######################
+# Run eqtl-factorization on single cell data
+######################
+# eqtl factorization input files (generated in 'prepare_eqtl_input.sh')
+sample_overlap_file=$eqtl_factorization_input_dir"single_cell_sig_dynamic_eqtls_individual_id.txt"
+sample_overlap_file=$eqtl_factorization_input_dir"single_cell_sig_dynamic_eqtls_individual_id_and_plate_id.txt"
+# TRAINING
+expression_training_file=$eqtl_factorization_input_dir"single_cell_sig_dynamic_eqtls_expression_training_data_uncorrected_zero_centered_r_squared_pruned.h5"
+genotype_training_file=$eqtl_factorization_input_dir"single_cell_sig_dynamic_eqtls_standardized_genotype_training_data_uncorrected_r_squared_pruned.h5"
+# TESTING
+expression_testing_file=$eqtl_factorization_input_dir"single_cell_sig_dynamic_eqtls_expression_training_data_uncorrected_zero_centered_r_squared_pruned.h5"
+genotype_testing_file=$eqtl_factorization_input_dir"ssingle_cell_sig_dynamic_eqtls_standardized_genotype_training_data_uncorrected_r_squared_pruned.h5"
+
+covariate_file=$eqtl_factorization_input_dir"single_cell_sig_dynamic_eqtls_covariate_subset_10.txt"
+
+
+# Paramaters
+model_name="eqtl_factorization_vi_factor_loading_spike_and_slab_with_multiple_re"
+num_latent_factors="5"
+random_effects="False"
+svi="False"
+parrallel="False"
+lasso_param_v="1"
+
+seeds=("0")
+for seed in "${seeds[@]}"; do
+	echo "Seed: "$seed
+	file_stem="eqtl_factorization_single_cell_sig_dynamic_eqtls_min_expressed_cells_$transformation_type_transform_data_corrected_genotype_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed_"$lasso_param_v"_lasso_param"
+	sbatch eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_factorization_results_dir $seed $model_name $random_effects $svi $parrallel $lasso_param_v $covariate_file
+done
+
+
 
 if false; then
 Rscript visualize_single_cell_eqtl_factorization.R $pre_processed_data_dir $eqtl_factorization_input_dir $eqtl_factorization_results_dir $visualize_eqtl_factorization_results_dir 

@@ -19,7 +19,8 @@ make_dimensionality_reduction_scatter_colored_by_categorical_variable <- functio
   				geom_point(size=.01) +
   				figure_theme() + 
   				labs(x=x_axis_label,y=y_axis_label, color=categorical_label) +
-  				guides(colour = guide_legend(override.aes = list(size=3)))
+  				guides(colour = guide_legend(override.aes = list(size=3))) +
+          theme(legend.position="none")
   	
   	
   	return(scatter)
@@ -62,6 +63,99 @@ make_fraction_of_zeros_histogram <- function(fraction_of_zeros) {
   			labs(x="Fraction of zeros / Gene") + 
   			figure_theme()
   	return(histo)
+}
+
+make_num_cells_per_plate_histogram <- function(covariate_data) {
+  unique_plates = unique(covariate_data$plate_id)
+  num_cells = c()
+  for (plate_iter in 1:length(unique_plates)) {
+    plate_name = unique_plates[plate_iter]
+    cell_indices = covariate_data$plate_id == plate_name
+    total = sum(cell_indices)
+    num_cells <- c(num_cells, total)
+  }
+
+  df <- data.frame(num_cells)
+  histo <- ggplot(df, aes(x=num_cells))+
+        geom_histogram(color="darkblue", fill="lightblue") + 
+        labs(x="Num cells / plate") + 
+        figure_theme()
+  return(histo)
+}
+
+
+make_num_experiments_per_plate_histogram <- function(covariate_data) {
+  unique_plates = unique(covariate_data$plate_id)
+  num_experiments = c()
+  for (plate_iter in 1:length(unique_plates)) {
+    plate_name = unique_plates[plate_iter]
+    cell_indices = covariate_data$plate_id == plate_name
+    total <- length(unique(covariate_data$experiment[cell_indices]))
+    num_experiments <- c(num_experiments, total)
+  }
+  df <- data.frame(num_experiments)
+  histo <- ggplot(df, aes(x=num_experiments))+
+        geom_histogram(color="darkblue", fill="lightblue") + 
+        labs(x="Num experiments / plate") + 
+        figure_theme()
+  return(histo)
+}
+
+
+make_num_days_per_plate_histogram <- function(covariate_data) {
+  unique_plates = unique(covariate_data$plate_id)
+  num_days = c()
+  for (plate_iter in 1:length(unique_plates)) {
+    plate_name = unique_plates[plate_iter]
+    cell_indices = covariate_data$plate_id == plate_name
+    total <- length(unique(covariate_data$day[cell_indices]))
+    num_days <- c(num_days, total)
+  }
+  df <- data.frame(num_days)
+  histo <- ggplot(df, aes(x=num_days))+
+        geom_histogram(color="darkblue", fill="lightblue") + 
+        labs(x="Num days / plate") + 
+        figure_theme()
+  return(histo)
+}
+
+make_num_plates_per_experiment_histogram <- function(covariate_data) {
+  unique_experiments = unique(covariate_data$experiment)
+  num_plates = c()
+  for (experiment_iter in 1:length(unique_experiments)) {
+    experiment_name = unique_experiments[experiment_iter]
+    cell_indices = covariate_data$experiment == experiment_name
+    total <- length(unique(covariate_data$plate_id[cell_indices]))
+    num_plates <- c(num_plates, total)
+  }
+  df <- data.frame(num_plates)
+  print(num_plates)
+  histo <- ggplot(df, aes(x=num_plates))+
+        geom_histogram(color="darkblue", fill="lightblue") + 
+        labs(x="Num plates / experiment") + 
+        figure_theme()
+  return(histo)
+}
+
+
+debug <- function(covariate_data) {
+  unique_plates = unique(covariate_data$plate_id)
+  new_names <- paste0(covariate_data$experiment, " ", covariate_data$day)
+  print(length(unique(new_names)))
+  unique_experiments = unique(covariate_data$experiment)
+  total = c()
+  for (experiment_iter in 1:length(unique_experiments)) {
+    experiment_name = unique_experiments[experiment_iter]
+    for (day in 0:3) {
+      cell_indices = (covariate_data$day == paste0("day",day)) & (covariate_data$experiment == experiment_name)
+      total <- c(total, sum(cell_indices))
+
+      if (length(unique(covariate_data$plate_id[cell_indices])) > 1) {
+        print(summary(covariate_data[cell_indices,]))
+      }
+    }
+  }
+
 }
 
 
@@ -112,6 +206,38 @@ fraction_of_cells_expressed_file <- paste0(processed_data_dir, "fraction_of_zero
 fraction_of_cells_expressed <- read.table(fraction_of_cells_expressed_file, header=TRUE, sep="\t")
 
 
+debug(covariate_data)
+
+##########################
+# Make histogram showing number of plates per experiment
+##########################
+num_plates_per_experiment_histogram <- make_num_plates_per_experiment_histogram(covariate_data)
+output_file <- paste0(visualize_processed_data_dir, "num_plates_per_experiment_histogram.pdf")
+ggsave(num_plates_per_experiment_histogram, file=output_file, width=7.2, height=5, units="in")
+
+##########################
+# Make histogram showing number of days per plate
+##########################
+num_days_per_plate_histogram <- make_num_days_per_plate_histogram(covariate_data)
+output_file <- paste0(visualize_processed_data_dir, "num_days_per_plate_histogram.pdf")
+ggsave(num_days_per_plate_histogram, file=output_file, width=7.2, height=5, units="in")
+
+##########################
+# Make histogram showing number of experiments per plate
+##########################
+num_experiments_per_plate_histogram <- make_num_experiments_per_plate_histogram(covariate_data)
+output_file <- paste0(visualize_processed_data_dir, "num_experiments_per_plate_histogram.pdf")
+ggsave(num_experiments_per_plate_histogram, file=output_file, width=7.2, height=5, units="in")
+
+##########################
+# Make histogram showing number of cells per plate
+##########################
+num_cells_per_plate_histogram <- make_num_cells_per_plate_histogram(covariate_data)
+output_file <- paste0(visualize_processed_data_dir, "num_cells_per_plate_histogram.pdf")
+ggsave(num_cells_per_plate_histogram, file=output_file, width=7.2, height=5, units="in")
+
+
+if (FALSE) {
 ##########################
 # Make Scatter plot correlating gene variance with fraction of cells expressed by gene
 ##########################
@@ -134,6 +260,18 @@ ggsave(fraction_of_zeros_histogram, file=output_file, width=7.2, height=5, units
 pc_scatter_colored_by_day <- make_dimensionality_reduction_scatter_colored_by_categorical_variable(covariate_data$day, pca_loadings[,1], pca_loadings[,2], "", "PC1", "PC2")
 output_file <- paste0(visualize_processed_data_dir, "pc_scatter_colored_by_differentiation_day.pdf")
 ggsave(pc_scatter_colored_by_day, file=output_file, width=7.2, height=5, units="in")
+
+pc_scatter_colored_by_plate_id <- make_dimensionality_reduction_scatter_colored_by_categorical_variable(factor(covariate_data$plate_id), pca_loadings[,1], pca_loadings[,2], "", "PC1", "PC2")
+output_file <- paste0(visualize_processed_data_dir, "pc_scatter_colored_by_plate_id.pdf")
+ggsave(pc_scatter_colored_by_plate_id, file=output_file, width=7.2, height=5, units="in")
+
+pc_scatter_colored_by_experiment <- make_dimensionality_reduction_scatter_colored_by_categorical_variable(factor(covariate_data$experiment), pca_loadings[,1], pca_loadings[,2], "", "PC1", "PC2")
+output_file <- paste0(visualize_processed_data_dir, "pc_scatter_colored_by_experiment.pdf")
+ggsave(pc_scatter_colored_by_experiment, file=output_file, width=7.2, height=5, units="in")
+
+pc_scatter_colored_by_donor <- make_dimensionality_reduction_scatter_colored_by_categorical_variable(factor(covariate_data$donor_long_id), pca_loadings[,1], pca_loadings[,2], "", "PC1", "PC2")
+output_file <- paste0(visualize_processed_data_dir, "pc_scatter_colored_by_donor.pdf")
+ggsave(pc_scatter_colored_by_donor, file=output_file, width=7.2, height=5, units="in")
 
 pc_scatter_colored_by_day <- make_dimensionality_reduction_scatter_colored_by_categorical_variable(covariate_data$day, pca_loadings_top_500_vg[,1], pca_loadings_top_500_vg[,2], "", "PC1", "PC2")
 output_file <- paste0(visualize_processed_data_dir, "pc_scatter_top_500_vg_colored_by_differentiation_day.pdf")
@@ -162,4 +300,4 @@ num_pcs <- 50
 output_file <- paste0(visualize_processed_data_dir, "pca_pve_top_2000_vg_line_plot.pdf")
 ve_line_plot <- make_pc_variance_explained_line_plot(pca_pve_top_2000_vg[,1], num_pcs)
 ggsave(ve_line_plot, file=output_file, width=7.2, height=5.0, units="in")
-
+}
