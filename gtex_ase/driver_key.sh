@@ -26,21 +26,44 @@ visualization_dir=$root_dir"visualize/"
 #########################
 # Input Data
 #########################
+ase_input_data_dir="/work-zfs/abattle4/lab_data/GTEx_v8/ase/GTEx_Analysis_v8_ASE_WASP_counts_by_subject/"
+gtex_individual_information_file="/work-zfs/abattle4/lab_data/GTEx_v8/sample_annotations/GTEx_Analysis_2017-06-05_v8_Annotations_SubjectPhenotypesDS.txt"
 gtex_covariate_dir="/work-zfs/abattle4/lab_data/GTEx_v8/ciseQTL/GTEx_Analysis_v8_eQTL_covariates/"
 gtex_genotype_dir="/work-zfs/abattle4/lab_data/GTEx_v8_trans_eqtl_data_processed_by_brian/processed_genotypes/"
 gtex_tissue_colors_file="/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/gtex_cis_eqtl/input_data/gtex_colors.txt"
-gtex_individual_information_file="/work-zfs/abattle4/lab_data/GTEx_v8/sample_annotations/GTEx_Analysis_2017-06-05_v8_Annotations_SubjectPhenotypesDS.txt"
 cell_type_decomposition_hlv_file="/work-zfs/abattle4/marios/GTEx_v8/coloc/scRNA_decon/CIBERSORT_GTEx_LV.csv"
 african_ancestry_gtex_eqtl_dir="/work-zfs/abattle4/surya/worksets/for_ben/GTEx_Analysis_v8_AFR_eQTL/"
 european_ancestry_gtex_eqtl_dir="/work-zfs/abattle4/surya/worksets/for_ben/GTEx_Analysis_v8_EUR_eQTL/"
 
 
+data_version="tissue_subset_10"
+tissues_file=$input_data_dir$data_version".txt"
+if false; then 
+sh preprocess_ase_data.sh $ase_input_data_dir $tissues_file $gtex_individual_information_file $cell_type_decomposition_hlv_file $processed_data_dir$data_version"_"
+fi
 
 
 
+ase_file=$processed_data_dir"tissue_subset_5_filtered_ase_counts_600_0.5_one_site_per_gene_min_allele.txt"
+k="5"
+if false; then
+sbatch run_ase_factorization.sh $ase_file $k $eqtl_results_dir"tissue_subset_5_k_"$k"_"
+fi
 
 
+ase_file=$processed_data_dir"tissue_subset_1_filtered_ase_counts_0.35_0.5_one_site_per_gene_min_allele.txt"
+k="5"
+if false; then
+sbatch run_ase_factorization.sh $ase_file $k $eqtl_results_dir"tissue_subset_1_k_"$k"_"
+fi
 
+ase_file=$processed_data_dir"tissue_subset_10_filtered_ase_counts_0.35_0.5_one_site_per_gene_min_allele.txt"
+k="10"
+if false; then
+sbatch run_ase_factorization.sh $ase_file $k $eqtl_results_dir"tissue_subset_10_k_"$k"_"
+fi
+
+Rscript visualize_ase_factorization.R $eqtl_results_dir $processed_data_dir $visualization_dir
 
 
 
