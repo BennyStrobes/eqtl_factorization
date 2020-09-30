@@ -13,6 +13,8 @@ covariate_file="$2"
 k="$3"
 eqtl_results_dir="$4"
 
-module load python/2.7-anaconda53
+module load python/2.7-anaconda
+module load gcc/6.4.0
+
 
 python run_ase_factorization.py $ase_file $covariate_file $k $eqtl_results_dir

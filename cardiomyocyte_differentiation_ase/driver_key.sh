@@ -30,18 +30,20 @@ ase_input_data_dir="/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/c
 het_prob_file="/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/cardiomyocyte_differentiation_ase/input_data/YRI_het_prob_genotype.vcf"
 annotated_samples_file="/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/cardiomyocyte_differentiation_ase/input_data/processed_covariates_categorical.txt"
 pca_file="/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/cardiomyocyte_differentiation_ase/input_data/principal_components_10.txt"
-if false; then
 sh preprocess_ase_data.sh $ase_input_data_dir $het_prob_file $annotated_samples_file $pca_file $processed_data_dir
-fi
+
 
 ase_file=$processed_data_dir"filtered_ase_counts_0.35_0.5_min_allele.txt"
 covariate_file=$processed_data_dir"covariates.txt"
 k="5"
 if false; then
-sbatch run_ase_factorization.sh $ase_file $covariate_file $k $eqtl_results_dir"cardiomyocyte_differentiation_"$k"_with_cov_"
+sh run_ase_factorization.sh $ase_file $covariate_file $k $eqtl_results_dir"cardiomyocyte_differentiation_"$k"_with_cov_temp_"
 fi
-Rscript visualize_ase_factorization.R $eqtl_results_dir $processed_data_dir $processed_data_dir"annotated_samples.txt" $visualization_dir
 
+
+if false; then
+Rscript visualize_ase_factorization.R $eqtl_results_dir $processed_data_dir $processed_data_dir"annotated_samples.txt" $visualization_dir
+fi
 
 
 

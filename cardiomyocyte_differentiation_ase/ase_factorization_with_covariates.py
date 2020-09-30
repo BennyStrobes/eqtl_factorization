@@ -50,6 +50,7 @@ class ASE_FACTORIZATION(object):
 			init = dict(beta=beta_init)
 			########################################
 			# Run optimization
+			pdb.set_trace()
 			op = BB_GLM_FIXED_CONC.optimizing(data = data, verbose=False,iter=5000,seed=1, init=init)
 			self.U[sample_iter, :] = op['beta']
 
@@ -78,6 +79,7 @@ class ASE_FACTORIZATION(object):
 			self.V[:, test_iter] = op['beta'][:(self.K+1)]
 			self.C[:, test_iter] = op['beta'][(self.K+1):]
 			self.conc[test_iter] = np.asmatrix(op['conc'])[0,0]
+			pdb.set_trace()
 
 	def initialize_variables(self):
 		self.N = self.allelic_counts.shape[0]

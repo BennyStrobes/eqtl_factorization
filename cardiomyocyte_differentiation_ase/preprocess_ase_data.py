@@ -373,6 +373,47 @@ def make_covariate_file_based_on_sample_repeat_structure(annotated_samples_file,
 	t.close()
 	f.close()
 
+def sample_overlap_file(annotated_samples_file, covariate_file):
+	f = open(annotated_samples_file)
+	indis = {}
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		indi = data[1].split('_')[0]
+		indis[indi] = 1
+	f.close()
+	indi_arr = []
+	for indi in indis.keys():
+		indi_arr.append(indi)
+	num_indis = len(indi_arr)
+	used_indi_arr = indi_arr[:(num_indis-1)]
+	num_used_indis = len(used_indi_arr)
+	indi_to_pos = {}
+	for i, indi in enumerate(used_indi_arr):
+		indi_to_pos[indi] = i
+	f = open(annotated_samples_file)
+	t = open(covariate_file, 'w')
+	head_count = 0 
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		pdb.set_trace()
+		covs = np.zeros(num_used_indis)
+		indi = data[1].split('_')[0]
+		if indi in indi_to_pos:
+			pos = indi_to_pos[indi]
+			covs[pos] = 1
+		t.write('\t'.join(covs.astype(str)) + '\n')
+	t.close()
+	f.close()
+
 def add_pcs_to_annotated_samples_file(annotated_samples_file, pca_file, updated_annotated_samples_file):
 	f = open(pca_file)
 	sample_names = []
@@ -415,7 +456,7 @@ output_root = sys.argv[5]
 
 # Add PCs to annotated samples file
 updated_annotated_samples_file = output_root + 'annotated_samples.txt'
-add_pcs_to_annotated_samples_file(annotated_samples_file, pca_file, updated_annotated_samples_file)
+#add_pcs_to_annotated_samples_file(annotated_samples_file, pca_file, updated_annotated_samples_file)
 
 
 # Generate unfiltered ase matrix 
@@ -447,6 +488,10 @@ covariate_file = output_root + 'covariates.txt'
 # make_covariate_file_based_on_sample_repeat_structure(annotated_samples_file, covariate_file)
 
 
+
+
+sample_overlap_file = output_root + 'sample_overlap.txt'
+make_sample_overlap_file(annotated_samples_file, sample_overlap_file)
 
 
 
