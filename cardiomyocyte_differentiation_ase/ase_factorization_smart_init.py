@@ -30,8 +30,8 @@ class ASE_FACTORIZATION(object):
 		self.cov = cov
 		self.initialize_variables()
 		for vi_iter in range(self.max_iter):
-			self.update_V_and_conc()
 			self.update_U()
+			self.update_V_and_conc()
 			# Save to output every five iters
 			if np.mod(vi_iter, 5) == 0: 
 				np.savetxt(self.output_root + '_iter.txt', np.asmatrix(vi_iter), fmt="%s", delimiter='\t')
@@ -53,6 +53,35 @@ class ASE_FACTORIZATION(object):
 			# Run optimization
 			op = BB_GLM_FIXED_CONC.optimizing(data = data, verbose=False,iter=5000,seed=1, init=init)
 			self.U[sample_iter, :] = op['beta']
+
+	def initialize_conc_and_C(self):
+		# Add column of ones (intercept to U)
+		#U_new = np.hstack((X0, self.U, self.cov))
+		U_new = np.copy(self.cov)
+		for test_iter in range(self.T):
+			observed_indices = np.isnan(self.allelic_counts[:,test_iter]) == False
+			data = dict(N=sum(observed_indices), P=U_new.shape[1], x=U_new[observed_indices,:], ys=self.allelic_counts[observed_indices, test_iter].astype(int), ns=self.total_counts[observed_indices, test_iter].astype(int), concShape=self.concShape, concRate=self.concRate)
+			########################################
+			# Get MOM estimates for initialization
+			rat = data['ys']/data['ns'].astype(float)
+			if np.sum(np.isnan(rat)) > 0:
+				pdb.set_trace()
+			# moment estimator of concentration parameter
+			conc_init = min(1.0/np.var(rat), 1000.0)
+			# thresholded moment estimator of the mean 
+			m_init = min(max(np.mean(rat), 1.0/1000 ), 1.0-(1.0/1000))
+			beta_init = np.zeros(data['P'])
+			beta_init[0] = np.log(m_init/(1.0-m_init))
+			init = dict(conc=conc_init, beta=beta_init)
+			########################################
+			# Run optimization
+			op = BB_GLM.optimizing(data = data, verbose=False,iter=5000,seed=1, init=init)
+
+			#sampling_fit = BB_GLM.sampling(data=data, init=init)
+			#aa = BB_GLM.vb(data=data, init=init)
+			self.C[:, test_iter] = op['beta'][:(self.num_cov)]
+			self.conc[test_iter] = np.asmatrix(op['conc'])[0,0]
+
 
 	def update_V_and_conc(self):
 		# Add column of ones (intercept to U)
@@ -87,8 +116,11 @@ class ASE_FACTORIZATION(object):
 		self.N = self.allelic_counts.shape[0]
 		self.T = self.allelic_counts.shape[1]
 		self.num_cov = self.cov.shape[1]
-		# Randomly initialize (only U matters)
-		self.U = np.random.randn(self.N, self.K)
-		self.V = np.random.randn(self.K, self.T) 
+		# Randomly initialize (only V, C, and conc matter)
+		# V is done at random. C and conc are learned from data
 		self.conc = np.random.randn(self.T)
 		self.C = np.random.randn(self.num_cov, self.T)
+		self.initialize_conc_and_C()
+		self.U = np.random.randn(self.N, self.K)
+		self.V = np.random.randn(self.K, self.T) 
+

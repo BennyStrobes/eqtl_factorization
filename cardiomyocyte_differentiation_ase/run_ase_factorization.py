@@ -2,11 +2,13 @@ import numpy as np
 import os
 import sys
 import pdb
-#import ase_factorization
+import ase_factorization
+import ase_factorization_smart_init
+import ase_factorization_old
 #import ase_factorization_via_stan_vb
-import ase_factorization_via_pymc3_vb
-import ase_factorization_via_pymc3_mvn_vb
-import ase_factorization_via_pymc3_lmm_vb
+#import ase_factorization_via_pymc3_vb
+#import ase_factorization_via_pymc3_mvn_vb
+#import ase_factorization_via_pymc3_lmm_vb
 
 
 def load_in_ase_data(ase_file):
@@ -31,7 +33,7 @@ def add_intercept_column_to_matrix(X):
 	Xnew = np.hstack((X0, X))
 	return Xnew
 
-def train_ase_factorization_model(ase_file, covariate_file, sample_overlap_file, k, model_name, output_dir):
+def train_ase_factorization_model(ase_file, covariate_file, sample_overlap_file, k, model_name, output_dir, random_seed):
 	if model_name == 'ase_factorization':
 		allelic_counts, total_counts = load_in_ase_data(ase_file)
 		if covariate_file != 'NA':
@@ -39,8 +41,25 @@ def train_ase_factorization_model(ase_file, covariate_file, sample_overlap_file,
 			cov_plus_intercept = add_intercept_column_to_matrix(cov)
 		else:
 			cov_plus_intercept = np.ones((allelic_counts.shape[0], 1))
-		ase_factorization_obj = ase_factorization.ASE_FACTORIZATION(K=k, output_root=output_dir + '_ase_factorization')
+		ase_factorization_obj = ase_factorization.ASE_FACTORIZATION(K=k, output_root=output_dir + '_ase_factorization', random_seed=random_seed)
 		ase_factorization_obj.fit(allelic_counts=allelic_counts, total_counts=total_counts, cov=cov_plus_intercept)
+	elif model_name == 'ase_factorization_smart_init':
+		allelic_counts, total_counts = load_in_ase_data(ase_file)
+		if covariate_file != 'NA':
+			cov = np.loadtxt(covariate_file)
+			cov_plus_intercept = add_intercept_column_to_matrix(cov)
+		else:
+			cov_plus_intercept = np.ones((allelic_counts.shape[0], 1))
+		ase_factorization_obj = ase_factorization_smart_init.ASE_FACTORIZATION(K=k, output_root=output_dir + '_ase_factorization', random_seed=random_seed)
+		ase_factorization_obj.fit(allelic_counts=allelic_counts, total_counts=total_counts, cov=cov_plus_intercept)
+	elif model_name == 'ase_factorization_old':
+		allelic_counts, total_counts = load_in_ase_data(ase_file)
+		if covariate_file != 'NA':
+			cov = np.loadtxt(covariate_file)
+		else:
+			cov_plus_intercept = np.ones((allelic_counts.shape[0], 1))
+		ase_factorization_obj = ase_factorization_old.ASE_FACTORIZATION(K=k, output_root=output_dir + '_ase_factorization', random_seed=random_seed)
+		ase_factorization_obj.fit(allelic_counts=allelic_counts, total_counts=total_counts, cov=cov)
 	elif model_name == 'ase_factorization_via_stan_vb':
 		allelic_counts, total_counts = load_in_ase_data(ase_file)
 		if covariate_file != 'NA':
@@ -85,6 +104,7 @@ sample_overlap_file = sys.argv[3]
 k = int(sys.argv[4])
 model_name = sys.argv[5]
 output_dir = sys.argv[6]
+random_seed = int(sys.argv[7])
 
 
-train_ase_factorization_model(ase_file, covariate_file, sample_overlap_file, k, model_name, output_dir)
+train_ase_factorization_model(ase_file, covariate_file, sample_overlap_file, k, model_name, output_dir, random_seed)

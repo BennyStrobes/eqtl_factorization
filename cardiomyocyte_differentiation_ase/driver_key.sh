@@ -36,18 +36,54 @@ sh preprocess_ase_data.sh $ase_input_data_dir $het_prob_file $annotated_samples_
 fi
 
 ase_file=$processed_data_dir"filtered_ase_counts_0.35_0.5_min_allele.txt"
-covariate_file=$processed_data_dir"covariates.txt"
 covariate_file="NA"
+covariate_file=$processed_data_dir"covariates.txt"
 sample_overlap_file=$processed_data_dir"sample_overlap.txt"
 k="3"
-model_name="ase_factorization"
 model_name="ase_factorization_via_stan_vb"
 model_name="ase_factorization_via_pymc3_vb"
 model_name="ase_factorization_via_pymc3_mvn_vb"
 model_name="ase_factorization_via_pymc3_lmm_vb"
+model_name="ase_factorization"
+model_name="ase_factorization_old"
+
 if false; then
-sbatch run_ase_factorization.sh $ase_file $covariate_file $sample_overlap_file $k $model_name $eqtl_results_dir$model_name"_cardiomyocyte_differentiation_"$k
+random_seed="2"
+model_name="ase_factorization_smart_init"
+sbatch run_ase_factorization.sh $ase_file $covariate_file $sample_overlap_file $k $model_name $eqtl_results_dir$model_name"_cardiomyocyte_differentiation_"$k"_seed_"$random_seed"_" $random_seed
+
+random_seed="3"
+model_name="ase_factorization_smart_init"
+sbatch run_ase_factorization.sh $ase_file $covariate_file $sample_overlap_file $k $model_name $eqtl_results_dir$model_name"_cardiomyocyte_differentiation_"$k"_seed_"$random_seed"_" $random_seed
 fi
+
+if false; then
+random_seed="2"
+model_name="ase_factorization"
+sbatch run_ase_factorization.sh $ase_file $covariate_file $sample_overlap_file $k $model_name $eqtl_results_dir$model_name"_cardiomyocyte_differentiation_"$k"_seed_"$random_seed"_" $random_seed
+
+random_seed="2"
+model_name="ase_factorization_old"
+sbatch run_ase_factorization.sh $ase_file $covariate_file $sample_overlap_file $k $model_name $eqtl_results_dir$model_name"_cardiomyocyte_differentiation_"$k"_seed_"$random_seed"_" $random_seed
+
+
+random_seed="3"
+model_name="ase_factorization"
+sbatch run_ase_factorization.sh $ase_file $covariate_file $sample_overlap_file $k $model_name $eqtl_results_dir$model_name"_cardiomyocyte_differentiation_"$k"_seed_"$random_seed"_" $random_seed
+
+random_seed="3"
+model_name="ase_factorization_old"
+sbatch run_ase_factorization.sh $ase_file $covariate_file $sample_overlap_file $k $model_name $eqtl_results_dir$model_name"_cardiomyocyte_differentiation_"$k"_seed_"$random_seed"_" $random_seed
+
+random_seed="4"
+model_name="ase_factorization"
+sbatch run_ase_factorization.sh $ase_file $covariate_file $sample_overlap_file $k $model_name $eqtl_results_dir$model_name"_cardiomyocyte_differentiation_"$k"_seed_"$random_seed"_" $random_seed
+
+random_seed="4"
+model_name="ase_factorization_old"
+sbatch run_ase_factorization.sh $ase_file $covariate_file $sample_overlap_file $k $model_name $eqtl_results_dir$model_name"_cardiomyocyte_differentiation_"$k"_seed_"$random_seed"_" $random_seed
+fi
+
 
 if false; then
 Rscript visualize_ase_factorization.R $eqtl_results_dir $processed_data_dir $processed_data_dir"annotated_samples.txt" $visualization_dir
