@@ -171,7 +171,7 @@ def compute_fraction_monoallelic(het_counts):
 			total_monoallelic = total_monoallelic + 1
 	return float(total_monoallelic)/total_het
 
-def filter_ase_matrix(unfiltered_ase_file, filtered_ase_file, fraction_samples, fraction_monoallelic):
+def filter_ase_matrix(unfiltered_ase_file, filtered_ase_file, fraction_samples, fraction_monoallelic_thresh):
 	f = open(unfiltered_ase_file)
 	t = open(filtered_ase_file, 'w')
 	head_count = 0
@@ -190,7 +190,7 @@ def filter_ase_matrix(unfiltered_ase_file, filtered_ase_file, fraction_samples, 
 		if len(het_indis)/float(num_samples) < fraction_samples:
 			continue
 		fraction_monoallelic = compute_fraction_monoallelic(counts[het_indis])
-		if fraction_monoallelic > .5:
+		if fraction_monoallelic > fraction_monoallelic_thresh:
 			continue
 		t.write(line + '\n')
 	f.close()
@@ -373,7 +373,7 @@ def make_covariate_file_based_on_sample_repeat_structure(annotated_samples_file,
 	t.close()
 	f.close()
 
-def sample_overlap_file(annotated_samples_file, covariate_file):
+def make_sample_overlap_file(annotated_samples_file, covariate_file):
 	f = open(annotated_samples_file)
 	indis = {}
 	head_count = 0
@@ -390,7 +390,7 @@ def sample_overlap_file(annotated_samples_file, covariate_file):
 	for indi in indis.keys():
 		indi_arr.append(indi)
 	num_indis = len(indi_arr)
-	used_indi_arr = indi_arr[:(num_indis-1)]
+	used_indi_arr = np.copy(indi_arr)
 	num_used_indis = len(used_indi_arr)
 	indi_to_pos = {}
 	for i, indi in enumerate(used_indi_arr):
@@ -404,13 +404,10 @@ def sample_overlap_file(annotated_samples_file, covariate_file):
 		if head_count == 0:
 			head_count = head_count + 1
 			continue
-		pdb.set_trace()
 		covs = np.zeros(num_used_indis)
 		indi = data[1].split('_')[0]
-		if indi in indi_to_pos:
-			pos = indi_to_pos[indi]
-			covs[pos] = 1
-		t.write('\t'.join(covs.astype(str)) + '\n')
+		pos = indi_to_pos[indi]
+		t.write(str(pos) + '\n')
 	t.close()
 	f.close()
 

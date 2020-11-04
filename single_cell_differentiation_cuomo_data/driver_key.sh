@@ -18,6 +18,9 @@ gene_annotation_file="/work-zfs/abattle4/lab_data/annotation/gencode.v19/gencode
 # Genotype PC file
 genotype_pc_file="/work-zfs/abattle4/prashanthi/sc-endo/data/genotypes/genotype_PCs.txt"
 
+g2m_cell_cycle_genes_file="/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell_differentiation_cuomo_data/input_data/cc_g2m_genes.txt"
+s_cell_cycle_genes_file="/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell_differentiation_cuomo_data/input_data/cc_s_genes.txt"
+
 
 ################################
 # Output Directories
@@ -47,9 +50,8 @@ visualize_eqtl_factorization_results_dir=$root_directory"visualize_eqtl_factoriz
 ################################
 # Pre-process data
 ################################
-if false; then
-sh preprocess_data.sh $normalized_expression_file $meta_data_file $genotype_dir $gene_annotation_file $genotype_pc_file $pre_processed_data_dir $visualize_pre_processed_data_dir
-fi
+sh preprocess_data.sh $normalized_expression_file $meta_data_file $genotype_dir $gene_annotation_file $genotype_pc_file $pre_processed_data_dir $visualize_pre_processed_data_dir $g2m_cell_cycle_genes_file $s_cell_cycle_genes_file
+
 
 
 ################################
@@ -93,12 +95,13 @@ parrallel="False"
 lasso_param_v="1"
 
 seeds=("0")
+if false; then
 for seed in "${seeds[@]}"; do
 	echo "Seed: "$seed
 	file_stem="eqtl_factorization_single_cell_sig_covariate_modulated_eqtls_top_"$num_genes"_min_expressed_cells_$transformation_type_transform_data_corrected_genotype_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed_"$lasso_param_v"_lasso_param"
 	sbatch eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_factorization_results_dir $seed $model_name $random_effects $svi $parrallel $lasso_param_v $covariate_file
 done
-
+fi
 
 ######################
 # Run eqtl-factorization on single cell data
@@ -125,13 +128,13 @@ parrallel="False"
 lasso_param_v="1"
 
 seeds=("0")
+if false; then
 for seed in "${seeds[@]}"; do
 	echo "Seed: "$seed
 	file_stem="eqtl_factorization_single_cell_sig_dynamic_eqtls_min_expressed_cells_$transformation_type_transform_data_corrected_genotype_"$num_latent_factors"_factors_"$model_name"_model_"$random_effects"_re_"$svi"_svi_"$seed"_seed_"$lasso_param_v"_lasso_param"
 	sbatch eqtl_factorization_vi.sh $sample_overlap_file $expression_training_file $genotype_training_file $expression_testing_file $genotype_testing_file $num_latent_factors $file_stem $eqtl_factorization_results_dir $seed $model_name $random_effects $svi $parrallel $lasso_param_v $covariate_file
 done
-
-
+fi
 
 if false; then
 Rscript visualize_single_cell_eqtl_factorization.R $pre_processed_data_dir $eqtl_factorization_input_dir $eqtl_factorization_results_dir $visualize_eqtl_factorization_results_dir 

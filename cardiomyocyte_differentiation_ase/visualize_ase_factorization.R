@@ -117,14 +117,14 @@ make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate <- 
 	factor_3_boxplot <- make_loading_boxplot_for_one_factor_by_categorical_covariate(covariate, real_valued_covariate, loadings[,factor_number], factor_number, covariate_name)
 
 	factor_number <- 4
-	factor_4_boxplot <- make_loading_boxplot_for_one_factor_by_categorical_covariate(covariate, real_valued_covariate, loadings[,factor_number], factor_number, covariate_name)
+	#factor_4_boxplot <- make_loading_boxplot_for_one_factor_by_categorical_covariate(covariate, real_valued_covariate, loadings[,factor_number], factor_number, covariate_name)
 
 	factor_number <- 5
-	factor_5_boxplot <- make_loading_boxplot_for_one_factor_by_categorical_covariate(covariate, real_valued_covariate, loadings[,factor_number], factor_number, covariate_name)
+	#factor_5_boxplot <- make_loading_boxplot_for_one_factor_by_categorical_covariate(covariate, real_valued_covariate, loadings[,factor_number], factor_number, covariate_name)
 
 
 
-	combined <- plot_grid(factor_1_boxplot, factor_2_boxplot, factor_3_boxplot, factor_4_boxplot, factor_5_boxplot + labs(x="Day"), ncol=1)
+	combined <- plot_grid(factor_1_boxplot, factor_2_boxplot, factor_3_boxplot+ labs(x="Day"), ncol=1)
 
 	return(combined)
 }
@@ -154,14 +154,14 @@ loading_expression_pc1_scatter_with_row_for_every_factor <- function(expression_
 	factor_3_scatterplot <- make_loading_expression_pc_scatter_for_each_factor(expression_pc, loadings[, factor_number], factor_number)
 
 	factor_number <- 4
-	factor_4_scatterplot <- make_loading_expression_pc_scatter_for_each_factor(expression_pc, loadings[, factor_number], factor_number)
+	#factor_4_scatterplot <- make_loading_expression_pc_scatter_for_each_factor(expression_pc, loadings[, factor_number], factor_number)
 
 	factor_number <- 5
-	factor_5_scatterplot <- make_loading_expression_pc_scatter_for_each_factor(expression_pc, loadings[, factor_number], factor_number)
+	#factor_5_scatterplot <- make_loading_expression_pc_scatter_for_each_factor(expression_pc, loadings[, factor_number], factor_number)
 
 
 
-	combined <- plot_grid(factor_1_scatterplot, factor_2_scatterplot, factor_3_scatterplot, factor_4_scatterplot, factor_5_scatterplot, ncol=1)
+	combined <- plot_grid(factor_1_scatterplot, factor_2_scatterplot, factor_3_scatterplot, ncol=1)
 
 
 	return(combined)
@@ -293,13 +293,12 @@ covariates <- read.table(covariate_file, header=TRUE, sep="\t", comment.char="",
 num_cov = dim(covariates)[2]
 covariates = covariates[,3:num_cov]
 
-print(summary(covariates))
 
-loading_file <- paste0(eqtl_results_dir, "cardiomyocyte_differentiation_5_with_cov_ase_factorization_temper_U.txt")
+loading_file <- paste0(eqtl_results_dir, "ase_factorization_via_pymc3_lmm_vb_cardiomyocyte_differentiation_3_ase_factorization11_temper_U.txt")
 loadings <- read.table(loading_file, header=FALSE)
 
 
-output_stem <- "cardiomyocyte_differentiation_k_5_"
+output_stem <- "cardiomyocyte_differentiation_pymc3_k_3_"
 
 # Create UMAP factors
 umap_loadings = umap(loadings)$layout

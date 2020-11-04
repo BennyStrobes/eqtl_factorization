@@ -2,6 +2,7 @@ import numpy as np
 import os
 import sys
 import pdb
+import scanpy
 
 def standardize_expression(normalized_expression_file, standardized_gene_expression_file):
 	f = open(normalized_expression_file)
@@ -345,6 +346,17 @@ def get_dictionary_list_of_individuals_that_we_have_genotype_for(genotype_file):
 	f.close()
 	return individuals
 
+def get_cell_cycle_scores_with_scanpy(normalized_expression_file, g2m_cell_cycle_genes_file, s_cell_cycle_genes_file, output_file):
+	adata = scanpy.read(normalized_expression_file).transpose()
+	scanpy.pp.scale(adata, max_value=10)
+
+	# Load in cc genes
+	g2m_genes = np.loadtxt(g2m_cell_cycle_genes_file, dtype=str, delimiter='\n')
+	s_genes = np.loadtxt(s_cell_cycle_genes_file, dtype=str, delimiter='\n')
+	scanpy.tl.score_genes_cell_cycle(adata, s_genes, g2m_genes)
+	adata.obs['cell_id'] = adata.obs.index
+	np.savetxt(output_file, np.asarray(adata.obs), fmt="%s", delimiter='\t', header='\t'.join(adata.obs.columns), comments='')
+
 
 normalized_expression_file = sys.argv[1]
 meta_data_file = sys.argv[2]
@@ -352,7 +364,31 @@ genotype_file = sys.argv[3]
 gene_annotation_file = sys.argv[4]
 genotype_pc_file = sys.argv[5]
 pre_processed_data_dir = sys.argv[6]
+g2m_cell_cycle_genes_file = sys.argv[7]
+s_cell_cycle_genes_file = sys.argv[8]
 
+new_normalized_expression_file = pre_processed_data_dir + 'normalized_expression2.txt'
+'''
+f = open(normalized_expression_file)
+t = open(new_normalized_expression_file, 'w')
+head_count = 0
+for line in f:
+	line = line.rstrip()
+	data = line.split('\t')
+	if head_count == 0:
+		head_count = head_count + 1
+		t.write(line + '\n')
+		continue
+	new_gene = data[0].split('_')[1]
+	t.write(new_gene + '\t' + '\t'.join(data[1:]) + '\n')
+t.close()
+f.close()
+print('done')
+'''
+############################
+get_cell_cycle_scores_with_scanpy(new_normalized_expression_file, g2m_cell_cycle_genes_file, s_cell_cycle_genes_file, pre_processed_data_dir + 'cell_cycle_scores.txt')
+
+'''
 ##############################
 # Extract dictionary list of protein coding ensamble ids
 protein_coding_genes = extract_dictionary_list_of_protein_coding_ensamble_ids(gene_annotation_file)
@@ -459,3 +495,4 @@ pca_loading_file = pre_processed_data_dir + 'standardized_normalized_top_' + str
 pca_pve_file = pre_processed_data_dir + 'standardized_normalized_top_' + str(nn) + '_variable_genes_expression_pca_pve.txt'
 top_n_variable_genes_standardized_gene_expression_file = pre_processed_data_dir + 'standardized_normalized_expression_all_cells_top_' + str(nn) + '_variable_genes.txt'
 generate_pca_scores_and_variance_explained(top_n_variable_genes_standardized_gene_expression_file, num_pcs, pca_loading_file, pca_pve_file)
+'''

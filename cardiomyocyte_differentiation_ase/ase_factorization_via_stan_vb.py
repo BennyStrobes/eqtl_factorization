@@ -7,10 +7,10 @@ import pickle
 
 
 # BB_GLM = pystan.StanModel(file = "betabinomial_glm.stan")
-BB_GLM = pickle.load(open('/work-zfs/abattle4/bstrober/temp/betabinomial_glm.pkl', 'rb'))
+#BB_GLM = pickle.load(open('/work-zfs/abattle4/bstrober/temp/betabinomial_glm.pkl', 'rb'))
 # BB_GLM_FIXED_CONC = pystan.StanModel(file = "betabinomial_glm_fixed_conc.stan")
-BB_GLM_FIXED_CONC = pickle.load(open('/work-zfs/abattle4/bstrober/temp/betabinomial_glm_fixed_conc.pkl', 'rb'))
-
+#BB_GLM_FIXED_CONC = pickle.load(open('/work-zfs/abattle4/bstrober/temp/betabinomial_glm_fixed_conc.pkl', 'rb'))
+BB_FACTORIZATION = pystan.StanModel(file='/work-zfs/abattle4/bstrober/temp/ase_factorization.stan')
 
 class ASE_FACTORIZATION(object):
 	def __init__(self, K=5, concShape=1.0001, concRate=1e-4, max_iter=1000, output_root='temp'):
@@ -28,36 +28,36 @@ class ASE_FACTORIZATION(object):
 		self.total_counts = total_counts
 		self.cov = cov
 		self.initialize_variables()
-		for vi_iter in range(self.max_iter):
-			self.update_V_and_conc()
-			self.update_U()
-			# Save to output every five iters
-			if np.mod(vi_iter, 5) == 0: 
-				np.savetxt(self.output_root + '_iter.txt', np.asmatrix(vi_iter), fmt="%s", delimiter='\t')
-				np.savetxt(self.output_root + '_temper_U.txt', (self.U), fmt="%s", delimiter='\t')
-				np.savetxt(self.output_root + '_temper_V.txt', (self.V), fmt="%s", delimiter='\t')
-				np.savetxt(self.output_root + '_temper_conc.txt', (self.conc), fmt="%s", delimiter='\t')
+		
+
+  		N = self.allelic_counts.shape[0]
+  		T = self.allelic_counts.shape[1]
+
+		data = dict(N=N, T=T, K=self.K, num_cov=self.num_cov, cov=self.cov, ys=np.transpose(self.allelic_counts.astype(int)), ns=np.transpose(self.total_counts.astype(int)), concShape=self.concShape, concRate=self.concRate)
+		print("START")
+		aa = BB_FACTORIZATION.vb(data=data)
+		pickle.dump(aa, open(self.output_root + '_model', 'wb'))
+
 
 	def update_U(self):
 		covariate_predicted = np.dot(self.cov, self.C)
 		for sample_iter in range(self.N):
 			observed_indices = np.isnan(self.allelic_counts[sample_iter,:]) == False
-			merged_intercept = self.V[0,:] + covariate_predicted[sample_iter, :]
-			data = dict(N=sum(observed_indices), P=self.U.shape[1], x=np.transpose(self.V[1:,observed_indices]), intercept=merged_intercept[observed_indices], ys=self.allelic_counts[sample_iter, observed_indices].astype(int), ns=self.total_counts[sample_iter, observed_indices].astype(int), conc=self.conc[observed_indices])
+			merged_intercept = covariate_predicted[sample_iter, :]
+			data = dict(N=sum(observed_indices), P=self.U.shape[1], x=np.transpose(self.V[:,observed_indices]), intercept=merged_intercept[observed_indices], ys=self.allelic_counts[sample_iter, observed_indices].astype(int), ns=self.total_counts[sample_iter, observed_indices].astype(int), conc=self.conc[observed_indices])
 			########################################
 			# Initialize
 			beta_init = np.zeros(data['P'])
 			init = dict(beta=beta_init)
 			########################################
 			# Run optimization
-			pdb.set_trace()
 			op = BB_GLM_FIXED_CONC.optimizing(data = data, verbose=False,iter=5000,seed=1, init=init)
 			self.U[sample_iter, :] = op['beta']
 
 	def update_V_and_conc(self):
 		# Add column of ones (intercept to U)
-		X0 = np.ones((self.N,1))
-		U_new = np.hstack((X0, self.U, self.cov))
+		#U_new = np.hstack((X0, self.U, self.cov))
+		U_new = np.hstack((self.cov, self.U))
 		for test_iter in range(self.T):
 			observed_indices = np.isnan(self.allelic_counts[:,test_iter]) == False
 			data = dict(N=sum(observed_indices), P=U_new.shape[1], x=U_new[observed_indices,:], ys=self.allelic_counts[observed_indices, test_iter].astype(int), ns=self.total_counts[observed_indices, test_iter].astype(int), concShape=self.concShape, concRate=self.concRate)
@@ -76,10 +76,11 @@ class ASE_FACTORIZATION(object):
 			########################################
 			# Run optimization
 			op = BB_GLM.optimizing(data = data, verbose=False,iter=5000,seed=1, init=init)
-			self.V[:, test_iter] = op['beta'][:(self.K+1)]
-			self.C[:, test_iter] = op['beta'][(self.K+1):]
+			#sampling_fit = BB_GLM.sampling(data=data, init=init)
+			#aa = BB_GLM.vb(data=data, init=init)
+			self.C[:, test_iter] = op['beta'][:(self.num_cov)]
+			self.V[:, test_iter] = op['beta'][(self.num_cov):]
 			self.conc[test_iter] = np.asmatrix(op['conc'])[0,0]
-			pdb.set_trace()
 
 	def initialize_variables(self):
 		self.N = self.allelic_counts.shape[0]
@@ -87,6 +88,15 @@ class ASE_FACTORIZATION(object):
 		self.num_cov = self.cov.shape[1]
 		# Randomly initialize (only U matters)
 		self.U = np.random.randn(self.N, self.K)
-		self.V = np.random.randn((self.K + 1), self.T)  # plus 1 for intercept
+		self.V = np.random.randn(self.K, self.T)  # plus 1 for intercept
 		self.conc = np.random.randn(self.T)
 		self.C = np.random.randn(self.num_cov, self.T)
+
+		for n in range(self.N):
+			for t in range(self.T):
+				if np.isnan(self.allelic_counts[n,t]) or np.isnan(self.total_counts[n,t]):
+					self.allelic_counts[n,t] = 0
+					self.total_counts[n,t] = 0
+
+
+

@@ -5,7 +5,7 @@ library(cowplot)
 library(umap)
 library(ggplot2)
 library(RColorBrewer)
-library(rhdf5)
+#library(rhdf5)
 
 options(bitmapType = 'cairo', device = 'pdf')
 
@@ -157,7 +157,7 @@ make_covariate_loading_correlation_heatmap <- function(covariates, loadings) {
  	cov_names <- colnames(covariates)[valid_covariates]
  	num <- length(cov_names)
 
-
+ 	print(cov_names)
 
   	covs <- covariates[,valid_covariates]
 	#covs <- covariates
@@ -166,17 +166,17 @@ make_covariate_loading_correlation_heatmap <- function(covariates, loadings) {
     # Initialize PVE heatmap
     factor_colnames <- paste0("Factor", 1:(dim(loadings)[2]))
     factor_rownames <- colnames(covs)
-    pve_map <- matrix(0, dim(covs)[2], dim(loadings)[2])
+    pve_map <- matrix(0, dim(covs)[2] + 2, dim(loadings)[2])
     colnames(pve_map) <- factor_colnames
-    rownames(pve_map) <- colnames(covs)
+    rownames(pve_map) <- c(colnames(covs), "experiment+day", "experiment+pseudotime")
 
 
     # Loop through each PC, COV Pair and take correlation
     num_pcs <- dim(loadings)[2]
     num_covs <- dim(covs)[2]
     for (num_pc in 1:num_pcs) {
+    	pc_vec <- loadings[,num_pc]
         for (num_cov in 1:num_covs) {
-            pc_vec <- loadings[,num_pc]
             cov_vec <- covs[,num_cov]
             if (covariate_type[num_cov] == "cat") {
             #print(cov_vec[1:10])
@@ -186,6 +186,11 @@ make_covariate_loading_correlation_heatmap <- function(covariates, loadings) {
         	}
             pve_map[num_cov, num_pc] <- summary(lin_model)$adj.r.squared
         }
+        lin_model <- lm(pc_vec ~ factor(covs[,4]) + covs[,2])
+        pve_map[(num_covs+1), num_pc] <- summary(lin_model)$adj.r.squared
+
+       	lin_model <- lm(pc_vec ~ factor(covs[,4]) + covs[,38])
+        pve_map[(num_covs+2), num_pc] <- summary(lin_model)$adj.r.squared
     }
     
     ord <- hclust( dist(scale(pve_map), method = "euclidean"), method = "ward.D" )$order

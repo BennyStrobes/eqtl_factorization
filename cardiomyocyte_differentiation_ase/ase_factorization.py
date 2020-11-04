@@ -20,12 +20,13 @@ class ASE_FACTORIZATION(object):
 		self.concRate = concRate
 		self.iter = 0
 		self.output_root = output_root
-	def fit(self, allelic_counts, total_counts):
+	def fit(self, allelic_counts, total_counts, cov):
 		""" Fit the model.
 			Args:
 		"""
 		self.allelic_counts = allelic_counts
 		self.total_counts = total_counts
+		self.cov = cov
 		self.initialize_variables()
 		for vi_iter in range(self.max_iter):
 			self.update_V_and_conc()
@@ -38,9 +39,11 @@ class ASE_FACTORIZATION(object):
 				np.savetxt(self.output_root + '_temper_conc.txt', (self.conc), fmt="%s", delimiter='\t')
 
 	def update_U(self):
+		covariate_predicted = np.dot(self.cov, self.C)
 		for sample_iter in range(self.N):
 			observed_indices = np.isnan(self.allelic_counts[sample_iter,:]) == False
-			data = dict(N=sum(observed_indices), P=self.U.shape[1], x=np.transpose(self.V[1:,observed_indices]), intercept=self.V[0,observed_indices], ys=self.allelic_counts[sample_iter, observed_indices].astype(int), ns=self.total_counts[sample_iter, observed_indices].astype(int), conc=self.conc[observed_indices])
+			merged_intercept = covariate_predicted[sample_iter, :]
+			data = dict(N=sum(observed_indices), P=self.U.shape[1], x=np.transpose(self.V[:,observed_indices]), intercept=merged_intercept[observed_indices], ys=self.allelic_counts[sample_iter, observed_indices].astype(int), ns=self.total_counts[sample_iter, observed_indices].astype(int), conc=self.conc[observed_indices])
 			########################################
 			# Initialize
 			beta_init = np.zeros(data['P'])
@@ -52,8 +55,8 @@ class ASE_FACTORIZATION(object):
 
 	def update_V_and_conc(self):
 		# Add column of ones (intercept to U)
-		X0 = np.ones((self.N,1))
-		U_new = np.hstack((X0, self.U))
+		#U_new = np.hstack((X0, self.U, self.cov))
+		U_new = np.hstack((self.cov, self.U))
 		for test_iter in range(self.T):
 			observed_indices = np.isnan(self.allelic_counts[:,test_iter]) == False
 			data = dict(N=sum(observed_indices), P=U_new.shape[1], x=U_new[observed_indices,:], ys=self.allelic_counts[observed_indices, test_iter].astype(int), ns=self.total_counts[observed_indices, test_iter].astype(int), concShape=self.concShape, concRate=self.concRate)
@@ -72,13 +75,18 @@ class ASE_FACTORIZATION(object):
 			########################################
 			# Run optimization
 			op = BB_GLM.optimizing(data = data, verbose=False,iter=5000,seed=1, init=init)
-			self.V[:, test_iter] = op['beta']
+			#sampling_fit = BB_GLM.sampling(data=data, init=init)
+			#aa = BB_GLM.vb(data=data, init=init)
+			self.C[:, test_iter] = op['beta'][:(self.num_cov)]
+			self.V[:, test_iter] = op['beta'][(self.num_cov):]
 			self.conc[test_iter] = np.asmatrix(op['conc'])[0,0]
 
 	def initialize_variables(self):
 		self.N = self.allelic_counts.shape[0]
 		self.T = self.allelic_counts.shape[1]
+		self.num_cov = self.cov.shape[1]
 		# Randomly initialize (only U matters)
 		self.U = np.random.randn(self.N, self.K)
-		self.V = np.random.randn((self.K + 1), self.T)  # plus 1 for intercept
+		self.V = np.random.randn(self.K, self.T) 
 		self.conc = np.random.randn(self.T)
+		self.C = np.random.randn(self.num_cov, self.T)
