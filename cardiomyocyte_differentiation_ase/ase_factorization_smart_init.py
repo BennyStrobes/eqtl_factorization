@@ -32,6 +32,7 @@ class ASE_FACTORIZATION(object):
 		for vi_iter in range(self.max_iter):
 			self.update_U()
 			self.update_V_and_conc()
+			self.iter = self.iter + 1
 			# Save to output every five iters
 			if np.mod(vi_iter, 5) == 0: 
 				np.savetxt(self.output_root + '_iter.txt', np.asmatrix(vi_iter), fmt="%s", delimiter='\t')
@@ -47,7 +48,10 @@ class ASE_FACTORIZATION(object):
 			data = dict(N=sum(observed_indices), P=self.U.shape[1], x=np.transpose(self.V[:,observed_indices]), intercept=merged_intercept[observed_indices], ys=self.allelic_counts[sample_iter, observed_indices].astype(int), ns=self.total_counts[sample_iter, observed_indices].astype(int), conc=self.conc[observed_indices])
 			########################################
 			# Initialize
-			beta_init = np.zeros(data['P'])
+			if self.iter == 0:
+				beta_init = np.zeros(data['P'])
+			else:
+				beta_init = np.copy(self.U[sample_iter, :])
 			init = dict(beta=beta_init)
 			########################################
 			# Run optimization
@@ -92,6 +96,7 @@ class ASE_FACTORIZATION(object):
 			data = dict(N=sum(observed_indices), P=U_new.shape[1], x=U_new[observed_indices,:], ys=self.allelic_counts[observed_indices, test_iter].astype(int), ns=self.total_counts[observed_indices, test_iter].astype(int), concShape=self.concShape, concRate=self.concRate)
 			########################################
 			# Get MOM estimates for initialization
+			'''
 			rat = data['ys']/data['ns'].astype(float)
 			if np.sum(np.isnan(rat)) > 0:
 				pdb.set_trace()
@@ -101,6 +106,9 @@ class ASE_FACTORIZATION(object):
 			m_init = min(max(np.mean(rat), 1.0/1000 ), 1.0-(1.0/1000))
 			beta_init = np.zeros(data['P'])
 			beta_init[0] = np.log(m_init/(1.0-m_init))
+			'''
+			conc_init = self.conc[test_iter]
+			beta_init = np.hstack((self.C[:, test_iter], self.V[:, test_iter]))
 			init = dict(conc=conc_init, beta=beta_init)
 			########################################
 			# Run optimization

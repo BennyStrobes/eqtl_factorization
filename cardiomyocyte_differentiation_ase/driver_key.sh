@@ -47,17 +47,13 @@ model_name="ase_factorization_via_pymc3_lmm_vb"
 model_name="ase_factorization"
 model_name="ase_factorization_old"
 
-if false; then
-random_seed="4"
-model_name="ase_factorization_smart_init"
-sbatch run_ase_factorization.sh $ase_file $covariate_file $sample_overlap_file $k $model_name $eqtl_results_dir$model_name"_cardiomyocyte_differentiation_"$k"_seed_"$random_seed"_" $random_seed
 
-random_seed="5"
+random_seed="7"
 model_name="ase_factorization_smart_init"
-sbatch run_ase_factorization.sh $ase_file $covariate_file $sample_overlap_file $k $model_name $eqtl_results_dir$model_name"_cardiomyocyte_differentiation_"$k"_seed_"$random_seed"_" $random_seed
-fi
-
 if false; then
+sbatch run_ase_factorization.sh $ase_file $covariate_file $sample_overlap_file $k $model_name $eqtl_results_dir$model_name"_iterative_init_cardiomyocyte_differentiation_"$k"_seed_"$random_seed"_" $random_seed
+
+
 random_seed="2"
 model_name="ase_factorization"
 sbatch run_ase_factorization.sh $ase_file $covariate_file $sample_overlap_file $k $model_name $eqtl_results_dir$model_name"_cardiomyocyte_differentiation_"$k"_seed_"$random_seed"_" $random_seed
@@ -83,7 +79,6 @@ random_seed="4"
 model_name="ase_factorization_old"
 sbatch run_ase_factorization.sh $ase_file $covariate_file $sample_overlap_file $k $model_name $eqtl_results_dir$model_name"_cardiomyocyte_differentiation_"$k"_seed_"$random_seed"_" $random_seed
 fi
-
 
 module load R/3.5.1
 Rscript visualize_ase_factorization.R $eqtl_results_dir $processed_data_dir $processed_data_dir"annotated_samples.txt" $visualization_dir
