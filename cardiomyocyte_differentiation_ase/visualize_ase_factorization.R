@@ -294,11 +294,11 @@ num_cov = dim(covariates)[2]
 covariates = covariates[,3:num_cov]
 
 
-loading_file <- paste0(eqtl_results_dir, "ase_factorization_via_pymc3_lmm_vb_cardiomyocyte_differentiation_3_ase_factorization11_temper_U.txt")
+loading_file <- paste0(eqtl_results_dir, "ase_factorization_smart_init_cardiomyocyte_differentiation_3_seed_5__ase_factorization_temper_U.txt")
 loadings <- read.table(loading_file, header=FALSE)
 
 
-output_stem <- "cardiomyocyte_differentiation_pymc3_k_3_"
+output_stem <- "cardiomyocyte_differentiation_stan_smart_init_seed_5_k_3_"
 
 # Create UMAP factors
 umap_loadings = umap(loadings)$layout
