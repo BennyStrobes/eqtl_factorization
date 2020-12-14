@@ -49,22 +49,21 @@ def regress_out_cell_line(scaled_rat, Z_mat):
 		final_rat[valid_row_indices,column_index] = scaled_rat[valid_row_indices,column_index] - predicted
 	return final_rat
 
-def outside_update_V_t(U_new, ys, ns, concShape, concRate, itera, conc_init, C_init, V_init):
+def outside_update_V_t(U_new, ys, ns, concShape, concRate, itera, fixed_conc):
 	observed_indices = np.isnan(ys) == False
-	data = dict(N=sum(observed_indices), P=U_new.shape[1], x=U_new[observed_indices,:], ys=ys[observed_indices].astype(int), ns=ns[observed_indices].astype(int), concShape=concShape, concRate=concRate)
+	data = dict(N=sum(observed_indices), P=U_new.shape[1],intercept=np.zeros(sum(observed_indices)), x=U_new[observed_indices,:], ys=ys[observed_indices].astype(int), ns=ns[observed_indices].astype(int), conc=np.ones(sum(observed_indices))*fixed_conc)
 	########################################
 	# Get MOM estimates for initialization
 	rat = data['ys']/data['ns'].astype(float)
 	if np.sum(np.isnan(rat)) > 0:
 		pdb.set_trace()
 	# moment estimator of concentration parameter
-	mom_conc_init = min(1.0/np.var(rat), 1000.0)
+	#mom_conc_init = min(1.0/np.var(rat), 1000.0)
 	# thresholded moment estimator of the mean 
 	m_init = min(max(np.mean(rat), 1.0/1000 ), 1.0-(1.0/1000))
 	beta_init = np.zeros(data['P'])
 	beta_init[0] = np.log(m_init/(1.0-m_init))
-	init = dict(conc=mom_conc_init, beta=beta_init)
-	pdb.set_trace()
+	init = dict(beta=beta_init)
 	'''
 	if itera == 0:
 		rat = data['ys']/data['ns'].astype(float)
@@ -82,24 +81,23 @@ def outside_update_V_t(U_new, ys, ns, concShape, concRate, itera, conc_init, C_i
 	'''
 	########################################
 	# Run optimization
-	
 	try:
 		with suppress_stdout_stderr():
-			op = BB_GLM.optimizing(data = data, verbose=False,iter=5000,seed=1, init=init)
+			op = BB_GLM_FIXED_CONC.optimizing(data = data, verbose=False,iter=5000,seed=1, init=init)
 	except RuntimeError:
 		try: 
-			op = BB_GLM.optimizing(data = data, verbose=False,iter=5000,seed=1)
+			op = BB_GLM_FIXED_CONC.optimizing(data = data, verbose=False,iter=5000,seed=1)
 		except RuntimeError:
 			try:
-				op = BB_GLM.optimizing(data = data, verbose=False,iter=5000,seed=1, algorithm="Newton")
+				op = BB_GLM_FIXED_CONC.optimizing(data = data, verbose=False,iter=5000,seed=1, algorithm="Newton")
 			except RuntimeError:
 				try:
-					op = BB_GLM.optimizing(data = data, verbose=False,iter=5000,seed=2, algorithm="Newton")
+					op = BB_GLM_FIXED_CONC.optimizing(data = data, verbose=False,iter=5000,seed=2, algorithm="Newton")
 				except RuntimeError:
 					print('error')
 					pdb.set_trace()
-	return np.hstack((op['conc'],op['beta']))
-	
+	return op['beta']
+
 
 class suppress_stdout_stderr(object):
     '''
@@ -151,12 +149,11 @@ class ASE_FACTORIZATION(object):
 		for vi_iter in range(self.max_iter):
 			print('ITERATION ' + str(self.iter))
 			self.update_V_and_conc()
-			print('halfway:)')
 			self.update_U()
 			# Save to output every five iters
 			if np.mod(vi_iter, 30) == 0: 
 				np.savetxt(self.output_root + '_iter.txt', np.asmatrix(vi_iter), fmt="%s", delimiter='\t')
-				np.savetxt(self.output_root +'_temper_U.txt', (self.U), fmt="%s", delimiter='\t')
+				np.savetxt(self.output_root + str(vi_iter) +'_temper_U.txt', (self.U), fmt="%s", delimiter='\t')
 				np.savetxt(self.output_root + '_temper_V.txt', (self.V), fmt="%s", delimiter='\t')
 				np.savetxt(self.output_root + '_temper_conc.txt', (self.conc), fmt="%s", delimiter='\t')
 			self.iter = self.iter + 1
@@ -199,21 +196,21 @@ class ASE_FACTORIZATION(object):
 	def update_V_and_conc(self):
 		# Add column of ones (intercept to U)
 		#U_new = np.hstack((X0, self.U, self.cov))
-		parrallel = False
+		parrallel = True
 		V_update_data = []
 		if parrallel == False:
 			U_new = np.hstack((self.cov, self.U))
 			for test_index in range(self.T):
 				print(test_index)
-				V_update_data.append(outside_update_V_t(U_new, self.allelic_counts[:, test_index], self.total_counts[:, test_index], self.concShape, self.concRate, self.iter, self.conc[test_index], self.C[:, test_index], self.V[:, test_index]))
+				V_update_data.append(outside_update_V_t(U_new, self.allelic_counts[:, test_index], self.total_counts[:, test_index], self.concShape, self.concRate, self.iter, self.conc[test_index]))
 		elif parrallel == True:
 			U_new = np.hstack((self.cov, self.U))
-			V_update_data = Parallel(n_jobs=24)(delayed(outside_update_V_t)(U_new, self.allelic_counts[:, test_index], self.total_counts[:, test_index], self.concShape, self.concRate, self.iter, self.conc[test_index], self.C[:, test_index], self.V[:, test_index]) for test_index in range(self.T))
-		V_update_data = np.asarray(V_update_data)
-		V_update_data_2 = np.transpose(V_update_data[:,1:])
-		self.conc = V_update_data[:,0]
-		self.C = V_update_data_2[:(self.num_cov), :]
-		self.V = V_update_data_2[(self.num_cov):, :]
+			V_update_data = Parallel(n_jobs=24)(delayed(outside_update_V_t)(U_new, self.allelic_counts[:, test_index], self.total_counts[:, test_index], self.concShape, self.concRate, self.iter, self.conc[test_index]) for test_index in range(self.T))
+		V_update_data = np.transpose(np.asarray(V_update_data))
+		#V_update_data_2 = np.transpose(V_update_data[:,1:])
+		#self.conc = V_update_data[:,0]
+		self.C = V_update_data[:(self.num_cov), :]
+		self.V = V_update_data[(self.num_cov):, :]
 
 	def initialize_variables(self):
 		self.N = self.allelic_counts.shape[0]
@@ -222,7 +219,8 @@ class ASE_FACTORIZATION(object):
 		# Randomly initialize (only U matters)
 		self.U = np.random.randn(self.N, self.K)
 		self.V = np.random.randn(self.K, self.T) 
-		self.conc = np.random.randn(self.T)
+		mom_conc_init = 1.0/np.nanvar(self.allelic_counts/self.total_counts)
+		self.conc = np.ones(self.T)*mom_conc_init
 		self.C = np.random.randn(self.num_cov, self.T)
 		ppca_init = False
 		if ppca_init == True:

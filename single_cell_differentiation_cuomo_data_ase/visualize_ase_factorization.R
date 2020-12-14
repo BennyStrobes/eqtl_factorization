@@ -89,12 +89,27 @@ make_loading_boxplot_plot_by_categorical_covariate <- function(covariates, loadi
 
 make_loading_expression_pc_scatter_for_each_factor <- function(expression_pc, loading, factor_number, x_axis_label) {
 	df <- data.frame(expression_pc=expression_pc, loading=loading)
+	print(factor_number)
+	print(cor(expression_pc, loading)*cor(expression_pc, loading))
+
 	plotter <- ggplot(df, aes(x=expression_pc, y=loading)) + 
 	           geom_point(size=.001, alpha=.35) +
 	           gtex_v8_figure_theme() + 
 	           labs(x=x_axis_label, y = paste0("Loading ", factor_number)) + 
 	           theme(legend.text = element_text(size=8), legend.title = element_text(size=8)) +
 	           geom_smooth()
+	return(plotter)
+
+}
+
+make_loading_cov_cov_scatter_colored_by_loadings_for_each_factor <- function(cov1, cov2, loading, factor_number, x_axis_label, y_axis_label) {
+	df <- data.frame(cov1=cov1, cov2=cov2, loading=loading)
+	plotter <- ggplot(df, aes(x=cov1, y=cov2, color=loading)) + 
+	           geom_point(size=.001) +
+	           gtex_v8_figure_theme() + 
+	           labs(x=x_axis_label, y = y_axis_label) + 
+	           scale_colour_gradient(low = "yellow", high = "red", na.value = NA) +
+	           theme(legend.text = element_text(size=8), legend.title = element_text(size=8)) 
 	return(plotter)
 
 }
@@ -123,6 +138,33 @@ loading_expression_pc1_scatter_with_row_for_every_factor <- function(expression_
 
 
 	return(combined)
+}
+
+loading_cov_cov_scatter_colored_by_loadings_with_row_for_every_factor <- function(cov1, cov2, loadings, x_axis_label, y_axis_label) {
+	factor_number <- 1
+	factor_1_scatterplot <- make_loading_cov_cov_scatter_colored_by_loadings_for_each_factor(cov1, cov2, loadings[, factor_number], factor_number, x_axis_label, y_axis_label)
+
+
+	factor_number <- 2
+	factor_2_scatterplot <- make_loading_cov_cov_scatter_colored_by_loadings_for_each_factor(cov1, cov2, loadings[, factor_number], factor_number, x_axis_label, y_axis_label)
+
+
+	factor_number <- 3
+	factor_3_scatterplot <- make_loading_cov_cov_scatter_colored_by_loadings_for_each_factor(cov1, cov2, loadings[, factor_number], factor_number, x_axis_label, y_axis_label)
+
+	factor_number <- 4
+	#factor_4_scatterplot <- make_loading_expression_pc_scatter_for_each_factor(expression_pc, loadings[, factor_number], factor_number, x_axis_label)
+
+	factor_number <- 5
+	#factor_5_scatterplot <- make_loading_expression_pc_scatter_for_each_factor(expression_pc, loadings[, factor_number], factor_number, x_axis_label)
+
+
+
+	combined <- plot_grid(factor_1_scatterplot, factor_2_scatterplot, factor_3_scatterplot, ncol=1)
+
+
+	return(combined)
+
 }
 
 
@@ -262,8 +304,8 @@ make_covariate_loading_correlation_heatmap <- function(covariates, loadings) {
     print(summary(covariates))
     #valid_covariates <- 2:85
     #covs <- covariates[,valid_covariates]
-    valid_covariates <- c(6, 7, 8, 10, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 31, 32, 33, 36, 37, 38, 40, 41, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54,55, 56, 57, 58, 59, 60, 69, 71, 77, 78, 79, 80, 81,83, 87, 95, 96, 97,98,99,100, 101,102,103, 104, 105)
- 	covariate_type <- c("num", "cat", "cat", "cat", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "cat", "num", "num", "num", "num", "num", "num", "num", "cat", "num", "num", "num", "num", "num", "num", "cat","num","num", "num", "cat", "num")
+    valid_covariates <- c(6, 7, 8, 10, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 31, 32, 33, 36, 37, 38, 40, 41, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54,55, 56, 57, 58, 59, 60, 69, 71, 77, 78, 79, 80, 81,83, 87, 95, 96, 97,98,99,100, 101,102,103, 104, 105, 106, 107, 108, 109, 110, 111, 112)
+ 	covariate_type <- c("num", "cat", "cat", "cat", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "cat", "num", "num", "num", "num", "num", "num", "num", "cat", "num", "num", "num", "num", "num", "num", "cat","num","num","num", "num", "num", "num", "num", "num", "num", "num", "cat", "num")
 
  	num_cov = length(valid_covariates)
  	for (iter in 1:num_cov) {
@@ -450,18 +492,17 @@ covariates <- read.table(covariate_file, header=TRUE, sep="\t", comment.char="",
 
 #go_loadings <- read.table(go_loadings_file, header=TRUE, sep="\t", comment.char="", quote="")
 
-loading_file <- paste0(eqtl_results_dir, "ase_factorization_via_pymc3_double_lmm_vb_subsampled_small_donor_and_experiment_endoderm_differentiation_3_ase_factorization10_temper_U.txt")
+loading_file <- paste0(eqtl_results_dir, "ase_factorization_via_pca_non_min_counts_regress_out_cell_line_subsampled_high_biallelic_fraction_only_endoderm_differentiation_3_ase_factorization3_temper_U.txt")
 loadings <- read.table(loading_file, header=FALSE)
 
 
-output_stem <- "endoderm_differentiation_pymc3_k_3_"
+output_stem <- "endoderm_differentiation_pca_non_min_k_3_"
 
 # Create UMAP factors
 umap_loadings = umap(loadings)$layout
 saveRDS( umap_loadings, "umap_loadings.rds")
 #print("UMAP DONE")
 #umap_loadings <- readRDS("umap_loadings.rds")
-
 
 
 ######################################
@@ -488,33 +529,36 @@ output_file <- paste0(visualization_dir, output_stem, "umap_loading_scatter_colo
 #umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$day, umap_loadings, "Day")
 #ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
 
-output_file <- paste0(visualization_dir, "boxplot_colored_by_plate_id.pdf")
+output_file <- paste0(visualization_dir, output_stem, "boxplot_colored_by_plate_id.pdf")
 plate_id_categorical_boxplot = make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate(factor(covariates$plate_id), loadings, "plate_id")
 ggsave(plate_id_categorical_boxplot, file=output_file, width=7.2, height=7.0, units="in")
 
-output_file <- paste0(visualization_dir, "boxplot_colored_by_plate_id.pdf")
+output_file <- paste0(visualization_dir, output_stem, "boxplot_colored_by_plate_id.pdf")
 plate_id_categorical_boxplot = make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate(factor(covariates$plate_id), loadings, "plate_id")
 ggsave(plate_id_categorical_boxplot, file=output_file, width=7.2, height=7.0, units="in")
 
-output_file <- paste0(visualization_dir, "boxplot_colored_by_indi_id.pdf")
+output_file <- paste0(visualization_dir, output_stem, "boxplot_colored_by_indi_id.pdf")
 indi_categorical_boxplot = make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate(covariates$donor_long_id, loadings, "Individual")
 ggsave(indi_categorical_boxplot, file=output_file, width=7.2, height=7.0, units="in")
 
-output_file <- paste0(visualization_dir, "boxplot_colored_by_experiment_day.pdf")
+output_file <- paste0(visualization_dir, output_stem, "boxplot_colored_by_experiment_day.pdf")
 exp_day_categorical_boxplot = make_loading_boxplot_plot_with_row_for_every_factor_by_2_categorical_covariates(factor(paste0(covariates$experiment,"_",covariates$day)), factor(covariates$day), loadings, "Experiment_day")
 ggsave(exp_day_categorical_boxplot, file=output_file, width=7.2, height=7.0, units="in")
 
-output_file <- paste0(visualization_dir, "boxplot_colored_by_experiment_day2.pdf")
+output_file <- paste0(visualization_dir, output_stem, "boxplot_colored_by_experiment_day2.pdf")
 exp_day_categorical_boxplot = make_loading_boxplot_plot_with_row_for_every_factor_by_2_categorical_covariates(factor(paste0(covariates$experiment,"_",covariates$day)), factor(covariates$experiment), loadings, "Experiment_day")
 ggsave(exp_day_categorical_boxplot, file=output_file, width=7.2, height=7.0, units="in")
 
-output_file <- paste0(visualization_dir, "boxplot_colored_by_experiment.pdf")
+output_file <- paste0(visualization_dir, output_stem, "boxplot_colored_by_experiment.pdf")
 experiment_categorical_boxplot = make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate(covariates$experiment, loadings, "Experiment")
 ggsave(experiment_categorical_boxplot, file=output_file, width=7.2, height=7.0, units="in")
 
+output_file <- paste0(visualization_dir, output_stem, "boxplot_colored_by_day.pdf")
+experiment_categorical_boxplot = make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate(covariates$day, loadings, "Day")
+ggsave(experiment_categorical_boxplot, file=output_file, width=7.2, height=7.0, units="in")
 
 
-output_file <- paste0(visualization_dir, "boxplot_colored_by_cell_cycle_state.pdf")
+output_file <- paste0(visualization_dir, output_stem, "boxplot_colored_by_cell_cycle_state.pdf")
 cc_categorical_boxplot = make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate(covariates$cc_phase, loadings, "Cell cycle state")
 ggsave(cc_categorical_boxplot, file=output_file, width=7.2, height=7.0, units="in")
 
@@ -522,7 +566,7 @@ ggsave(cc_categorical_boxplot, file=output_file, width=7.2, height=7.0, units="i
 ######################################
 # Make Heatmap correlating known covariates with eqtl factorization loadings
 #######################################
-output_file <- paste0(visualization_dir, "loading_covariate_heatmap.pdf")
+output_file <- paste0(visualization_dir, output_stem, "loading_covariate_heatmap.pdf")
 heatmap <- make_covariate_loading_correlation_heatmap(covariates, loadings) 
 ggsave(heatmap, file=output_file, width=10.2, height=5.5, units="in")
 
@@ -540,6 +584,14 @@ print("DONE")
 #######################################
 output_file <- paste0(visualization_dir, output_stem, "umap_loading_scatter_colored_by_expression_S_score.pdf")
 umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$S_score, umap_loadings, "S-score")
+ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+
+
+######################################
+# Visualize UMAP scatter plot colored by G2_M_transition
+#######################################
+output_file <- paste0(visualization_dir, output_stem, "umap_loading_scatter_colored_by_G2_M_transition.pdf")
+umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$G2_M_transition, umap_loadings, "G2_M_transition")
 ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
 
 ######################################
@@ -594,6 +646,13 @@ ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
 ######################################
 # Visualize UMAP scatter plot colored by expression PC1
 #######################################
+output_file <- paste0(visualization_dir, output_stem, "umap_loading_scatter_colored_by_differentiation.pdf")
+umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$differentiation, umap_loadings, "differentiation")
+ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+
+######################################
+# Visualize UMAP scatter plot colored by expression PC1
+#######################################
 aa = covariates$pct_counts_top_500_features_endogenous
 print(summary(aa))
 aa[aa < 52] = 52
@@ -643,6 +702,44 @@ output_file <- paste0(visualization_dir, output_stem, "umap_loading_scatter_colo
 umap_scatter <- make_umap_loading_scatter_plot_colored_by_categorical_variable(covariates$plate_id, umap_loadings, "cell_line")
 ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
 
+
+
+
+######################################
+# Make loading scatterplot with row for every factor colored by expression PC1
+#######################################
+output_file <- paste0(visualization_dir, output_stem, "pseudotime_G2_M_transition_scatter_with_row_for_every_factor_colored_by_loadings.pdf")
+scatterplot <- loading_cov_cov_scatter_colored_by_loadings_with_row_for_every_factor(covariates$pseudo, covariates$G2_M_transition, loadings, "Pseudotime", "G2_M_transition")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+######################################
+# Make loading scatterplot with row for every factor colored by expression PC1
+#######################################
+output_file <- paste0(visualization_dir, output_stem, "pseudotime_G1_S_transition_scatter_with_row_for_every_factor_colored_by_loadings.pdf")
+scatterplot <- loading_cov_cov_scatter_colored_by_loadings_with_row_for_every_factor(covariates$pseudo, covariates$G1_S_transition, loadings, "Pseudotime", "G1_S_transition")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+######################################
+# Make loading scatterplot with row for every factor colored by expression PC1
+#######################################
+output_file <- paste0(visualization_dir, output_stem, "pseudotime_differentiation_scatter_with_row_for_every_factor_colored_by_loadings.pdf")
+scatterplot <- loading_cov_cov_scatter_colored_by_loadings_with_row_for_every_factor(covariates$pseudo, covariates$differentiation, loadings, "Pseudotime", "Differentiation")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+######################################
+# Make loading scatterplot with row for every factor colored by expression PC1
+#######################################
+output_file <- paste0(visualization_dir, output_stem, "pseudotime_respiration_scatter_with_row_for_every_factor_colored_by_loadings.pdf")
+scatterplot <- loading_cov_cov_scatter_colored_by_loadings_with_row_for_every_factor(covariates$pseudo, covariates$respiration, loadings, "Pseudotime", "respiration")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+######################################
+# Make loading scatterplot with row for every factor colored by expression PC1
+#######################################
+output_file <- paste0(visualization_dir, output_stem, "pseudotime_sterol_biosynthesis_scatter_with_row_for_every_factor_colored_by_loadings.pdf")
+scatterplot <- loading_cov_cov_scatter_colored_by_loadings_with_row_for_every_factor(covariates$pseudo, covariates$sterol_biosynthesis, loadings, "Pseudotime", "sterol_biosynthesis")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
 ######################################
 # Make loading scatterplot with row for every factor colored by expression PC1
 #######################################
@@ -650,6 +747,34 @@ output_file <- paste0(visualization_dir, output_stem, "loading_expression_pc1_sc
 scatterplot <- loading_expression_pc1_scatter_with_row_for_every_factor(covariates$PC1_top500hvgs , loadings, "Expression PC1")
 ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
 
+######################################
+# Make loading scatterplot with row for every factor colored by expression PC1
+#######################################
+output_file <- paste0(visualization_dir, output_stem, "loading_pseudotime2_scatter_with_row_for_every_factor.pdf")
+scatterplot <- loading_expression_pc1_scatter_with_row_for_every_factor(covariates$pseudotime2 , loadings, "Pseudotime")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+######################################
+# Make loading scatterplot with row for every factor colored by expression PC1
+#######################################
+output_file <- paste0(visualization_dir, output_stem, "loading_pseudoXG2_M_transition_scatter_with_row_for_every_factor.pdf")
+scatterplot <- loading_expression_pc1_scatter_with_row_for_every_factor(covariates$pseudo*covariates$G2_M_transition, loadings, "pseudotimeXG2_M_transition")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+output_file <- paste0(visualization_dir, output_stem, "loading_pseudoXsterol_biosynthesis_scatter_with_row_for_every_factor.pdf")
+scatterplot <- loading_expression_pc1_scatter_with_row_for_every_factor(covariates$pseudo*covariates$sterol_biosynthesis, loadings, "pseudotimeXsterol_biosynthesis")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+output_file <- paste0(visualization_dir, output_stem, "loading_G2_M_transitionXsterol_biosynthesis_scatter_with_row_for_every_factor.pdf")
+scatterplot <- loading_expression_pc1_scatter_with_row_for_every_factor(covariates$G2_M_transition*covariates$sterol_biosynthesis, loadings, "G2_M_transitionXsterol_biosynthesis")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+######################################
+# Make loading scatterplot with row for every factor colored by expression PC1
+#######################################
+output_file <- paste0(visualization_dir, output_stem, "loading_pseudo_scatter_with_row_for_every_factor.pdf")
+scatterplot <- loading_expression_pc1_scatter_with_row_for_every_factor(covariates$pseudo , loadings, "Pseudotime")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
 
 ######################################
 # Make loading scatterplot with row for every factor colored by expression PC1
@@ -664,6 +789,63 @@ ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
 #######################################
 output_file <- paste0(visualization_dir, output_stem, "loading_log10_total_feature_scatter_with_row_for_every_factor.pdf")
 scatterplot <- loading_expression_pc1_scatter_with_row_for_every_factor(covariates$log10_total_features , loadings, "log10(total features)")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+######################################
+# Make loading scatterplot with row for every factor colored by expression PC1
+#######################################
+output_file <- paste0(visualization_dir, output_stem, "loading_G2_M_transition_scatter_with_row_for_every_factor.pdf")
+scatterplot <- loading_expression_pc1_scatter_with_row_for_every_factor(covariates$G2_M_transition, loadings, "G2_M_transition")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+######################################
+# Make loading scatterplot with row for every factor colored by expression PC1
+#######################################
+output_file <- paste0(visualization_dir, output_stem, "loading_differentiation_scatter_with_row_for_every_factor.pdf")
+scatterplot <- loading_expression_pc1_scatter_with_row_for_every_factor(covariates$differentiation, loadings, "differentiation")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+
+######################################
+# Make loading scatterplot with row for every factor colored by expression PC1
+#######################################
+output_file <- paste0(visualization_dir, output_stem, "loading_fraction_biallelic_scatter_with_row_for_every_factor.pdf")
+scatterplot <- loading_expression_pc1_scatter_with_row_for_every_factor(covariates$fraction_biallelic, loadings, "fraction_biallelic")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+######################################
+# Make loading scatterplot with row for every factor colored by expression PC1
+#######################################
+output_file <- paste0(visualization_dir, output_stem, "loading_number_biallelic_sites_scatter_with_row_for_every_factor.pdf")
+scatterplot <- loading_expression_pc1_scatter_with_row_for_every_factor(covariates$number_biallelic_sites, loadings, "number_biallelic_sites")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+######################################
+# Make loading scatterplot with row for every factor colored by expression PC1
+#######################################
+output_file <- paste0(visualization_dir, output_stem, "loading_global_allelic_fraction_scatter_with_row_for_every_factor.pdf")
+scatterplot <- loading_expression_pc1_scatter_with_row_for_every_factor(covariates$global_allelic_fraction, loadings, "global_allelic_fraction")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+######################################
+# Make loading scatterplot with row for every factor colored by expression PC1
+#######################################
+output_file <- paste0(visualization_dir, output_stem, "loading_G1_S_transition_scatter_with_row_for_every_factor.pdf")
+scatterplot <- loading_expression_pc1_scatter_with_row_for_every_factor(covariates$G1_S_transition, loadings, "G1_S_transition")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+######################################
+# Make loading scatterplot with row for every factor colored by expression PC1
+#######################################
+output_file <- paste0(visualization_dir, output_stem, "loading_respiration_scatter_with_row_for_every_factor.pdf")
+scatterplot <- loading_expression_pc1_scatter_with_row_for_every_factor(covariates$respiration, loadings, "respiration")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+######################################
+# Make loading scatterplot with row for every factor colored by expression PC1
+#######################################
+output_file <- paste0(visualization_dir, output_stem, "loading_sterol_biosynthesis_scatter_with_row_for_every_factor.pdf")
+scatterplot <- loading_expression_pc1_scatter_with_row_for_every_factor(covariates$sterol_biosynthesis, loadings, "sterol_biosynthesis")
 ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
 
 ######################################
@@ -707,6 +889,39 @@ ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
 output_file <- paste0(visualization_dir, output_stem, "loading_pct_counts_top_500_features_scatter_with_row_for_every_factor.pdf")
 scatterplot <- loading_expression_pc1_scatter_with_row_for_every_factor(covariates$pct_counts_top_500_features, loadings, "pct_counts_top_500_features_endogenous")
 ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ######################################
 # Make loading boxplot with row for every factor colored by day

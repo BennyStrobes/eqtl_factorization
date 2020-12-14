@@ -83,7 +83,7 @@ class ASE_FACTORIZATION(object):
 			p = pm.math.invlogit(pm.math.dot(X, BETA.T) + pm.math.dot(U,V.T) + A[Z,:])
 			conc_mat = pm.math.dot(np.ones((N,1)), CONC)
 			R = pm.BetaBinomial('like',alpha=(p*conc_mat)[~nans], beta=((1.0-p)*conc_mat)[~nans], n=n[~nans], observed=k[~nans])
-			approx = pm.fit(method='advi', n=80000)
+			approx = pm.fit(method='advi', n=30000)
 		pickle.dump(approx, open(self.output_root + '_model', 'wb'))
 		approx = pickle.load( open(self.output_root + '_model', "rb" ) )
 		means_dict = approx.bij.rmap(approx.params[0].eval())

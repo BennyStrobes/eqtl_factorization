@@ -47,7 +47,7 @@ def filter_lowly_expressed_sites(k, n, count_thresh):
 				elif n[row_num,col_num] < count_thresh:
 					new_rat[row_num, col_num] = np.nan
 				else:
-					new_rat[row_num, col_num] = n[row_num, col_num]
+					new_rat[row_num, col_num] = k[row_num, col_num]/n[row_num, col_num]
 		return new_rat
 
 # BB_GLM = pystan.StanModel(file = "betabinomial_glm.stan")
@@ -85,8 +85,8 @@ class ASE_FACTORIZATION(object):
 
 	def run_factorization(self, N, S, X, Z, I, K, k, n):
 		# Smart initialization
-		#rat2 = k/n
-		rat = filter_lowly_expressed_sites(k,n, 7)
+		#rat = k/n
+		rat = filter_lowly_expressed_sites(k,n, 3)
 		nans = np.isnan(rat)
 
 		scaled_rat = scale_allelic_ratios(rat)

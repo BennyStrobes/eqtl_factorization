@@ -70,8 +70,9 @@ class ASE_FACTORIZATION(object):
 		with pm.Model() as bb_glm:
 			CONC = pm.HalfCauchy('CONC', beta=5, shape=(1,self.S), testval=self.conc_init)
 			BETA = pm.Normal('BETA', mu=0, tau=(1/1000000.0), shape=(self.S, self.num_cov), testval=self.beta_init)
-			U = pm.Normal('U', mu=0, tau=(1.0/100.0), shape=(self.N, self.K), testval=self.U_init)
-			V = pm.Normal('V', mu=0, tau=(1.0/100.0), shape=(self.S, self.K), testval=self.V_init)
+			gamma = pm.HalfCauchy('GAMMA', beta=5, shape=(self.N, self.K), testval=np.ones((self.N, self.K)))
+			U = pm.Normal('U', mu=0, sigma=1.0/gamma, shape=(self.N, self.K), testval=self.U_init)
+			V = pm.Normal('V', mu=0, tau=(1.0/1.0), shape=(self.S, self.K), testval=self.V_init)
 
 			MU_A = pm.Normal("MU_A", mu=0., sd=100**2, shape=(1,self.S), testval=self.mu_a_init)
 			SIGMA_A = pm.HalfCauchy("SIGMA_A", beta=5.0, shape=(1,self.S), testval=self.sigma_a_init)
@@ -82,18 +83,43 @@ class ASE_FACTORIZATION(object):
 			p = pm.math.invlogit(pm.math.dot(self.cov, BETA.T) + pm.math.dot(U,V.T) + A[self.Z,:])
 			conc_mat = pm.math.dot(np.ones((self.N,1)), CONC)
 			R = pm.BetaBinomial('like',alpha=(p*conc_mat)[~nans], beta=((1.0-p)*conc_mat)[~nans], n=self.total_counts[~nans], observed=self.allelic_counts[~nans])
-			approx = pm.fit(method='advi', n=1000)
+			approx = pm.fit(method='advi', n=30000)
 		pickle.dump(approx, open(self.output_root + '_model', 'wb'))
 		#approx = pickle.load( open(self.output_root + '_model', "rb" ) )
 		means_dict = approx.bij.rmap(approx.params[0].eval())
 		np.savetxt(self.output_root + '_temper_U.txt', (means_dict['U']), fmt="%s", delimiter='\t')
 		np.savetxt(self.output_root + '_temper_V.txt', (means_dict['V'].T), fmt="%s", delimiter='\t')
 		np.savetxt(self.output_root + '_temper_BETA.txt', (means_dict['BETA'].T), fmt="%s", delimiter='\t')
-		np.savetxt(self.output_root + '_temper_CONC.txt', np.exp(means_dict['CONC_log__']), fmt="%s", delimiter='\t')
-		np.savetxt(self.output_root + '_temper_A.txt', (means_dict['A']), fmt="%s", delimiter='\t')
-		np.savetxt(self.output_root + '_temper_MU_A.txt', (means_dict['MU_A']), fmt="%s", delimiter='\t')
-		np.savetxt(self.output_root + '_temper_SIGMA_A.txt', np.exp(means_dict['SIGMA_A_log__']), fmt="%s", delimiter='\t')
-		np.savetxt(self.output_root + '_temper_ELBO.txt', approx.hist, fmt="%s", delimiter='\t')
+
+	def run_non_sparse_model_for_initialization(self):
+		rat = self.allelic_counts/self.total_counts
+		nans = np.isnan(rat)
+		# Run bb-mf
+		with pm.Model() as bb_glm:
+			CONC = pm.HalfCauchy('CONC', beta=5, shape=(1,self.S), testval=self.conc_init)
+			BETA = pm.Normal('BETA', mu=0, tau=(1/1000000.0), shape=(self.S, self.num_cov), testval=self.beta_init)
+			U = pm.Normal('U', mu=0, tau=(1.0/1.0), shape=(self.N, self.K), testval=self.U_init)
+			V = pm.Normal('V', mu=0, tau=(1.0/1.0), shape=(self.S, self.K), testval=self.V_init)
+
+			MU_A = pm.Normal("MU_A", mu=0., sd=100**2, shape=(1,self.S), testval=self.mu_a_init)
+			SIGMA_A = pm.HalfCauchy("SIGMA_A", beta=5.0, shape=(1,self.S), testval=self.sigma_a_init)
+			mu_a_mat = pm.math.dot(np.ones((self.I,1)), MU_A)
+			sigma_a_mat = pm.math.dot(np.ones((self.I,1)), SIGMA_A)
+			A = pm.Normal('A', mu=mu_a_mat, sigma=sigma_a_mat, shape=(self.I,self.S), testval=self.A_init)
+
+			p = pm.math.invlogit(pm.math.dot(self.cov, BETA.T) + pm.math.dot(U,V.T) + A[self.Z,:])
+			conc_mat = pm.math.dot(np.ones((self.N,1)), CONC)
+			R = pm.BetaBinomial('like',alpha=(p*conc_mat)[~nans], beta=((1.0-p)*conc_mat)[~nans], n=self.total_counts[~nans], observed=self.allelic_counts[~nans])
+			approx = pm.fit(method='advi', n=10000)
+		means_dict = approx.bij.rmap(approx.params[0].eval())
+		# Set initializations for sparse model to learned values from this non-sparse model
+		self.conc_init = np.exp(means_dict['CONC_log__'])
+		self.beta_init = means_dict['BETA']
+		self.U_init = means_dict['U']
+		self.V_init = means_dict['V']
+		self.mu_a_init = means_dict['MU_A']
+		self.sigma_a_init = np.exp(means_dict['SIGMA_A_log__'])
+		self.A_init = means_dict['A']
 
 	def run_ppca_initialization(self):
 		print('Starting PPCA initialization')
@@ -133,14 +159,13 @@ class ASE_FACTORIZATION(object):
 		self.V_init = init_dict['V']
 		print('Smart PPCA complete')
 	def initialize_variables(self):
-		ppca_initialization = False
 		self.I = len(np.unique(self.Z))
 		self.N = self.allelic_counts.shape[0]
 		self.S = self.allelic_counts.shape[1]
 		self.num_cov = self.cov.shape[1]
 		# Randomly initialize (only U matters)
-		self.U_init = np.random.randn(self.N, self.K)
-		self.V_init = np.random.randn(self.S, self.K)  # plus 1 for intercept
+		self.U_init = np.random.randn(self.N, self.K)*.01
+		self.V_init = np.random.randn(self.S, self.K)*.01  # plus 1 for intercept
 		rat = self.allelic_counts/self.total_counts
 		nans = np.isnan(rat)
 		self.conc_init = np.zeros((1, self.S))
@@ -149,17 +174,16 @@ class ASE_FACTORIZATION(object):
 			column_rat = rat[:, index_s]
 			column_nans = np.isnan(column_rat)
 			valid_rat = column_rat[~column_nans]
-			conc_init_s = min(10.0/np.var(valid_rat), 1000.0)
+			conc_init_s = min(1.0/np.var(valid_rat), 1000.0)
 			m_init = min(max(np.mean(valid_rat), 1.0/1000 ), 1.0-(1.0/1000))
-
 			self.conc_init[0, index_s] = conc_init_s
 			self.beta_init[0, index_s] = np.log(m_init/(1.0-m_init))
 		self.beta_init = np.transpose(self.beta_init)
 		self.A_init = np.zeros((self.I, self.S))
 		self.sigma_a_init = np.ones((1,self.S))
 		self.mu_a_init = np.zeros((1, self.S))
-		if ppca_initialization == True:
-			self.run_ppca_initialization()
+		self.run_non_sparse_model_for_initialization()
+		self.gamma_init = np.ones((self.N, self.K))
 
 		'''
 		for n in range(self.N):

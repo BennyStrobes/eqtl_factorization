@@ -348,12 +348,17 @@ def filter_cell_info_file(annotated_samples_file, filtered_cell_info_file, final
 			num_cells = len(data[1:])
 			num_expressed = np.zeros(num_cells)
 			num_biallelic = np.zeros(num_cells)
+			numerator = np.zeros(num_cells)
+			denomenator = np.zeros(num_cells)
 			continue
 		for i, stringer in enumerate(data[1:]):
 			if stringer == 'NA':
 				continue
 			numer = int(stringer.split('/')[0])
 			dener = int(stringer.split('/')[1])
+			numer = np.min((numer, dener-numer))
+			numerator[i] = numerator[i] + numer
+			denomenator[i] = denomenator[i] + dener
 			if dener < 10:
 				continue
 			num_expressed[i] = num_expressed[i] + 1
@@ -362,6 +367,7 @@ def filter_cell_info_file(annotated_samples_file, filtered_cell_info_file, final
 				num_biallelic[i] = num_biallelic[i] + 1
 	f.close()
 	frac = num_biallelic.astype(float)/num_expressed
+	frac2 = numerator.astype(float)/denomenator
 	valid_cells = {}
 	f = open(final_ase_file)
 	head_count = 0
@@ -373,7 +379,7 @@ def filter_cell_info_file(annotated_samples_file, filtered_cell_info_file, final
 			if len(data[1:]) != len(frac):
 				print('assumption error')
 			for i, cell_name in enumerate(data[1:]):
-				valid_cells[cell_name] = (num_biallelic[i], num_expressed[i], frac[i])
+				valid_cells[cell_name] = (num_biallelic[i], num_expressed[i], frac[i], frac2[i])
 			continue
 		break
 	f.close()
@@ -386,11 +392,11 @@ def filter_cell_info_file(annotated_samples_file, filtered_cell_info_file, final
 		data = line.split('\t')
 		if head_count == 0:
 			head_count = head_count + 1
-			t.write(line + '\t' + 'number_biallelic_sites\tnum_expressed_sites' '\t' + 'fraction_biallelic' + '\n')
+			t.write(line + '\t' + 'number_biallelic_sites\tnum_expressed_sites' '\t' + 'fraction_biallelic' + '\t' + 'global_allelic_fraction' + '\n')
 			continue
 		cell_name = data[0]
 		if cell_name in valid_cells:
-			t.write(line + '\t' + str(valid_cells[cell_name][0]) + '\t' + str(valid_cells[cell_name][1]) + '\t' + str(valid_cells[cell_name][2]) + '\n')
+			t.write(line + '\t' + str(valid_cells[cell_name][0]) + '\t' + str(valid_cells[cell_name][1]) + '\t' + str(valid_cells[cell_name][2])+ '\t' + str(valid_cells[cell_name][3]) + '\n')
 	f.close()
 	t.close()
 
@@ -523,7 +529,7 @@ def filter_go_term_loading_file(go_term_loading_file, filtered_go_term_loading_f
 			t.write(cell_name + '\t' + '\t'.join(loadings) + '\n')
 	t.close()
 
-def add_cell_cycle_info_to_annotated_samples_file(annotated_samples_file, cell_cycle_file, cc_annotated_samples_file):
+def add_cell_cycle_info_to_annotated_samples_file(annotated_samples_file, cell_cycle_file, cell_state_file, cc_annotated_samples_file):
 	f = open(cell_cycle_file)
 	head_count = 0
 	mapping = {}
@@ -536,6 +542,18 @@ def add_cell_cycle_info_to_annotated_samples_file(annotated_samples_file, cell_c
 		cell_id = data[3]
 		mapping[cell_id] = np.asarray(data[:3])
 	f.close()
+	f = open(cell_state_file)
+	mapping2 = {}
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split('\t')
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		cell_id = data[0]
+		mapping2[cell_id] = np.asarray(data[1:])
+	f.close()
 	f = open(annotated_samples_file)
 	t = open(cc_annotated_samples_file, 'w')
 	head_count = 0
@@ -544,12 +562,12 @@ def add_cell_cycle_info_to_annotated_samples_file(annotated_samples_file, cell_c
 		data = line.split()
 		if head_count == 0:
 			head_count = head_count + 1
-			'S_score', 'G2M_score', 'phase',
-			t.write(line + '\t' + 'S_score\tG2M_score\tcc_phase\n')
+			t.write(line + '\t' + 'S_score\tG2M_score\tcc_phase\trespiration\tdifferentiation\tG1_S_transition\tsterol_biosynthesis\tG2_M_transition\tpseudotime2\n')
 			continue
 		cell_id = data[0]
 		info = mapping[cell_id]
-		t.write(line + '\t' + '\t'.join(info) + '\n')
+		info2 = mapping2[cell_id]
+		t.write(line + '\t' + '\t'.join(info) + '\t' + '\t'.join(info2) + '\n')
 	f.close()
 	t.close()
 
@@ -564,6 +582,8 @@ processed_data_dir = sys.argv[3]
 gencode_gene_annotation_file = sys.argv[4]
 # cell cycle file
 cell_cycle_file = sys.argv[5]
+# Cell State file
+cell_state_file = sys.argv[6]
 
 
 go_term_loading_file = processed_data_dir + 'go_terms_cell_loadings.txt'
@@ -574,7 +594,7 @@ num_cells = len(ordered_cells)
 
 # update annotated samples file with cell cycle info
 cc_annotated_samples_file = processed_data_dir + 'annotated_samples_with_cell_cycle.txt'
-#add_cell_cycle_info_to_annotated_samples_file(annotated_samples_file, cell_cycle_file, cc_annotated_samples_file)
+add_cell_cycle_info_to_annotated_samples_file(annotated_samples_file, cell_cycle_file, cell_state_file, cc_annotated_samples_file)
 
 
 # Rows are exonic sites, columns are cells (according to ordered_cells)
@@ -604,19 +624,19 @@ final_ase_file = processed_data_dir + 'filtered_ase_counts_' + str(fraction_samp
 
 
 filtered_cell_info_file = processed_data_dir + 'cell_info_after_filtering_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '.txt'
-#filter_cell_info_file(cc_annotated_samples_file, filtered_cell_info_file, final_ase_file)
+filter_cell_info_file(cc_annotated_samples_file, filtered_cell_info_file, final_ase_file)
 
 filtered_go_term_loading_file = processed_data_dir + 'go_terms_cell_loadings_after_filtering_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '.txt'
 #filter_go_term_loading_file(go_term_loading_file, filtered_go_term_loading_file, final_ase_file)
 
 cell_overlap_file = processed_data_dir + 'cell_overlap_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '.txt'
-generate_sample_overlap_file(filtered_cell_info_file, cell_overlap_file, 'donor_long_id')
+#generate_sample_overlap_file(filtered_cell_info_file, cell_overlap_file, 'donor_long_id')
 
 plate_overlap_file = processed_data_dir + 'cell_plate_overlap_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '.txt'
-generate_sample_overlap_file(filtered_cell_info_file, plate_overlap_file, 'plate_id')
+#generate_sample_overlap_file(filtered_cell_info_file, plate_overlap_file, 'plate_id')
 
 experiment_overlap_file = processed_data_dir + 'cell_experiment_overlap_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '.txt'
-generate_sample_overlap_file(filtered_cell_info_file, experiment_overlap_file, 'experiment')
+#generate_sample_overlap_file(filtered_cell_info_file, experiment_overlap_file, 'experiment')
 
 
 ############################################
@@ -628,20 +648,20 @@ subsampling_fraction = .1
 #subsample_cells(final_ase_file, subsampled_ase_file, subsampling_fraction)
 
 filtered_cell_info_subsampled_file = processed_data_dir + 'cell_info_after_filtering_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '_subsampled.txt'
-#filter_cell_info_file(cc_annotated_samples_file, filtered_cell_info_subsampled_file, subsampled_ase_file)
+filter_cell_info_file(cc_annotated_samples_file, filtered_cell_info_subsampled_file, subsampled_ase_file)
 
 cell_overlap_subsampled_file = processed_data_dir + 'cell_overlap_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '_subsampled.txt'
 #generate_sample_overlap_file(filtered_cell_info_subsampled_file, cell_overlap_subsampled_file, 'donor_long_id')
 
 filtered_go_term_loading_file = processed_data_dir + 'go_terms_cell_loadings_after_filtering_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '_subsampled.txt'
-filter_go_term_loading_file(go_term_loading_file, filtered_go_term_loading_file, subsampled_ase_file)
+#filter_go_term_loading_file(go_term_loading_file, filtered_go_term_loading_file, subsampled_ase_file)
 
 
 plate_overlap_subsampled_file = processed_data_dir + 'cell_plate_overlap_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '_subsampled.txt'
-generate_sample_overlap_file(filtered_cell_info_subsampled_file, plate_overlap_subsampled_file, 'plate_id')
+#generate_sample_overlap_file(filtered_cell_info_subsampled_file, plate_overlap_subsampled_file, 'plate_id')
 
 experiment_overlap_subsampled_file = processed_data_dir + 'cell_experiment_overlap_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '_subsampled.txt'
-generate_sample_overlap_file(filtered_cell_info_subsampled_file, experiment_overlap_subsampled_file, 'experiment')
+#generate_sample_overlap_file(filtered_cell_info_subsampled_file, experiment_overlap_subsampled_file, 'experiment')
 
 ############################################
 # Remove cells with low biallelic fraction
@@ -650,7 +670,7 @@ ase_high_biallelic_fraction_file = processed_data_dir + 'filtered_ase_counts_' +
 #remove_low_biallelic_fraction_cells(filtered_cell_info_file, final_ase_file, ase_high_biallelic_fraction_file)
 
 filtered_cell_info_high_biallelic_fraction_file = processed_data_dir + 'cell_info_after_filtering_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '_high_biallelic_fraction_only.txt'
-#filter_cell_info_file(cc_annotated_samples_file, filtered_cell_info_high_biallelic_fraction_file, ase_high_biallelic_fraction_file)
+filter_cell_info_file(cc_annotated_samples_file, filtered_cell_info_high_biallelic_fraction_file, ase_high_biallelic_fraction_file)
 
 filtered_go_term_loading_file = processed_data_dir + 'go_terms_cell_loadings_after_filtering_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '_high_biallelic_fraction_only.txt'
 #filter_go_term_loading_file(go_term_loading_file, filtered_go_term_loading_file, ase_high_biallelic_fraction_file)
@@ -659,10 +679,10 @@ cell_overlap_high_biallelic_fraction_file = processed_data_dir + 'cell_overlap_'
 #generate_sample_overlap_file(filtered_cell_info_high_biallelic_fraction_file, cell_overlap_high_biallelic_fraction_file, 'donor_long_id')
 
 plate_overlap_high_biallelic_fraction_file = processed_data_dir + 'cell_plate_overlap_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '_high_biallelic_fraction_only.txt'
-generate_sample_overlap_file(filtered_cell_info_high_biallelic_fraction_file, plate_overlap_high_biallelic_fraction_file, 'plate_id')
+#generate_sample_overlap_file(filtered_cell_info_high_biallelic_fraction_file, plate_overlap_high_biallelic_fraction_file, 'plate_id')
 
 experiment_overlap_high_biallelic_fraction_file = processed_data_dir + 'cell_experiment_overlap_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '_high_biallelic_fraction_only.txt'
-generate_sample_overlap_file(filtered_cell_info_high_biallelic_fraction_file, experiment_overlap_high_biallelic_fraction_file, 'experiment')
+#generate_sample_overlap_file(filtered_cell_info_high_biallelic_fraction_file, experiment_overlap_high_biallelic_fraction_file, 'experiment')
 
 
 
@@ -674,7 +694,7 @@ subsampling_fraction = .15
 #subsample_cells(ase_high_biallelic_fraction_file, subsampled_ase_file, subsampling_fraction)
 
 filtered_cell_info_subsampled_file = processed_data_dir + 'cell_info_after_filtering_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '_high_biallelic_fraction_only_subsampled.txt'
-#filter_cell_info_file(cc_annotated_samples_file, filtered_cell_info_subsampled_file, subsampled_ase_file)
+filter_cell_info_file(cc_annotated_samples_file, filtered_cell_info_subsampled_file, subsampled_ase_file)
 
 filtered_go_term_loading_subsampled_file = processed_data_dir + 'go_terms_cell_loadings_after_filtering_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '_high_biallelic_fraction_only_subsampled.txt'
 #filter_go_term_loading_file(go_term_loading_file, filtered_go_term_loading_subsampled_file, subsampled_ase_file)
@@ -683,10 +703,10 @@ cell_overlap_subsampled_file = processed_data_dir + 'cell_overlap_' + str(fracti
 #generate_sample_overlap_file(filtered_cell_info_subsampled_file, cell_overlap_subsampled_file, 'donor_long_id')
 
 plate_overlap_subsampled_file = processed_data_dir + 'cell_plate_overlap_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '_high_biallelic_fraction_only_subsampled.txt'
-generate_sample_overlap_file(filtered_cell_info_subsampled_file, plate_overlap_subsampled_file, 'plate_id')
+#generate_sample_overlap_file(filtered_cell_info_subsampled_file, plate_overlap_subsampled_file, 'plate_id')
 
 experiment_overlap_subsampled_file = processed_data_dir + 'cell_experiment_overlap_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '_high_biallelic_fraction_only_subsampled.txt'
-generate_sample_overlap_file(filtered_cell_info_subsampled_file, experiment_overlap_subsampled_file, 'experiment')
+#generate_sample_overlap_file(filtered_cell_info_subsampled_file, experiment_overlap_subsampled_file, 'experiment')
 
 
 
@@ -697,19 +717,19 @@ generate_sample_overlap_file(filtered_cell_info_subsampled_file, experiment_over
 ############################################
 subsampled_ase_file = processed_data_dir + 'filtered_ase_counts_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '_final_high_biallelic_fraction_only_subsampled_small.txt'
 subsampling_fraction = .05
-subsample_cells(ase_high_biallelic_fraction_file, subsampled_ase_file, subsampling_fraction)
+#subsample_cells(ase_high_biallelic_fraction_file, subsampled_ase_file, subsampling_fraction)
 
 filtered_cell_info_subsampled_file = processed_data_dir + 'cell_info_after_filtering_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '_high_biallelic_fraction_only_subsampled_small.txt'
 filter_cell_info_file(cc_annotated_samples_file, filtered_cell_info_subsampled_file, subsampled_ase_file)
 
 filtered_go_term_loading_subsampled_file = processed_data_dir + 'go_terms_cell_loadings_after_filtering_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '_high_biallelic_fraction_only_subsampled_small.txt'
-filter_go_term_loading_file(go_term_loading_file, filtered_go_term_loading_subsampled_file, subsampled_ase_file)
+#filter_go_term_loading_file(go_term_loading_file, filtered_go_term_loading_subsampled_file, subsampled_ase_file)
 
 cell_overlap_subsampled_file = processed_data_dir + 'cell_overlap_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '_high_biallelic_fraction_only_subsampled_small.txt'
-generate_sample_overlap_file(filtered_cell_info_subsampled_file, cell_overlap_subsampled_file, 'donor_long_id')
+#generate_sample_overlap_file(filtered_cell_info_subsampled_file, cell_overlap_subsampled_file, 'donor_long_id')
 
 plate_overlap_subsampled_file = processed_data_dir + 'cell_plate_overlap_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '_high_biallelic_fraction_only_subsampled_small.txt'
-generate_sample_overlap_file(filtered_cell_info_subsampled_file, plate_overlap_subsampled_file, 'plate_id')
+#generate_sample_overlap_file(filtered_cell_info_subsampled_file, plate_overlap_subsampled_file, 'plate_id')
 
 experiment_overlap_subsampled_file = processed_data_dir + 'cell_experiment_overlap_' + str(fraction_samples) + '_' + str(fraction_monoallelic) + '_high_biallelic_fraction_only_subsampled_small.txt'
-generate_sample_overlap_file(filtered_cell_info_subsampled_file, experiment_overlap_subsampled_file, 'experiment')
+#generate_sample_overlap_file(filtered_cell_info_subsampled_file, experiment_overlap_subsampled_file, 'experiment')

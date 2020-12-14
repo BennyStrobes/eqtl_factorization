@@ -217,80 +217,60 @@ processed_data_dir = args[1]
 
 
 cell_info_file <- paste0(processed_data_dir, "cell_info_after_filtering_0.3_0.5.txt")
-allelic_fraction_pseutome_binned_file <- paste0(processed_data_dir, "ase_40_binned_by_pseudotime_allelic_fraction.txt")
-allelic_fraction_experiment_binned_file <- paste0(processed_data_dir, "ase_binned_by_experiment_allelic_fraction.txt")
-allelic_fraction_plate_id_binned_file <- paste0(processed_data_dir, "ase_binned_by_plate_id_allelic_fraction.txt")
-allelic_fraction_U0_binned_file <- paste0(processed_data_dir, "ase_30_binned_by_U_0_allelic_fraction.txt")
-allelic_fraction_U1_binned_file <- paste0(processed_data_dir, "ase_30_binned_by_U_1_allelic_fraction.txt")
-allelic_fraction_U2_binned_file <- paste0(processed_data_dir, "ase_30_binned_by_U_2_allelic_fraction.txt")
 
 
-cell_info <- read.table(cell_info_file, header=TRUE, sep="\t", comment.char="",quote="")
+pseudotime_binned_file <- paste0(processed_data_dir,"ase_30_binned_by_pseudotime_allelic_fraction.txt")
+
+pseudotime_heatmap <- generate_pseudotime_af_heatmap(pseudotime_binned_file)
+ggsave(pseudotime_heatmap, file=paste0(processed_data_dir, "pseudotime_heatmap.pdf"), width=7.2, height=5.0, units="in")
+
+
+binomial_allelic_fraction_U0_binned_file <- paste0(processed_data_dir, "ase_binomial_mean_30_binned_by_mixture_U_0_allelic_fraction.txt")
+binomial_allelic_fraction_U1_binned_file <- paste0(processed_data_dir, "ase_binomial_mean_30_binned_by_mixture_U_1_allelic_fraction.txt")
+binomial_allelic_fraction_U2_binned_file <- paste0(processed_data_dir, "ase_binomial_mean_30_binned_by_mixture_U_2_allelic_fraction.txt")
+
 
 if (FALSE) {
-binomial_p_mle = sum(cell_info$number_biallelic_sites)/sum(cell_info$num_expressed_sites)
-
-biallelic_sites = cell_info$number_biallelic_sites
-expressed_sites = cell_info$num_expressed_sites
-num_sites = length(biallelic_sites)
-for (site_num in 1:num_sites) {
-	aa = binom.test(biallelic_sites[site_num], expressed_sites[site_num], p = binomial_p_mle, alternative = "two.sided",conf.level = 0.95)
-	print(paste0(cell_info$fraction_biallelic[site_num], "\t", aa$p.value))
-}
-}
-
-biallelic_scatter <- make_fraction_biallelic_expression_pc1_scatterplot(cell_info)
-ggsave(biallelic_scatter, file=paste0(processed_data_dir, "fraction_biallelic_expression_pc1_scatter.pdf"), width=7.2, height=5.0, units="in")
-
-
-biallelic_scatter <- make_fraction_biallelic_scatterplot(cell_info)
-ggsave(biallelic_scatter, file=paste0(processed_data_dir, "fraction_biallelic_scatter.pdf"), width=7.2, height=5.0, units="in")
-
-
-biallelic_scatter <- make_fraction_biallelic_scatterplot_colored_by_experiment(cell_info)
-ggsave(biallelic_scatter, file=paste0(processed_data_dir, "fraction_biallelic_scatter_colored_by_experiment.pdf"), width=7.2, height=5.0, units="in")
-
-biallelic_scatter <- make_fraction_biallelic_scatterplot_colored_by_plate(cell_info)
-ggsave(biallelic_scatter, file=paste0(processed_data_dir, "fraction_biallelic_scatter_colored_by_plate_id.pdf"), width=7.2, height=5.0, units="in")
-
-
-
-biallelic_histogram <- make_fraction_biallelic_histogram(cell_info)
-ggsave(biallelic_histogram, file=paste0(processed_data_dir, "fraction_biallelic_histogram.pdf"), width=7.2, height=5.0, units="in")
-
-
-
-
-experiment_fraction_biallelic_boxplot <- make_fraction_biallelic_boxplot_by_experiment(cell_info)
-ggsave(experiment_fraction_biallelic_boxplot, file=paste0(processed_data_dir, "fraction_biallelic_boxplot_by_experiment.pdf"), width=7.2, height=5.0, units="in")
-
-plate_fraction_biallelic_boxplot <- make_fraction_biallelic_boxplot_by_plate(cell_info)
-ggsave(plate_fraction_biallelic_boxplot, file=paste0(processed_data_dir, "fraction_biallelic_boxplot_by_plate.pdf"), width=7.2, height=5.0, units="in")
-
-
-U_0_heatmap <- generate_U_af_heatmap(allelic_fraction_U0_binned_file, 1)
-ggsave(U_0_heatmap, file=paste0(processed_data_dir, "af_U1_binned_heatmap.pdf"), width=7.2, height=5.0, units="in")
-
-U_1_heatmap <- generate_U_af_heatmap(allelic_fraction_U1_binned_file, 2)
-ggsave(U_1_heatmap, file=paste0(processed_data_dir, "af_U2_binned_heatmap.pdf"), width=7.2, height=5.0, units="in")
-
-U_2_heatmap <- generate_U_af_heatmap(allelic_fraction_U2_binned_file, 3)
-ggsave(U_2_heatmap, file=paste0(processed_data_dir, "af_U3_binned_heatmap.pdf"), width=7.2, height=5.0, units="in")
-
+U_0_heatmap <- generate_U_af_heatmap(binomial_allelic_fraction_U0_binned_file, 1)
+U_1_heatmap <- generate_U_af_heatmap(binomial_allelic_fraction_U1_binned_file, 2)
+U_2_heatmap <- generate_U_af_heatmap(binomial_allelic_fraction_U2_binned_file, 3)
 combined_U_heatmap <- plot_grid(U_0_heatmap, U_1_heatmap, U_2_heatmap, ncol=1)
-ggsave(combined_U_heatmap, file=paste0(processed_data_dir, "af_U_binned_heatmap_merged.pdf"), width=7.2, height=8.0, units="in")
+ggsave(combined_U_heatmap, file=paste0(processed_data_dir, "af_binomial_fraction_U_binned_heatmap_merged.pdf"), width=7.2, height=8.0, units="in")
+print('done')
+folded_binomial_allelic_fraction_U0_binned_file <- paste0(processed_data_dir, "ase_folded_binomial_mean_30_binned_by_mixture_U_0_allelic_fraction.txt")
+folded_binomial_allelic_fraction_U1_binned_file <- paste0(processed_data_dir, "ase_folded_binomial_mean_30_binned_by_mixture_U_1_allelic_fraction.txt")
+folded_binomial_allelic_fraction_U2_binned_file <- paste0(processed_data_dir, "ase_folded_binomial_mean_30_binned_by_mixture_U_2_allelic_fraction.txt")
 
+U_0_heatmap <- generate_U_af_heatmap(folded_binomial_allelic_fraction_U0_binned_file, 1)
+U_1_heatmap <- generate_U_af_heatmap(folded_binomial_allelic_fraction_U1_binned_file, 2)
+U_2_heatmap <- generate_U_af_heatmap(folded_binomial_allelic_fraction_U2_binned_file, 3)
+combined_U_heatmap <- plot_grid(U_0_heatmap, U_1_heatmap, U_2_heatmap, ncol=1)
+ggsave(combined_U_heatmap, file=paste0(processed_data_dir, "af_folded_binomial_fraction_U_binned_heatmap_merged.pdf"), width=7.2, height=8.0, units="in")
+print('done')
 
-plate_heatmap <- generate_plate_af_heatmap(allelic_fraction_plate_id_binned_file)
-ggsave(plate_heatmap, file=paste0(processed_data_dir, "af_plate_binned_heatmap.pdf"), width=7.2, height=5.0, units="in")
-
-if (FALSE) {
-pseudotime_heatmap <- generate_pseudotime_af_heatmap(allelic_fraction_pseutome_binned_file)
-ggsave(pseudotime_heatmap, file=paste0(processed_data_dir, "af_pseudotime_binned_heatmap.pdf"), width=7.2, height=5.0, units="in")
-
-experiment_heatmap <- generate_experiment_af_heatmap(allelic_fraction_experiment_binned_file)
-ggsave(experiment_heatmap, file=paste0(processed_data_dir, "af_experiment_binned_heatmap.pdf"), width=7.2, height=5.0, units="in")
-
-experiment_heatmap <- generate_experiment_af_heatmap_cluster_experiments(allelic_fraction_experiment_binned_file)
-ggsave(experiment_heatmap, file=paste0(processed_data_dir, "af_experiment_binned_clustered_heatmap.pdf"), width=7.2, height=5.0, units="in")
 }
+beta_binomial_allelic_fraction_U0_binned_file <- paste0(processed_data_dir, "ase_beta_binomial_mean_30_binned_by_mixture_U_0_allelic_fraction.txt")
+beta_binomial_allelic_fraction_U1_binned_file <- paste0(processed_data_dir, "ase_beta_binomial_mean_30_binned_by_mixture_U_1_allelic_fraction.txt")
+beta_binomial_allelic_fraction_U2_binned_file <- paste0(processed_data_dir, "ase_beta_binomial_mean_30_binned_by_mixture_U_2_allelic_fraction.txt")
+
+
+U_0_heatmap <- generate_U_af_heatmap(beta_binomial_allelic_fraction_U0_binned_file, 1)
+U_1_heatmap <- generate_U_af_heatmap(beta_binomial_allelic_fraction_U1_binned_file, 2)
+U_2_heatmap <- generate_U_af_heatmap(beta_binomial_allelic_fraction_U2_binned_file, 3)
+combined_U_heatmap <- plot_grid(U_0_heatmap, U_1_heatmap, U_2_heatmap, ncol=1)
+ggsave(combined_U_heatmap, file=paste0(processed_data_dir, "af_beta_binomial_fraction_U_binned_heatmap_merged.pdf"), width=7.2, height=8.0, units="in")
+print('done')
+
+folded_beta_binomial_allelic_fraction_U0_binned_file <- paste0(processed_data_dir, "ase_folded_beta_binomial_mean_30_binned_by_mixture_U_0_allelic_fraction.txt")
+folded_beta_binomial_allelic_fraction_U1_binned_file <- paste0(processed_data_dir, "ase_folded_beta_binomial_mean_30_binned_by_mixture_U_1_allelic_fraction.txt")
+folded_beta_binomial_allelic_fraction_U2_binned_file <- paste0(processed_data_dir, "ase_folded_beta_binomial_mean_30_binned_by_mixture_U_2_allelic_fraction.txt")
+
+U_0_heatmap <- generate_U_af_heatmap(folded_beta_binomial_allelic_fraction_U0_binned_file, 1)
+U_1_heatmap <- generate_U_af_heatmap(folded_beta_binomial_allelic_fraction_U1_binned_file, 2)
+U_2_heatmap <- generate_U_af_heatmap(folded_beta_binomial_allelic_fraction_U2_binned_file, 3)
+combined_U_heatmap <- plot_grid(U_0_heatmap, U_1_heatmap, U_2_heatmap, ncol=1)
+ggsave(combined_U_heatmap, file=paste0(processed_data_dir, "af_folded_beta_binomial_fraction_U_binned_heatmap_merged.pdf"), width=7.2, height=8.0, units="in")
+
+print('done')
+
+

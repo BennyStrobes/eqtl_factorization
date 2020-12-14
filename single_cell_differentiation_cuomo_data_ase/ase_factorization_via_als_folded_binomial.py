@@ -10,9 +10,13 @@ from ppca import PPCA
 from sklearn.linear_model import LinearRegression
 
 # BB_GLM = pystan.StanModel(file = "betabinomial_glm.stan")
-BB_GLM = pickle.load(open('/work-zfs/abattle4/bstrober/temp/betabinomial_glm.pkl', 'rb'))
+#BB_GLM = pickle.load(open('/work-zfs/abattle4/bstrober/temp/betabinomial_glm.pkl', 'rb'))
 # BB_GLM_FIXED_CONC = pystan.StanModel(file = "betabinomial_glm_fixed_conc.stan")
-BB_GLM_FIXED_CONC = pickle.load(open('/work-zfs/abattle4/bstrober/temp/betabinomial_glm_fixed_conc.pkl', 'rb'))
+#BB_GLM_FIXED_CONC = pickle.load(open('/work-zfs/abattle4/bstrober/temp/betabinomial_glm_fixed_conc.pkl', 'rb'))
+#FOLDED_BINOMIAL_GLM = pystan.StanModel(file="folded_binomial_glm.stan")
+FOLDED_BINOMIAL_GLM = pickle.load(open('/work-zfs/abattle4/bstrober/temp/folded_binomial_glm.pkl', 'rb'))
+FOLDED_BINOMIAL_INTERCEPT_GLM = pickle.load(open('/work-zfs/abattle4/bstrober/temp/folded_binomial_with_intercept_glm.pkl', 'rb'))
+
 
 # scale each column
 def scale_allelic_ratios(rat):
@@ -49,9 +53,10 @@ def regress_out_cell_line(scaled_rat, Z_mat):
 		final_rat[valid_row_indices,column_index] = scaled_rat[valid_row_indices,column_index] - predicted
 	return final_rat
 
-def outside_update_V_t(U_new, ys, ns, concShape, concRate, itera, conc_init, C_init, V_init):
+def outside_update_V_t(U_new, ys, ns, itera, C_init, V_init):
 	observed_indices = np.isnan(ys) == False
-	data = dict(N=sum(observed_indices), P=U_new.shape[1], x=U_new[observed_indices,:], ys=ys[observed_indices].astype(int), ns=ns[observed_indices].astype(int), concShape=concShape, concRate=concRate)
+	data = dict(N=sum(observed_indices), P=U_new.shape[1], x=U_new[observed_indices,:], ys=ys[observed_indices].astype(int), ns=ns[observed_indices].astype(int))
+	'''
 	########################################
 	# Get MOM estimates for initialization
 	rat = data['ys']/data['ns'].astype(float)
@@ -65,6 +70,7 @@ def outside_update_V_t(U_new, ys, ns, concShape, concRate, itera, conc_init, C_i
 	beta_init[0] = np.log(m_init/(1.0-m_init))
 	init = dict(conc=mom_conc_init, beta=beta_init)
 	pdb.set_trace()
+	'''
 	'''
 	if itera == 0:
 		rat = data['ys']/data['ns'].astype(float)
@@ -81,24 +87,27 @@ def outside_update_V_t(U_new, ys, ns, concShape, concRate, itera, conc_init, C_i
 		init = dict(conc=conc_init, beta=np.hstack((C_init,V_init)))
 	'''
 	########################################
+	beta_init = np.hstack((C_init,V_init))
+	init = dict(beta=beta_init)
+
 	# Run optimization
 	
 	try:
 		with suppress_stdout_stderr():
-			op = BB_GLM.optimizing(data = data, verbose=False,iter=5000,seed=1, init=init)
+			op = FOLDED_BINOMIAL_GLM.optimizing(data = data, verbose=False,iter=5000,seed=1)
 	except RuntimeError:
 		try: 
-			op = BB_GLM.optimizing(data = data, verbose=False,iter=5000,seed=1)
+			op = FOLDED_BINOMIAL_GLM.optimizing(data = data, verbose=False,iter=5000,seed=2)
 		except RuntimeError:
 			try:
-				op = BB_GLM.optimizing(data = data, verbose=False,iter=5000,seed=1, algorithm="Newton")
+				op = FOLDED_BINOMIAL_GLM.optimizing(data = data, verbose=False,iter=5000,seed=1, algorithm="Newton")
 			except RuntimeError:
 				try:
-					op = BB_GLM.optimizing(data = data, verbose=False,iter=5000,seed=2, algorithm="Newton")
+					op = FOLDED_BINOMIAL_GLM.optimizing(data = data, verbose=False,iter=5000,seed=2, algorithm="Newton")
 				except RuntimeError:
 					print('error')
-					pdb.set_trace()
-	return np.hstack((op['conc'],op['beta']))
+					op = {'beta': beta_init}
+	return op['beta']
 	
 
 class suppress_stdout_stderr(object):
@@ -138,7 +147,7 @@ class ASE_FACTORIZATION(object):
 		self.concRate = concRate
 		self.iter = 0
 		self.random_seed = random_seed
-		self.output_root = output_root + '_no_ppca_seed_' + str(self.random_seed) + '_'
+		self.output_root = output_root + '_' + str(self.random_seed) + '_'
 	def fit(self, allelic_counts, total_counts, cov):
 		""" Fit the model.
 			Args:
@@ -150,7 +159,7 @@ class ASE_FACTORIZATION(object):
 		self.initialize_variables()
 		for vi_iter in range(self.max_iter):
 			print('ITERATION ' + str(self.iter))
-			self.update_V_and_conc()
+			self.update_V()
 			print('halfway:)')
 			self.update_U()
 			# Save to output every five iters
@@ -158,7 +167,7 @@ class ASE_FACTORIZATION(object):
 				np.savetxt(self.output_root + '_iter.txt', np.asmatrix(vi_iter), fmt="%s", delimiter='\t')
 				np.savetxt(self.output_root +'_temper_U.txt', (self.U), fmt="%s", delimiter='\t')
 				np.savetxt(self.output_root + '_temper_V.txt', (self.V), fmt="%s", delimiter='\t')
-				np.savetxt(self.output_root + '_temper_conc.txt', (self.conc), fmt="%s", delimiter='\t')
+				np.savetxt(self.output_root + '_temper_C.txt', (self.C), fmt="%s", delimiter='\t')
 			self.iter = self.iter + 1
 
 	def update_U(self):
@@ -166,7 +175,7 @@ class ASE_FACTORIZATION(object):
 		for sample_iter in range(self.N):
 			observed_indices = np.isnan(self.allelic_counts[sample_iter,:]) == False
 			merged_intercept = covariate_predicted[sample_iter, :]
-			data = dict(N=sum(observed_indices), P=self.U.shape[1], x=np.transpose(self.V[:,observed_indices]), intercept=merged_intercept[observed_indices], ys=self.allelic_counts[sample_iter, observed_indices].astype(int), ns=self.total_counts[sample_iter, observed_indices].astype(int), conc=self.conc[observed_indices])
+			data = dict(N=sum(observed_indices), P=self.U.shape[1], x=np.transpose(self.V[:,observed_indices]), intercept=merged_intercept[observed_indices], ys=self.allelic_counts[sample_iter, observed_indices].astype(int), ns=self.total_counts[sample_iter, observed_indices].astype(int))
 			########################################
 			# Initialize
 			'''
@@ -175,43 +184,45 @@ class ASE_FACTORIZATION(object):
 			else:
 				beta_init = self.U[sample_iter, :]
 			'''
-			beta_init = np.zeros(data['P'])
+			beta_init = self.U[sample_iter, :]
 			init = dict(beta=beta_init)
 			########################################
 			# Run optimization
 			try:
 				with suppress_stdout_stderr():
-					op = BB_GLM_FIXED_CONC.optimizing(data = data, verbose=False,iter=5000,seed=1, init=init)
+					op = FOLDED_BINOMIAL_INTERCEPT_GLM.optimizing(data = data, verbose=False,iter=5000,seed=1)
 			except RuntimeError:
 				try:
-					op = BB_GLM_FIXED_CONC.optimizing(data = data, verbose=False,iter=5000,seed=1)
+					pdb.set_trace()
+					op = FOLDED_BINOMIAL_INTERCEPT_GLM.optimizing(data = data, verbose=False,iter=5000,seed=2)
 				except RuntimeError:
 					try:
-						op = BB_GLM_FIXED_CONC.optimizing(data = data, verbose=False,iter=5000,seed=1, algorithm="Newton")
+						op = FOLDED_BINOMIAL_INTERCEPT_GLM.optimizing(data = data, verbose=False,iter=5000,seed=1, algorithm="Newton")
 					except RuntimeError:
 						try:
-							op = BB_GLM_FIXED_CONC.optimizing(data = data, verbose=False,iter=5000,seed=2, algorithm="Newton")
+							op = FOLDED_BINOMIAL_INTERCEPT_GLM.optimizing(data = data, verbose=False,iter=5000,seed=2, algorithm="Newton")
 						except RuntimeError:
 							print('eror')
 							pdb.set_trace()
 			self.U[sample_iter, :] = op['beta']
 
-	def update_V_and_conc(self):
+	def update_V(self):
 		# Add column of ones (intercept to U)
 		#U_new = np.hstack((X0, self.U, self.cov))
-		parrallel = False
+		parrallel = True
 		V_update_data = []
 		if parrallel == False:
 			U_new = np.hstack((self.cov, self.U))
 			for test_index in range(self.T):
 				print(test_index)
-				V_update_data.append(outside_update_V_t(U_new, self.allelic_counts[:, test_index], self.total_counts[:, test_index], self.concShape, self.concRate, self.iter, self.conc[test_index], self.C[:, test_index], self.V[:, test_index]))
+				V_update_data.append(outside_update_V_t(U_new, self.allelic_counts[:, test_index], self.total_counts[:, test_index], self.iter, self.C[:, test_index], self.V[:, test_index]))
 		elif parrallel == True:
 			U_new = np.hstack((self.cov, self.U))
-			V_update_data = Parallel(n_jobs=24)(delayed(outside_update_V_t)(U_new, self.allelic_counts[:, test_index], self.total_counts[:, test_index], self.concShape, self.concRate, self.iter, self.conc[test_index], self.C[:, test_index], self.V[:, test_index]) for test_index in range(self.T))
-		V_update_data = np.asarray(V_update_data)
-		V_update_data_2 = np.transpose(V_update_data[:,1:])
-		self.conc = V_update_data[:,0]
+			V_update_data = Parallel(n_jobs=24)(delayed(outside_update_V_t)(U_new, self.allelic_counts[:, test_index], self.total_counts[:, test_index], self.iter, self.C[:, test_index], self.V[:, test_index]) for test_index in range(self.T))
+		#V_update_data = np.asarray(V_update_data)
+		#V_update_data_2 = np.transpose(V_update_data[:,1:])
+		#self.conc = V_update_data[:,0]
+		V_update_data_2 = np.transpose(np.asarray(V_update_data))
 		self.C = V_update_data_2[:(self.num_cov), :]
 		self.V = V_update_data_2[(self.num_cov):, :]
 
@@ -220,17 +231,6 @@ class ASE_FACTORIZATION(object):
 		self.T = self.allelic_counts.shape[1]
 		self.num_cov = self.cov.shape[1]
 		# Randomly initialize (only U matters)
-		self.U = np.random.randn(self.N, self.K)
-		self.V = np.random.randn(self.K, self.T) 
-		self.conc = np.random.randn(self.T)
-		self.C = np.random.randn(self.num_cov, self.T)
-		ppca_init = False
-		if ppca_init == True:
-			rat = self.allelic_counts/self.total_counts
-			nans = np.isnan(rat)
-			scaled_rat = scale_allelic_ratios(rat)
-			scaled_residual_rat = regress_out_cell_line(scaled_rat, self.cov[:,1:])
-			rescaled_residual_rat = scale_allelic_ratios(scaled_residual_rat)
-			ppca = PPCA()
-			ppca.fit(data=np.transpose(rescaled_residual_rat), d=self.K, verbose=True, tol=1e-6)
-			self.U = ppca.C/np.std(ppca.C)
+		self.U = np.random.randn(self.N, self.K)*.01
+		self.V = np.random.randn(self.K, self.T)*.01
+		self.C = np.random.randn(self.num_cov, self.T)*.01

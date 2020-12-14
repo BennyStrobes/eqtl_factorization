@@ -66,7 +66,7 @@ def split_ase_file_into_bins(ase_file, num_bins, cell_bins, allelic_counts_outpu
 					numer = int(counts[index].split('/')[0])
 					dener = int(counts[index].split('/')[1])
 					corrected_numer = np.min((numer, dener-numer))
-					numerz = numerz + corrected_numer 
+					numerz = numerz + numer 
 					denerz = denerz + dener
 			if denerz == 0:
 				allelic_counts.append('NA')
