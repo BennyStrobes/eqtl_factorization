@@ -4,6 +4,7 @@
 #SBATCH --time=40:00:00
 #SBATCH --partition=lrgmem
 #SBATCH --mem=50GB
+#SBATCH --cpus-per-task=24
 #SBATCH --nodes=1
 
 

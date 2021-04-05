@@ -13,6 +13,30 @@ visualize_pseudobulk_eqtl_dir="$6"
 
 
 ###########################
+# Prepare input data for pseudobulk per individual eqtl analysis
+###########################
+if false; then
+python prepare_pseudobulk_per_individual_eqtl_analysis_input_data.py $processed_expression_dir $gene_annotation_file $genotype_data_dir $pseudobulk_eqtl_dir
+fi
+
+###########################
+# Run pseudobulk-per-individual eqtl analysis 
+###########################
+
+# Input files
+expression_file=$pseudobulk_eqtl_dir"pseudobulk_per_individual_eqtl_input_expression.txt"
+genotype_file=$pseudobulk_eqtl_dir"pseudobulk_per_individual_eqtl_input_genotype.txt"
+test_names_file=$pseudobulk_eqtl_dir"pseudobulk_per_individual_eqtl_input_variant_gene_pairs.txt"
+covariate_file=$pseudobulk_eqtl_dir"pseudobulk_per_individual_pca_scores.txt"
+# Output root
+output_root=$pseudobulk_eqtl_dir"pseudobulk_per_individual_eqtl_analysis_"
+# Run pseudobulk eqtl analysis in this cell type
+if false; then
+module load python/2.7-anaconda
+python run_eqtl_analysis.py $expression_file $genotype_file $test_names_file $covariate_file $output_root
+fi
+
+###########################
 # Prepare input data for pseudobulk eqtl analysis
 ###########################
 if false; then
@@ -42,11 +66,9 @@ fi
 ###########################
 # Prepare input data for single-cell eqtl analysis
 ###########################
-date
 if false; then
 python prepare_single_cell_eqtl_analysis_input_data.py $processed_expression_dir $gene_annotation_file $genotype_data_dir $single_cell_eqtl_dir
 fi
-date
 
 
 ###########################
@@ -115,5 +137,6 @@ fi
 ###########################
 # Visualize pseudobulk eqtl results
 ###########################`
+if false; then
 Rscript visualize_pseudobulk_eqtls.R $processed_expression_dir $pseudobulk_eqtl_dir $single_cell_eqtl_dir $visualize_pseudobulk_eqtl_dir
-
+fi

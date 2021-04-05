@@ -357,6 +357,43 @@ def get_cell_cycle_scores_with_scanpy(normalized_expression_file, g2m_cell_cycle
 	adata.obs['cell_id'] = adata.obs.index
 	np.savetxt(output_file, np.asarray(adata.obs), fmt="%s", delimiter='\t', header='\t'.join(adata.obs.columns), comments='')
 
+def append_cell_covariates_file(input_cov_file, cell_modules_file, output_cov_file):
+	# creating mapping from cell name to new covariates
+	mapping = {}
+	# Stream cell modules file
+	head_count = 0
+	f = open(cell_modules_file)
+	for line in f:
+		line = line.rstrip()
+		data = line.split('\t')
+		if head_count == 0:
+			head_count = head_count + 1
+			new_cov_names = np.asarray(data[1:])
+			continue
+		cell_id = data[0]
+		new_covs = np.asarray(data[1:])
+		mapping[cell_id] = new_covs
+	f.close()
+	# update covariate file
+	f = open(input_cov_file)
+	head_count = 0
+	t = open(output_cov_file, 'w')
+	for line in f:
+		line = line.rstrip()
+		data = line.split('\t')
+		if head_count == 0:
+			head_count = head_count + 1
+			t.write(line + '\t' + '\t'.join(new_cov_names) + '\n')
+			continue
+		cell_id = data[0]
+		if cell_id not in mapping:
+			print('assumption error!!')
+			pdb.set_trace()
+		new_covs = mapping[cell_id]
+		t.write(line + '\t' + '\t'.join(new_covs) + '\n')
+	f.close()
+	t.close()
+
 
 normalized_expression_file = sys.argv[1]
 meta_data_file = sys.argv[2]
@@ -366,6 +403,7 @@ genotype_pc_file = sys.argv[5]
 pre_processed_data_dir = sys.argv[6]
 g2m_cell_cycle_genes_file = sys.argv[7]
 s_cell_cycle_genes_file = sys.argv[8]
+cell_modules_file = sys.argv[9]
 
 new_normalized_expression_file = pre_processed_data_dir + 'normalized_expression2.txt'
 '''
@@ -386,7 +424,7 @@ f.close()
 print('done')
 '''
 ############################
-get_cell_cycle_scores_with_scanpy(new_normalized_expression_file, g2m_cell_cycle_genes_file, s_cell_cycle_genes_file, pre_processed_data_dir + 'cell_cycle_scores.txt')
+#get_cell_cycle_scores_with_scanpy(new_normalized_expression_file, g2m_cell_cycle_genes_file, s_cell_cycle_genes_file, pre_processed_data_dir + 'cell_cycle_scores.txt')
 
 '''
 ##############################
@@ -410,7 +448,13 @@ make_cell_to_individual_mapping(meta_data_file, cell_to_individual_mapping_file,
 # And filter cells to those for which we have genotype data for
 recreated_cell_covariates_file = pre_processed_data_dir + 'cell_covariates.txt'
 valid_cell_indices = recreate_cell_covariates(meta_data_file, recreated_cell_covariates_file, valid_individuals, genotype_pc_file)
-
+'''
+###########################################
+# Add some columns to cell covariates file
+recreated_cell_covariates_file = pre_processed_data_dir + 'cell_covariates.txt'
+appended_cell_covariates_file = pre_processed_data_dir + 'cell_covariates_appeneded.txt'
+#append_cell_covariates_file(recreated_cell_covariates_file, cell_modules_file, appended_cell_covariates_file)
+'''
 ###############################
 # Re-create expression data
 # Also filter to only protein coding genes
@@ -436,41 +480,42 @@ for day in range(4):
 # Center expression data
 centered_normalized_gene_expression_file = pre_processed_data_dir + 'centered_normalized_expression_all_cells.txt'
 center_expression(recreated_normalized_gene_expression_file, centered_normalized_gene_expression_file)
-
+'''
 ###############################
 # Standardize expression data
 standardized_gene_expression_file = pre_processed_data_dir + 'standardized_normalized_expression_all_cells.txt'
-standardize_expression(recreated_normalized_gene_expression_file, standardized_gene_expression_file)
+#standardize_expression(recreated_normalized_gene_expression_file, standardized_gene_expression_file)
 
 ###############################
 # Generate expression data for top nn variable genes
 nn = 500
 top_n_variable_genes_standardized_gene_expression_file = pre_processed_data_dir + 'standardized_normalized_expression_all_cells_top_' + str(nn) + '_variable_genes.txt'
-standardize_expression_for_top_nn_variable_genes(recreated_normalized_gene_expression_file, top_n_variable_genes_standardized_gene_expression_file, nn)
+#standardize_expression_for_top_nn_variable_genes(recreated_normalized_gene_expression_file, top_n_variable_genes_standardized_gene_expression_file, nn)
 
 ###############################
 # Generate expression data for top nn variable genes
 nn = 2000
 top_n_variable_genes_standardized_gene_expression_file = pre_processed_data_dir + 'standardized_normalized_expression_all_cells_top_' + str(nn) + '_variable_genes.txt'
-standardize_expression_for_top_nn_variable_genes(recreated_normalized_gene_expression_file, top_n_variable_genes_standardized_gene_expression_file, nn)
+#standardize_expression_for_top_nn_variable_genes(recreated_normalized_gene_expression_file, top_n_variable_genes_standardized_gene_expression_file, nn)
 
 ###############################
 # Compute variance of each gene
 variance_of_each_gene_file = pre_processed_data_dir + 'variance_of_each_gene.txt'
-variance_of_each_gene(recreated_normalized_gene_expression_file, variance_of_each_gene_file)
+#variance_of_each_gene(recreated_normalized_gene_expression_file, variance_of_each_gene_file)
 
 ###############################
 # Compute fraction of zeros in each gene
 fraction_of_zeros_in_each_gene_file = pre_processed_data_dir + 'fraction_of_zeros_in_each_gene.txt'
-fraction_of_zeros_in_each_gene(recreated_normalized_gene_expression_file, fraction_of_zeros_in_each_gene_file)
+#fraction_of_zeros_in_each_gene(recreated_normalized_gene_expression_file, fraction_of_zeros_in_each_gene_file)
 
 ###############################
 # Run PCA on standardized expression data
-num_pcs=50
+num_pcs=200
 pca_loading_file = pre_processed_data_dir + 'standardized_normalized_expression_pca_loadings.txt'
 pca_pve_file = pre_processed_data_dir + 'standardized_normalized_expression_pca_pve.txt'
+print('starting')
 generate_pca_scores_and_variance_explained(standardized_gene_expression_file, num_pcs, pca_loading_file, pca_pve_file)
-
+'''
 ###############################
 # Run PCA on centered expression data
 num_pcs=50

@@ -2,14 +2,14 @@ import numpy as np
 import os
 import sys
 import pdb
-#import eqtl_factorization_vi_spike_and_slab
+import eqtl_factorization_vi_spike_and_slab
 #import eqtl_factorization_vi_dirichlet_simplex
 #import eqtl_factorization_vi_spike_and_slab_tied_residuals
 #import eqtl_factorization_vi_spike_and_slab_loadings_ard_factors
 #import eqtl_factorization_vi_spike_and_slab_loadings_ard_loadings
-import eqtl_factorization_vi_zero_inflated
-import eqtl_factorization_vi_zero_inflated2
-import eqtl_factorization_vi_zero_inflated3
+#import eqtl_factorization_vi_zero_inflated
+#import eqtl_factorization_vi_zero_inflated2
+#import eqtl_factorization_vi_zero_inflated3
 #import eqtl_factorization_als
 #import eqtl_factorization_als_unconstrained
 #import eqtl_factorization_als_positive_loadings
@@ -99,7 +99,7 @@ def train_eqtl_factorization_model(sample_overlap_file, expression_training_file
 	# RUN MODEL
 	#############################
 	if model_name == 'eqtl_factorization_vi_spike_and_slab':
-		eqtl_vi = eqtl_factorization_vi_spike_and_slab.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-16, beta=1e-16, a=1, b=1, gamma_v=1.0, max_iter=max_it, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean, sample_batch_fraction=.1)
+		eqtl_vi = eqtl_factorization_vi_spike_and_slab.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-16, beta=1e-16, a=1, b=1, gamma_v=1.0, max_iter=max_it, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean, sample_batch_fraction=.1, output_root=output_root)
 		eqtl_vi.fit(G=G, Y=Y, z=Z)
 		# pickle.dump(eqtl_vi, open(output_root + '_model', 'wb'))
 		#eqtl_vi = pickle.load(open(output_root + '_model', 'rb'))

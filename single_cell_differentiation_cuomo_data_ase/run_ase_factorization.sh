@@ -2,9 +2,10 @@
 
 #SBATCH
 #SBATCH --time=24:00:00
-#SBATCH --partition=shared
+#SBATCH --partition=lrgmem
 #SBATCH --nodes=1
 #SBATCH --mem=5GB
+#SBATCH --cpus-per-task=24
 
 
 ase_file="$1"
@@ -16,10 +17,9 @@ model_name="$6"
 eqtl_results_dir="$7"
 
 # For pystan
-if false; then
 module load python/2.7-anaconda
 module load gcc/6.4.0
-fi
+
 
 
 python run_ase_factorization.py $ase_file $covariate_file $sample_overlap_file $batch_overlap_file $k $model_name $eqtl_results_dir

@@ -290,7 +290,7 @@ def outside_update_tau_t(tau_alpha, tau_beta, G_slice, Y_slice, N, U_S, V_S_t, F
 
 
 class EQTL_FACTORIZATION_VI(object):
-	def __init__(self, K=25, alpha=1e-3, beta=1e-3, a=1, b=1, gamma_v=1.0, max_iter=1000, delta_elbo_threshold=1e-8, SVI=False, parrallel_boolean=False, sample_batch_fraction=.3, learning_rate=.4, forgetting_rate=.01, num_test_cores=24, num_sample_cores=24):
+	def __init__(self, K=25, alpha=1e-3, beta=1e-3, a=1, b=1, gamma_v=1.0, max_iter=1000, delta_elbo_threshold=1e-8, SVI=False, parrallel_boolean=False, sample_batch_fraction=.3, learning_rate=.4, forgetting_rate=.01, num_test_cores=10, num_sample_cores=10, output_root=''):
 		self.alpha_prior = alpha
 		self.beta_prior = beta
 		self.a_prior = a 
@@ -304,6 +304,7 @@ class EQTL_FACTORIZATION_VI(object):
 		self.parrallel_boolean = parrallel_boolean
 		self.num_sample_cores = num_sample_cores
 		self.num_test_cores = num_test_cores
+		self.output_root = output_root
 		if SVI == True:
 			self.sample_batch_fraction = sample_batch_fraction
 			self.learning_rate = learning_rate
@@ -322,6 +323,7 @@ class EQTL_FACTORIZATION_VI(object):
 		self.Y_full = Y
 		self.z_full = np.asarray(z)
 		self.initialize_variables()
+		print(self.parrallel_boolean)
 		#self.update_elbo()
 		# Loop through VI iterations
 		for vi_iter in range(self.max_iter):
@@ -330,25 +332,38 @@ class EQTL_FACTORIZATION_VI(object):
 			self.update_step_size()
 			# Update parameter estimaters via coordinate ascent
 			print('Step size: ' + str(self.step_size))
+			print('U')
 			self.update_U()
+			print('V')
 			self.update_V()
-			#self.update_alpha()
+			print('alpha')
+			self.update_alpha()
+			print('Intercept')
 			self.update_intercept()
+			print('F')
 			self.update_F()
-			self.update_theta_U()
-			#self.update_psi()
+			print('thetaU')
+			if vi_iter > 4:
+				self.update_theta_U()
+			print('psi')
+			self.update_psi()
+			print('tau')
 			self.update_tau()
 			self.iter = self.iter + 1
 			# Remove irrelevent factors
-			if np.mod(vi_iter, 50) == 0 and vi_iter > 0:
+			if np.mod(vi_iter, 10) == 0 and vi_iter > 0:
 				# UPDATE remove irrelevent_factors TO BE IN TERMS OF *_FULL (ie re-learn theta_U on all data)
-				self.remove_irrelevent_factors()
-				np.savetxt('/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_U_S_v2.txt', (self.U_mu_full*self.S_U_full), fmt="%s", delimiter='\t')
-				np.savetxt('/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_theta_U_v2.txt', (self.theta_U_a/(self.theta_U_a + self.theta_U_b)), fmt="%s", delimiter='\t')			
-				np.savetxt('/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_V_v2.txt', (self.V_mu), fmt="%s", delimiter='\t')
-				np.savetxt('/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_F_v2.txt', (self.F_mu), fmt="%s", delimiter='\t')
-				#np.savetxt('/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_alpha_v2.txt', (self.alpha_mu), fmt="%s", delimiter='\t')
-				np.savetxt('/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_tau.txt', (self.tau_alpha/self.tau_beta), fmt="%s", delimiter='\t')
+				#self.remove_irrelevent_factors()
+				np.savetxt(self.output_root + '_temper_U_S.txt', (self.U_mu*self.S_U), fmt="%s", delimiter='\t')
+				np.savetxt(self.output_root + '_temper_S.txt', (self.S_U), fmt="%s", delimiter='\t')
+				np.savetxt(self.output_root + '_temper_theta_U.txt', (self.theta_U_a/(self.theta_U_a + self.theta_U_b)), fmt="%s", delimiter='\t')			
+				np.savetxt(self.output_root + '_temper_V.txt', (self.V_mu), fmt="%s", delimiter='\t')
+				np.savetxt(self.output_root + '_temper_F.txt', (self.F_mu), fmt="%s", delimiter='\t')
+				np.savetxt(self.output_root + 'temper_alpha.txt', (self.alpha_mu), fmt="%s", delimiter='\t')
+				np.savetxt(self.output_root + '_temper_tau.txt', (self.tau_alpha/self.tau_beta), fmt="%s", delimiter='\t')
+				np.savetxt(self.output_root + '_temper_intercept.txt', (self.intercept_mu), fmt="%s", delimiter='\t')
+				np.savetxt(self.output_root + '_temper_iter.txt', np.asmatrix(vi_iter), fmt="%s", delimiter='\t')
+
 				#np.savetxt('/home-1/bstrobe1@jhu.edu/work/ben/temp/temper_psi.txt', (self.psi_alpha/self.psi_beta), fmt="%s", delimiter='\t')
 
 
@@ -1044,18 +1059,17 @@ class EQTL_FACTORIZATION_VI(object):
 		self.tau_alpha = np.ones(self.T)*self.alpha_prior
 		self.tau_beta = np.ones(self.T)*self.beta_prior
 		# bernoulli probs
-		self.theta_U_a = np.ones(self.K)*self.a_prior
+		self.theta_U_a = np.ones(self.K)*self.a_prior*10.0
 		self.theta_U_b = np.ones(self.K)*self.b_prior
 
 		# Initialize other variables based around U
 		self.step_size = 1.0
-		pdb.set_trace()
-		self.update_V()
+		#self.update_V()
 		# self.update_alpha()
-		self.update_intercept()
-		self.update_F()
+		#self.update_intercept()
+		#self.update_F()
 		# self.update_psi()
-		self.update_tau()
+		#self.update_tau()
 
 		if self.SVI == True:
 			self.sample_batch_fraction = actual_sample_batch_fraction

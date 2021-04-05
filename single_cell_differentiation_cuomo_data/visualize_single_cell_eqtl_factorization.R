@@ -129,12 +129,12 @@ make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate <- 
 	factor_number <- 4
 	factor_4_boxplot <- make_loading_boxplot_for_one_factor_by_categorical_covariate(covariate, loadings[,factor_number], factor_number, covariate_name)
 
-	#factor_number <- 5
-	#factor_5_boxplot <- make_loading_boxplot_for_one_factor_by_categorical_covariate(covariate, loadings[,factor_number], factor_number, covariate_name)
+	factor_number <- 5
+	factor_5_boxplot <- make_loading_boxplot_for_one_factor_by_categorical_covariate(covariate, loadings[,factor_number], factor_number, covariate_name)
 
 
-	#combined <- plot_grid(factor_1_boxplot, factor_2_boxplot, factor_3_boxplot, factor_4_boxplot, factor_5_boxplot, ncol=1)
-	combined <- plot_grid(factor_1_boxplot, factor_2_boxplot, factor_3_boxplot, factor_4_boxplot, ncol=1)
+	combined <- plot_grid(factor_1_boxplot, factor_2_boxplot, factor_3_boxplot, factor_4_boxplot, factor_5_boxplot, ncol=1)
+	#combined <- plot_grid(factor_1_boxplot, factor_2_boxplot, factor_3_boxplot, factor_4_boxplot, ncol=1)
 
 	return(combined)
 }
@@ -152,7 +152,7 @@ make_covariate_loading_correlation_heatmap <- function(covariates, loadings) {
     #valid_covariates <- 2:85
     #covs <- covariates[,valid_covariates]
     valid_covariates <- c(6, 7, 8, 10, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 31, 32, 33, 36, 37, 38, 40, 41, 43, 44, 45,46, 47, 48, 49, 51, 52, 53, 54, 59, 60, 69, 71, 87, 95, 96, 97, 98)
- 	covariate_type <- c("num", "cat", "cat", "cat", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "cat", "num", "num", "num", "num", "num", "num", "cat")
+ 	covariate_type <- c("num", "cat", "cat", "cat", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "num", "cat", "num", "num", "num", "num", "num", "num", "num")
 
  	cov_names <- colnames(covariates)[valid_covariates]
  	num <- length(cov_names)
@@ -354,6 +354,100 @@ make_pseudotime_factor_scatter <- function(pseudotime, loading, day) {
 	return(p)
 }
 
+make_loading_covariate_scatter_for_each_factor <- function(expression_pc, loading, factor_number, x_axis_label) {
+	df <- data.frame(expression_pc=expression_pc, loading=loading)
+	print(factor_number)
+	print(cor(expression_pc, loading)*cor(expression_pc, loading))
+
+	plotter <- ggplot(df, aes(x=expression_pc, y=loading)) + 
+	           geom_point(size=.001, alpha=.35) +
+	           gtex_v8_figure_theme() + 
+	           labs(x=x_axis_label, y = paste0("Loading ", factor_number)) + 
+	           theme(legend.text = element_text(size=8), legend.title = element_text(size=8)) +
+	           geom_smooth()
+	return(plotter)
+
+}
+
+
+loading_covariate_scatter_with_row_for_every_factor <- function(expression_pc, loadings, x_axis_label) {
+	factor_number <- 1
+	factor_1_scatterplot <- make_loading_covariate_scatter_for_each_factor(expression_pc, loadings[, factor_number], factor_number, x_axis_label)
+
+
+	factor_number <- 2
+	factor_2_scatterplot <- make_loading_covariate_scatter_for_each_factor(expression_pc, loadings[, factor_number], factor_number, x_axis_label)
+
+
+	factor_number <- 3
+	factor_3_scatterplot <- make_loading_covariate_scatter_for_each_factor(expression_pc, loadings[, factor_number], factor_number, x_axis_label)
+
+	factor_number <- 4
+	factor_4_scatterplot <- make_loading_covariate_scatter_for_each_factor(expression_pc, loadings[, factor_number], factor_number, x_axis_label)
+
+	factor_number <- 5
+	ffactor_5_scatterplot <- make_loading_covariate_scatter_for_each_factor(expression_pc, loadings[, factor_number], factor_number, x_axis_label)
+
+
+
+	combined <- plot_grid(factor_1_scatterplot, factor_2_scatterplot, factor_3_scatterplot, factor_4_scatterplot, ffactor_5_scatterplot, ncol=1)
+
+
+	return(combined)
+}
+
+make_loading_boxplot_for_one_factor_by_2_categorical_covariates <- function(covariate1, covariate2, loadings, factor_number, covariate_name) {
+	df <- data.frame(loading=loadings, covariate1=factor(covariate1), covariate2=factor(covariate2))
+
+	boxplot <- ggplot(df, aes(x=covariate1, y=loading, fill=covariate2)) + geom_boxplot(outlier.size = .00001) +
+				gtex_v8_figure_theme() + 
+	        	labs(x="", y = paste0("Sample loading (", factor_number,")"), fill="") +
+	        	theme(legend.position="none") +
+	        	guides(colour = guide_legend(override.aes = list(size=2))) +
+	        	theme(axis.text.x=element_blank()) + 
+	           	guides(colour=guide_legend(nrow=4,byrow=TRUE, override.aes = list(size=2))) +
+	           	geom_hline(yintercept=0)
+
+}
+
+
+
+make_loading_boxplot_plot_with_row_for_every_factor_by_2_categorical_covariates <- function(covariate1, covariate2, loadings, covariate_name) {
+	loading_vec <- c()
+	covariate_vec <- c()
+	num_factors <- dim(loadings)[2]
+	print(num_factors)
+
+	factor_number <- 1
+	factor_1_boxplot <- make_loading_boxplot_for_one_factor_by_2_categorical_covariates(covariate1, covariate2, loadings[,factor_number], factor_number, covariate_name)
+
+	factor_number <- 2
+	factor_2_boxplot <- make_loading_boxplot_for_one_factor_by_2_categorical_covariates(covariate1, covariate2, loadings[,factor_number], factor_number, covariate_name)
+
+
+	factor_number <- 3
+	factor_3_boxplot <- make_loading_boxplot_for_one_factor_by_2_categorical_covariates(covariate1, covariate2, loadings[,factor_number], factor_number, covariate_name)
+
+	factor_number <- 4
+	factor_4_boxplot <- make_loading_boxplot_for_one_factor_by_2_categorical_covariates(covariate1, covariate2, loadings[,factor_number], factor_number, covariate_name)
+
+	factor_number <- 5
+	factor_5_boxplot <- make_loading_boxplot_for_one_factor_by_2_categorical_covariates(covariate1, covariate2, loadings[,factor_number], factor_number, covariate_name)
+
+	#factor_number <- 4
+	#factor_4_boxplot <- make_loading_boxplot_for_one_factor_by_categorical_covariate(covariate, loadings[,factor_number], factor_number, covariate_name)
+
+	#factor_number <- 5
+	#factor_5_boxplot <- make_loading_boxplot_for_one_factor_by_categorical_covariate(covariate, loadings[,factor_number], factor_number, covariate_name)
+
+
+	#combined <- plot_grid(factor_1_boxplot, factor_2_boxplot, factor_3_boxplot, factor_4_boxplot, factor_5_boxplot, ncol=1)
+	combined <- plot_grid(factor_1_boxplot, factor_2_boxplot, factor_3_boxplot, factor_4_boxplot, factor_5_boxplot, ncol=1)
+
+	return(combined)
+}
+
+
 #############################
 # Command line args
 #############################
@@ -363,10 +457,11 @@ eqtl_factorization_results_dir <- args[3]
 eqtl_visualization_dir <- args[4]
 
 
-eqtl_factorization_stem <- "/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell_differentiation_cuomo_data/eqtl_factorization_results/eqtl_factorization_single_cell_sig_covariate_modulated_eqtls_top_2000_min_expressed_cells_5_factors_eqtl_factorization_vi_factor_loading_spike_and_slab_with_re_model_False_re_False_svi_0_seed_1_lasso_param_temper_"
+eqtl_factorization_stem <- "/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell_differentiation_cuomo_data/eqtl_factorization_results/eqtl_factorization_single_cell_sig_dynamic_eqtls_min_expressed_cells_5_factors_eqtl_factorization_vi_fixed_environmental_effect_learn_cov_model_False_re_False_svi_0_seed_1_lasso_param_temper_"
+print(eqtl_factorization_stem)
 #eqtl_factorization_stem <- "/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell_differentiation_cuomo_data/eqtl_factorization_results/eqtl_factorization_single_cell_sig_tests_50_pc_min_expressed_cells_5_factors_eqtl_factorization_vi_with_re_model_False_re_False_svi_0_seed_100_lasso_param_temper_"
 #eqtl_factorization_stem <- "/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell_differentiation_cuomo_data/eqtl_factorization_results/eqtl_factorization_single_cell_sig_tests_50_pc_min_expressed_cells_5_factors_eqtl_factorization_vi_zero_inflated2_model_False_re_False_svi_0_seed_100_lasso_param_temper_"
-output_stem = "sig_covariate_eqtls_top_2000_re_model_spike_and_slab_on_both_"
+output_stem = "sig_dynamic_eqtls_top_2000_re_model_spike_and_slab_and_environment_fixed_effect_learn_cov_20_"
 #output_stem = "re_model_"
 #output_stem = "no_re_model_"
 
@@ -379,7 +474,7 @@ eqtl_visualization_dir <- paste0(eqtl_visualization_dir, output_stem)
 
 
 # Input files
-covariate_file <- paste0(pre_processed_data_dir, "cell_covariates.txt")
+covariate_file <- paste0(pre_processed_data_dir, "cell_covariates_appeneded.txt")
 # Load in data
 covariates <- read.table(covariate_file, comment.char="*", header=TRUE, sep="\t")
 
@@ -410,9 +505,9 @@ pve_of_eqtl_factors <- compute_pve_of_eqtl_factors(loadings, factors, taus)
 print(pve_of_eqtl_factors)
 
 print("UMAP START")
-#umap_loadings = umap(loadings)$layout
-#saveRDS( umap_loadings, paste0(eqtl_visualization_dir, "umap_loadings.rds"))
-umap_loadings <- readRDS(paste0(eqtl_visualization_dir, "umap_loadings.rds"))
+umap_loadings = umap(loadings)$layout
+saveRDS( umap_loadings, paste0(eqtl_visualization_dir, "umap_loadings.rds"))
+#umap_loadings <- readRDS(paste0(eqtl_visualization_dir, "umap_loadings.rds"))
 print("UMAP DONE")
 
 
@@ -444,8 +539,8 @@ ggsave(factor_histogram, file=output_file, width=7.2, height=7, units="in")
 # Make Heatmap correlating known covariates with Expression PCs
 #######################################
 output_file <- paste0(eqtl_visualization_dir, "expression_pc_covariate_heatmap.pdf")
-heatmap <- make_covariate_loading_correlation_heatmap(covariates, expression_pcs) 
-ggsave(heatmap, file=output_file, width=10.2, height=5.5, units="in")
+#heatmap <- make_covariate_loading_correlation_heatmap(covariates, expression_pcs) 
+#ggsave(heatmap, file=output_file, width=10.2, height=5.5, units="in")
 
 
 ######################################
@@ -485,11 +580,16 @@ output_file <- paste0(eqtl_visualization_dir, "boxplot_colored_by_plate_id.pdf")
 plate_id_categorical_boxplot = make_loading_boxplot_plot_with_row_for_every_factor_by_categorical_covariate(factor(covariates$plate_id), loadings, "plate_id")
 ggsave(plate_id_categorical_boxplot, file=output_file, width=7.2, height=7.0, units="in")
 
+
+output_file <- paste0(eqtl_visualization_dir, "boxplot_colored_by_experiment_day2.pdf")
+exp_day_categorical_boxplot = make_loading_boxplot_plot_with_row_for_every_factor_by_2_categorical_covariates(factor(paste0(covariates$experiment,"_",covariates$day)), factor(covariates$day), loadings, "Experiment_day")
+ggsave(exp_day_categorical_boxplot, file=output_file, width=7.2, height=7.0, units="in")
+
 ######################################
 # Visualize UMAP scatter plot colored by known percent mito
 #######################################
-output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_pseudotime.pdf")
-umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$princ_curve_scaled01, umap_loadings, "Pseudotime")
+output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_expr_PC1.pdf")
+umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$princ_curve_scaled01, umap_loadings, "Expr PC1")
 ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
 
 ######################################
@@ -520,6 +620,85 @@ ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
 output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_log_total_counts.pdf")
 umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$log10_total_counts, umap_loadings, "log_total_counts")
 ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+
+######################################
+# Visualize UMAP scatter plot colored by known cell counts
+#######################################
+output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_pseudotime.pdf")
+umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$pseudotime, umap_loadings, "Pseudotime")
+ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+
+######################################
+# Visualize UMAP scatter plot colored by known cell counts
+#######################################
+output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_G2_M_transition.pdf")
+umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$G2_M_transition, umap_loadings, "G2_M_transition")
+ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+
+######################################
+# Visualize UMAP scatter plot colored by known cell counts
+#######################################
+output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_sterol_biosynthesis.pdf")
+umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$sterol_biosynthesis, umap_loadings, "sterol_biosynthesis")
+ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+
+######################################
+# Visualize UMAP scatter plot colored by known cell counts
+#######################################
+output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_G1_S_transition.pdf")
+umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$G1_S_transition, umap_loadings, "G1_S_transition")
+ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+
+######################################
+# Visualize UMAP scatter plot colored by known cell counts
+#######################################
+output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_differentiation.pdf")
+umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$differentiation, umap_loadings, "differentiation")
+ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+
+######################################
+# Visualize UMAP scatter plot colored by known cell counts
+#######################################
+output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_respiration.pdf")
+umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(covariates$respiration, umap_loadings, "respiration")
+ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+
+
+######################################
+# Visualize UMAP scatter plot colored by known cell counts
+#######################################
+output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_loading_1.pdf")
+umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(loadings[,1], umap_loadings, "loading_1")
+ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+
+######################################
+# Visualize UMAP scatter plot colored by known cell counts
+#######################################
+output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_loading_2.pdf")
+umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(loadings[,2], umap_loadings, "loading_2")
+ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+
+######################################
+# Visualize UMAP scatter plot colored by known cell counts
+#######################################
+output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_loading_3.pdf")
+umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(loadings[,3], umap_loadings, "loading_3")
+ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+######################################
+# Visualize UMAP scatter plot colored by known cell counts
+#######################################
+output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_loading_4.pdf")
+umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(loadings[,4], umap_loadings, "loading_4")
+ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+
+######################################
+# Visualize UMAP scatter plot colored by known cell counts
+#######################################
+output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_loading_5.pdf")
+umap_scatter <- make_umap_loading_scatter_plot_colored_by_real_valued_variable(loadings[,5], umap_loadings, "loading_5")
+ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+
+
 ######################################
 # Visualize UMAP scatter plot colored by known cell counts
 #######################################
@@ -540,3 +719,49 @@ ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
 output_file <- paste0(eqtl_visualization_dir, "umap_loading_scatter_colored_by_experiment.pdf")
 umap_scatter <- make_umap_loading_scatter_plot_colored_by_categorical_variable(factor(covariates$experiment), umap_loadings, "Experiment")
 ggsave(umap_scatter, file=output_file, width=7.2, height=6.0, units="in")
+
+
+######################################
+# Make loading scatterplot with row for every factor colored by a real valued covariate
+#######################################
+output_file <- paste0(eqtl_visualization_dir, "loading_pseudotime_scatter_with_row_for_every_factor.pdf")
+scatterplot <- loading_covariate_scatter_with_row_for_every_factor(covariates$pseudotime , loadings, "Pseudotime")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+######################################
+# Make loading scatterplot with row for every factor colored by a real valued covariate
+#######################################
+output_file <- paste0(eqtl_visualization_dir, "loading_G2_M_transition_scatter_with_row_for_every_factor.pdf")
+scatterplot <- loading_covariate_scatter_with_row_for_every_factor(covariates$G2_M_transition , loadings, "G2_M_transition")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+######################################
+# Make loading scatterplot with row for every factor colored by a real valued covariate
+#######################################
+output_file <- paste0(eqtl_visualization_dir, "loading_sterol_biosynthesis_scatter_with_row_for_every_factor.pdf")
+scatterplot <- loading_covariate_scatter_with_row_for_every_factor(covariates$sterol_biosynthesis , loadings, "sterol_biosynthesis")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+
+######################################
+# Make loading scatterplot with row for every factor colored by a real valued covariate
+#######################################
+output_file <- paste0(eqtl_visualization_dir, "loading_G1_S_transition_scatter_with_row_for_every_factor.pdf")
+scatterplot <- loading_covariate_scatter_with_row_for_every_factor(covariates$G1_S_transition , loadings, "G1_S_transition")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+######################################
+# Make loading scatterplot with row for every factor colored by a real valued covariate
+#######################################
+output_file <- paste0(eqtl_visualization_dir, "loading_differentiation_scatter_with_row_for_every_factor.pdf")
+scatterplot <- loading_covariate_scatter_with_row_for_every_factor(covariates$differentiation , loadings, "differentiation")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+
+
+######################################
+# Make loading scatterplot with row for every factor colored by a real valued covariate
+#######################################
+output_file <- paste0(eqtl_visualization_dir, "loading_respiration_scatter_with_row_for_every_factor.pdf")
+scatterplot <- loading_covariate_scatter_with_row_for_every_factor(covariates$respiration , loadings, "respiration")
+ggsave(scatterplot, file=output_file, width=7.2, height=9.0, units="in")
+

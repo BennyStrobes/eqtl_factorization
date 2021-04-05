@@ -206,7 +206,7 @@ output_root = sys.argv[5]  # output root
 ####################
 # Output file
 variant_gene_pairs_eqtl_results_file = output_root + 'all_variant_gene_pairs.txt'
-#eqtl_analysis(covariate_file, test_names_file, expression_file, genotype_file, variant_gene_pairs_eqtl_results_file)
+eqtl_analysis(covariate_file, test_names_file, expression_file, genotype_file, variant_gene_pairs_eqtl_results_file)
 
 
 ####################

@@ -259,11 +259,12 @@ class ASE_FACTORIZATION(object):
 		np.random.seed(self.random_seed)
 		self.allelic_counts = allelic_counts
 		self.total_counts = total_counts
-		self.filter_out_outlier_genes()
+		#self.filter_out_outlier_genes()
 		self.cov = cov
 		self.z = z.astype(int)
 		self.observed_data_log_likelihoods = []
 		self.initialize_variables()
+		pdb.set_trace()
 		for vi_iter in range(self.max_iter):
 			print('ITERATION ' + str(self.iter))
 			
@@ -280,9 +281,6 @@ class ASE_FACTORIZATION(object):
 			self.update_w()
 			self.update_V_and_conc_and_C()
 			self.update_U()
-			for inner_iter in range(15):
-				self.update_V()
-				self.update_U()
 			# Save to output every five iters
 			if np.mod(vi_iter, 1) == 0: 
 				np.savetxt(self.output_root + '_iter.txt', np.asmatrix(vi_iter), fmt="%s", delimiter='\t')
@@ -426,10 +424,11 @@ class ASE_FACTORIZATION(object):
 				self.phi[individual_index][test_index,:] = self.phi[individual_index][test_index,:]/np.sum(self.phi[individual_index][test_index,:])
 	def update_U(self):
 		covariate_predicted = np.dot(self.cov, self.C)
-		parrallel = True
+		parrallel = False
 		U_update_data = []
 		if parrallel == False:
 			for sample_iter in range(self.N):
+				print(sample_iter)
 				U_update_data.append(outside_update_U_n(self.V, self.allelic_counts[sample_iter, :], self.total_counts[sample_iter, :], self.conc, covariate_predicted[sample_iter, :],  self.phi[self.z[sample_iter],:,:]))
 		elif parrallel == True:
 			U_update_data = Parallel(n_jobs=24)(delayed(outside_update_U_n)(self.V, self.allelic_counts[sample_iter, :], self.total_counts[sample_iter, :], self.conc, covariate_predicted[sample_iter, :],  self.phi[self.z[sample_iter],:,:]) for sample_iter in range(self.N))
@@ -477,7 +476,7 @@ class ASE_FACTORIZATION(object):
 	def update_V_and_conc_and_C(self):
 		# Add column of ones (intercept to U)
 		#U_new = np.hstack((X0, self.U, self.cov))
-		parrallel = True
+		parrallel = False
 		V_update_data = []
 		if parrallel == False:
 			U_new = np.hstack((self.cov, self.U))
@@ -542,7 +541,7 @@ class ASE_FACTORIZATION(object):
 			self.conc[test_index] = conc_init
 		# E-step stuff
 		self.phi = np.ones((self.I, self.T, 4))
-		start_over = False
+		start_over = True
 		if start_over == True:
 			root = '/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell_differentiation_cuomo_data_ase/eqtl_results/ase_factorization_via_em_als_folded_beta_binomial_subsampled_high_biallelic_fraction_only_endoderm_differentiation_3_ase_factorization_no_ppca_seed_4_'
 			self.U = np.loadtxt(root + '_temper_U.txt')

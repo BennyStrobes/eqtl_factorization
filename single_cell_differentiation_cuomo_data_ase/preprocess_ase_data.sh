@@ -25,12 +25,12 @@ fi
 if false; then
 python preprocess_ase_data.py $ase_input_data_dir $annotated_samples_file $processed_data_dir $gencode_gene_annotation_file $cell_cycle_file $cell_state_file
 fi
+
 if false; then
 
 num_bins="30"
 ase_binned_by_pseudotime_root=$processed_data_dir"ase_"$num_bins"_binned_by_pseudotime_"
 python generate_ase_binned_by_pseudotime.py $processed_data_dir"filtered_ase_counts_0.3_0.5_final.txt" $processed_data_dir"cell_info_after_filtering_0.3_0.5.txt" $num_bins $ase_binned_by_pseudotime_root
-
 
 
 num_bins="30"
@@ -67,6 +67,7 @@ module load python/2.7-anaconda
 module load gcc/6.4.0
 python generate_ase_mean_binned_by_U.py $processed_data_dir"filtered_ase_counts_0.3_0.5_final_high_biallelic_fraction_only_subsampled.txt" $processed_data_dir"cell_info_after_filtering_0.3_0.5_high_biallelic_fraction_only_subsampled.txt" $num_bins $loading_file $ase_binned_by_U_root $distribution
 fi
+
 module load R/3.5.1
 Rscript visualize_processed_allelic_counts.R $processed_data_dir
 

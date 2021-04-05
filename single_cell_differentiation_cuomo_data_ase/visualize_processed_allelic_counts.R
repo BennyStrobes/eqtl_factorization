@@ -9,7 +9,7 @@ options(bitmapType = 'cairo', device = 'pdf')
 
 
 
-generate_pseudotime_af_heatmap <- function(allelic_fraction_pseutome_binned_file) {
+generate_pseudotime_af_heatmap <- function(allelic_fraction_pseutome_binned_file, fill_label) {
 	af <- read.table(allelic_fraction_pseutome_binned_file, header=TRUE, sep="\t")
 	rowz = af[,1]
 	af <- af[,2:(dim(af)[2])]
@@ -30,11 +30,56 @@ generate_pseudotime_af_heatmap <- function(allelic_fraction_pseutome_binned_file
 	melted_mat$pseudotime = factor(melted_mat$pseudotime, levels=colz)
 
 	heatmap <- ggplot(data=melted_mat, aes(x=pseudotime, y=Exonic_site)) + geom_tile(aes(fill=allelic_fraction)) + scale_fill_gradient2(midpoint=-.05, guide="colorbar")
-	heatmap <- heatmap + labs(y="Exonic site", x="Pseudotime",fill="Standardized\nAllelic Fraction")
+	heatmap <- heatmap + labs(y="Exonic site", x="Pseudotime",fill=paste0("Standardized\n", fill_label))
 	heatmap <- heatmap + theme(text = element_text(size=11),axis.text=element_text(size=11), panel.grid.major = element_blank(), panel.grid.minor = element_blank(),panel.background = element_blank(), axis.line = element_line(colour = "black"), legend.text = element_text(size=11), legend.title = element_text(size=11),  axis.text.x = element_text(angle = 90,hjust=1, vjust=.5)) 
 	heatmap <- heatmap + theme(axis.text.x=element_blank())
 	heatmap <- heatmap + theme(axis.text.y=element_blank())
 	return(heatmap)
+}
+
+
+generate_pseudotime_af_heatmap_with_existing_order <- function(allelic_fraction_pseutome_binned_file, fill_label, ord) {
+	af <- read.table(allelic_fraction_pseutome_binned_file, header=TRUE, sep="\t")
+	rowz = af[,1]
+	af <- af[,2:(dim(af)[2])]
+	af_mat = as.matrix(af)
+
+	rownames(af_mat) =rowz
+	colz <- colnames(af_mat)
+
+	scaled_af_mat <- t(scale(t(af_mat)))
+
+
+	#ord <- hclust( dist(scaled_af_mat, method = "euclidean"), method = "ward.D" )$order
+
+	melted_mat <- melt(scaled_af_mat)
+	colnames(melted_mat) <- c("Exonic_site", "pseudotime","allelic_fraction")
+
+	melted_mat$Exonic_site = factor(melted_mat$Exonic_site, levels=rownames(scaled_af_mat)[ord])
+	melted_mat$pseudotime = factor(melted_mat$pseudotime, levels=colz)
+
+	heatmap <- ggplot(data=melted_mat, aes(x=pseudotime, y=Exonic_site)) + geom_tile(aes(fill=allelic_fraction)) + scale_fill_gradient2(midpoint=-.05, guide="colorbar")
+	heatmap <- heatmap + labs(y="Exonic site", x="Pseudotime",fill=paste0("Standardized\n", fill_label))
+	heatmap <- heatmap + theme(text = element_text(size=11),axis.text=element_text(size=11), panel.grid.major = element_blank(), panel.grid.minor = element_blank(),panel.background = element_blank(), axis.line = element_line(colour = "black"), legend.text = element_text(size=11), legend.title = element_text(size=11),  axis.text.x = element_text(angle = 90,hjust=1, vjust=.5)) 
+	heatmap <- heatmap + theme(axis.text.x=element_blank())
+	heatmap <- heatmap + theme(axis.text.y=element_blank())
+	return(heatmap)
+}
+
+generate_pseudotime_af_site_ordering <- function(allelic_fraction_pseutome_binned_file) {
+	af <- read.table(allelic_fraction_pseutome_binned_file, header=TRUE, sep="\t")
+	rowz = af[,1]
+	af <- af[,2:(dim(af)[2])]
+	af_mat = as.matrix(af)
+
+	rownames(af_mat) =rowz
+	colz <- colnames(af_mat)
+
+	scaled_af_mat <- t(scale(t(af_mat)))
+
+
+	ord <- hclust( dist(scaled_af_mat, method = "euclidean"), method = "ward.D" )$order
+	return(ord)
 }
 
 generate_U_af_heatmap <- function(allelic_fraction_pseutome_binned_file, component_num) {
@@ -220,9 +265,28 @@ cell_info_file <- paste0(processed_data_dir, "cell_info_after_filtering_0.3_0.5.
 
 
 pseudotime_binned_file <- paste0(processed_data_dir,"ase_30_binned_by_pseudotime_allelic_fraction.txt")
-
-pseudotime_heatmap <- generate_pseudotime_af_heatmap(pseudotime_binned_file)
+pseudotime_heatmap <- generate_pseudotime_af_heatmap(pseudotime_binned_file, "Allelic Fraction")
 ggsave(pseudotime_heatmap, file=paste0(processed_data_dir, "pseudotime_heatmap.pdf"), width=7.2, height=5.0, units="in")
+
+pseudotime_binned_cell_line_min_file <- paste0(processed_data_dir,"ase_30_binned_by_pseudotime_allelic_fraction_cell_line_min.txt")
+pseudotime_heatmap <- generate_pseudotime_af_heatmap(pseudotime_binned_cell_line_min_file, "Allelic Fraction")
+ggsave(pseudotime_heatmap, file=paste0(processed_data_dir, "pseudotime_cell_line_min_heatmap.pdf"), width=7.2, height=5.0, units="in")
+
+pseudotime_binned_no_min_file <- paste0(processed_data_dir,"ase_30_binned_by_pseudotime_allelic_fraction_no_min.txt")
+pseudotime_heatmap <- generate_pseudotime_af_heatmap(pseudotime_binned_no_min_file, "Allelic Fraction")
+ggsave(pseudotime_heatmap, file=paste0(processed_data_dir, "pseudotime_no_min_heatmap.pdf"), width=7.2, height=5.0, units="in")
+
+ord_af <- generate_pseudotime_af_site_ordering(pseudotime_binned_file)
+
+pseudotime_binned_depth_file <- paste0(processed_data_dir,"ase_30_binned_by_pseudotime_allelic_depth.txt")
+pseudotime_heatmap <- generate_pseudotime_af_heatmap_with_existing_order(pseudotime_binned_depth_file, "Depth", ord_af)
+ggsave(pseudotime_heatmap, file=paste0(processed_data_dir, "pseudotime_depth_heatmap.pdf"), width=7.2, height=5.0, units="in")
+
+pseudotime_binned_log_depth_file <- paste0(processed_data_dir,"ase_30_binned_by_pseudotime_allelic_log_depth.txt")
+pseudotime_heatmap <- generate_pseudotime_af_heatmap_with_existing_order(pseudotime_binned_log_depth_file, "Log Depth", ord_af)
+ggsave(pseudotime_heatmap, file=paste0(processed_data_dir, "pseudotime_log_depth_heatmap.pdf"), width=7.2, height=5.0, units="in")
+
+
 
 
 binomial_allelic_fraction_U0_binned_file <- paste0(processed_data_dir, "ase_binomial_mean_30_binned_by_mixture_U_0_allelic_fraction.txt")

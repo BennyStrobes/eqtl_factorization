@@ -181,9 +181,10 @@ class ASE_FACTORIZATION(object):
 			self.e_step()
 			print('Starting M-STEP')
 			self.update_w()
+			print('V')
 			self.update_V_and_conc()
 			self.e_step()
-
+			print('U')
 			self.update_U()
 			# Save to output every five iters
 			if np.mod(vi_iter, 1) == 0: 
@@ -199,7 +200,7 @@ class ASE_FACTORIZATION(object):
 			self.iter = self.iter + 1
 	def update_w(self):
 		# Initialize matrix to keep track of w for this iteration
-		posterior_sums = np.zeros((self.T, 4)) + .1
+		posterior_sums = np.zeros((self.T, 4)) + 2
 		# Loop through individuals
 		for individual_index in range(self.I):
 			for test_index in range(self.T):
@@ -399,7 +400,7 @@ class ASE_FACTORIZATION(object):
 		self.C = np.random.randn(self.num_cov, self.T)*.01
 		# E-step stuff
 		self.phi = np.ones((self.I, self.T, 4))
-		start_over = True
+		start_over = False
 		if start_over == True:
 			root = '/work-zfs/abattle4/bstrober/single_cell_eqtl_factorization/single_cell_differentiation_cuomo_data_ase/eqtl_results/ase_factorization_via_em_als_folded_beta_binomial_subsampled_high_biallelic_fraction_only_endoderm_differentiation_3_ase_factorization_no_ppca_seed_4_'
 			self.U = np.loadtxt(root + '_temper_U.txt')

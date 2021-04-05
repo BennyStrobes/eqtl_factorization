@@ -67,13 +67,13 @@ model_name="ase_factorization_via_pymc3_lmm_ard_vb"
 model_name="ase_factorization_via_pymc3_lmm_vb_min_counts"
 model_name="ase_factorization_via_als"
 model_name="ase_factorization_via_als_folded_binomial"
-model_name="ase_factorization_via_em_als_folded_beta_binomial"
-model_name="ase_factorization_via_fast_em_als_folded_beta_binomial"
 model_name="ase_factorization_via_pymc3_lmm_vb_non_min_counts"
 model_name="ase_factorization_via_pca_non_min_counts_regress_out_cell_line"
-if false; then
-sh run_ase_factorization.sh $ase_file $covariate_file $sample_overlap_file $plate_overlap_file $k $model_name $eqtl_results_dir$model_name"_subsampled_high_biallelic_fraction_only_endoderm_differentiation_"$k
-fi
+model_name="ase_factorization_via_fast_em_als_folded_beta_binomial"
+model_name="ase_factorization_via_em_als_folded_beta_binomial"
+
+sbatch run_ase_factorization.sh $ase_file $covariate_file $sample_overlap_file $plate_overlap_file $k $model_name $eqtl_results_dir$model_name"_subsampled_high_biallelic_fraction_only_endoderm_differentiation_"$k
+
 
 
 
@@ -82,8 +82,9 @@ if false; then
 Rscript visualize_ase_factorization.R $eqtl_results_dir $processed_data_dir $processed_data_dir"cell_info_after_filtering_0.3_0.5_high_biallelic_fraction_only_subsampled_small.txt" $processed_data_dir"go_terms_cell_loadings_after_filtering_0.3_0.5_high_biallelic_fraction_only_subsampled_small.txt" $visualization_dir"high_biallelic_fraction_subsampled_small_"
 fi
 module load R/3.5.1
+if false; then 
 Rscript visualize_ase_factorization.R $eqtl_results_dir $processed_data_dir $processed_data_dir"cell_info_after_filtering_0.3_0.5_high_biallelic_fraction_only_subsampled.txt" $processed_data_dir"go_terms_cell_loadings_after_filtering_0.3_0.5_high_biallelic_fraction_only_subsampled.txt" $visualization_dir"high_biallelic_fraction_subsampled_"
-
+fi
 
 if false; then
 Rscript visualize_ase_factorization.R $eqtl_results_dir $processed_data_dir $processed_data_dir"cell_info_after_filtering_0.3_0.5_high_biallelic_fraction_only.txt" $processed_data_dir"go_terms_cell_loadings_after_filtering_0.3_0.5_high_biallelic_fraction_only.txt" $visualization_dir"high_biallelic_fraction_"

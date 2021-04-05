@@ -14,6 +14,9 @@ import eqtl_factorization_vi_with_re_tied_variance
 import eqtl_factorization_vi_loading_spike_and_slab_with_re
 import eqtl_factorization_vi_factor_loading_spike_and_slab_with_re
 import eqtl_factorization_vi_factor_loading_spike_and_slab_with_multiple_re
+import eqtl_factorization_vi_factor_loading_spike_and_slab_with_re_and_fixed_environmental_effect
+import eqtl_factorization_vi_factor_loading_spike_and_slab_with_re_and_fixed_environmental_effect_learn_cov
+
 #import eqtl_factorization_vi_zero_inflated3
 #import eqtl_factorization_als
 #import eqtl_factorization_als_unconstrained
@@ -36,7 +39,8 @@ def load_in_sample_overlap_data(sample_overlap_file):
 	for line in f:
 		line = line.rstrip()
 		data = line.split()
-		Z1.append(np.asarray(data).astype(int))
+		#Z1.append(np.asarray(data).astype(int))
+		Z1.append(int(line))
 	f.close()
 	return np.asarray(Z1)
 
@@ -166,6 +170,23 @@ def train_eqtl_factorization_model(sample_overlap_file, expression_training_file
 		np.savetxt(output_root + '_tau.txt', (eqtl_vi.tau_alpha/eqtl_vi.tau_beta), fmt="%s", delimiter='\t')
 		np.savetxt(output_root + '_S.txt', (eqtl_vi.S), fmt="%s", delimiter='\t')
 		np.savetxt(output_root + '_C.txt', (eqtl_vi.C_mu), fmt="%s", delimiter='\t')
+	if model_name == 'eqtl_factorization_vi_loading_spike_and_slab_with_re_and_fixed_environmental_effect':
+		cov = np.loadtxt(covariate_file, delimiter='\t')
+		eqtl_vi = eqtl_factorization_vi_loading_spike_and_slab_with_re_and_fixed_environmental_effect.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-16, beta=1e-16, a=1, b=1, gamma_v=float(lasso_param), gamma_u=1.0, max_iter=max_it, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean, sample_batch_fraction=.2, output_root=output_root)
+		eqtl_vi.fit(G=G, Y=Y, cov=cov, z=Z)
+		# pickle.dump(eqtl_vi, open(output_root + '_model', 'wb'))
+		#eqtl_vi = pickle.load(open(output_root + '_model', 'rb'))
+		# shared_ve, factor_ve = eqtl_vi.compute_variance_explained_of_factors()
+		if svi_boolean == False:
+			np.savetxt(output_root + '_U_S.txt', (eqtl_vi.U_mu), fmt="%s", delimiter='\t')
+		elif svi_boolean == True:
+			np.savetxt(output_root + '_U_S.txt', (eqtl_vi.U_mu_full), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_V.txt', (eqtl_vi.V_mu), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_F.txt', (eqtl_vi.F_mu), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_intercept.txt', (eqtl_vi.intercept_mu), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_tau.txt', (eqtl_vi.tau_alpha/eqtl_vi.tau_beta), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_S.txt', (eqtl_vi.S), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_C.txt', (eqtl_vi.C_mu), fmt="%s", delimiter='\t')		
 	if model_name == 'eqtl_factorization_vi_loading_spike_and_slab_with_re':
 		cov = np.loadtxt(covariate_file, delimiter='\t')
 		eqtl_vi = eqtl_factorization_vi_loading_spike_and_slab_with_re.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-16, beta=1e-16, a=1, b=1, gamma_v=float(lasso_param), gamma_u=1.0, max_iter=max_it, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean, sample_batch_fraction=.2, output_root=output_root)
@@ -216,6 +237,38 @@ def train_eqtl_factorization_model(sample_overlap_file, expression_training_file
 		np.savetxt(output_root + '_intercept.txt', (eqtl_vi.intercept_mu), fmt="%s", delimiter='\t')
 		np.savetxt(output_root + '_tau.txt', (eqtl_vi.tau_alpha/eqtl_vi.tau_beta), fmt="%s", delimiter='\t')
 		np.savetxt(output_root + '_S.txt', (eqtl_vi.S), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_C.txt', (eqtl_vi.C_mu), fmt="%s", delimiter='\t')
+	if model_name == 'eqtl_factorization_vi_fixed_environmental_effect':
+		cov = np.loadtxt(covariate_file, delimiter='\t')
+		eqtl_vi = eqtl_factorization_vi_factor_loading_spike_and_slab_with_re_and_fixed_environmental_effect.EQTL_FACTORIZATION_VI(K=num_latent_factors, alpha=1e-16, beta=1e-16, a=1, b=1, gamma_v=float(lasso_param), gamma_u=1.0, max_iter=max_it, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean, sample_batch_fraction=.2, output_root=output_root)
+		eqtl_vi.fit(G=G, Y=Y, cov=cov, z=Z)
+		# pickle.dump(eqtl_vi, open(output_root + '_model', 'wb'))
+		#eqtl_vi = pickle.load(open(output_root + '_model', 'rb'))
+		# shared_ve, factor_ve = eqtl_vi.compute_variance_explained_of_factors()
+		if svi_boolean == False:
+			np.savetxt(output_root + '_U_S.txt', (eqtl_vi.U_mu), fmt="%s", delimiter='\t')
+		elif svi_boolean == True:
+			np.savetxt(output_root + '_U_S.txt', (eqtl_vi.U_mu_full), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_V.txt', (eqtl_vi.V_mu), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_F.txt', (eqtl_vi.F_mu), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_intercept.txt', (eqtl_vi.intercept_mu), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_tau.txt', (eqtl_vi.tau_alpha/eqtl_vi.tau_beta), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_C.txt', (eqtl_vi.C_mu), fmt="%s", delimiter='\t')
+	if model_name == 'eqtl_factorization_vi_fixed_environmental_effect_learn_cov':
+		cov = np.loadtxt(covariate_file, delimiter='\t')
+		eqtl_vi = eqtl_factorization_vi_factor_loading_spike_and_slab_with_re_and_fixed_environmental_effect_learn_cov.EQTL_FACTORIZATION_VI(K=num_latent_factors, J=20, alpha=1e-16, beta=1e-16, a=1, b=1, gamma_v=float(lasso_param), gamma_u=1.0, max_iter=max_it, delta_elbo_threshold=.01, SVI=svi_boolean, parrallel_boolean=parrallel_boolean, sample_batch_fraction=.2, output_root=output_root)
+		eqtl_vi.fit(G=G, Y=Y, cov=cov, z=Z)
+		# pickle.dump(eqtl_vi, open(output_root + '_model', 'wb'))
+		#eqtl_vi = pickle.load(open(output_root + '_model', 'rb'))
+		# shared_ve, factor_ve = eqtl_vi.compute_variance_explained_of_factors()
+		if svi_boolean == False:
+			np.savetxt(output_root + '_U_S.txt', (eqtl_vi.U_mu), fmt="%s", delimiter='\t')
+		elif svi_boolean == True:
+			np.savetxt(output_root + '_U_S.txt', (eqtl_vi.U_mu_full), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_V.txt', (eqtl_vi.V_mu), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_F.txt', (eqtl_vi.F_mu), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_intercept.txt', (eqtl_vi.intercept_mu), fmt="%s", delimiter='\t')
+		np.savetxt(output_root + '_tau.txt', (eqtl_vi.tau_alpha/eqtl_vi.tau_beta), fmt="%s", delimiter='\t')
 		np.savetxt(output_root + '_C.txt', (eqtl_vi.C_mu), fmt="%s", delimiter='\t')
 	if model_name == 'eqtl_factorization_vi_with_re_tied_variance':
 		cov = np.loadtxt(covariate_file, delimiter='\t')

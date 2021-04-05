@@ -42,7 +42,7 @@ def get_mapping_from_gene_to_chromosome_position(gene_annotation_file, genes):
 			pdb.set_trace()
 		if data[6] != 'protein_coding' or data[7] != 'KNOWN':
 			continue
-		if data[1] == 'chrX' or data[1] == 'chrY':
+		if data[1] == 'chrX' or data[1] == 'chrY' or data[1] == 'chrM':
 			continue
 		# Extract relevent info on gene: Chrom num and TSS
 		chrom_num = int(data[1].split('hr')[1])
@@ -101,9 +101,17 @@ def get_maf(genotype):
 ########################
 # Step 1: Create file with all variant gene pairs such that gene is within $distanceKB of gene
 ########################
-def extract_variant_gene_pairs_for_eqtl_testing(gene_file, gene_annotation_file, distance, genotype_data_dir, variant_gene_pair_file):
+def extract_variant_gene_pairs_for_eqtl_testing(gene_file, gene_annotation_file, distance, genotype_file, variant_gene_pair_file):
 	# Extract gene list
-	genes = np.loadtxt(gene_file, delimiter='\t',dtype=str)[:,0]
+	#genes = np.loadtxt(gene_file, delimiter='\t',dtype=str)[:,0]
+	genes = []
+	f = open(gene_file)
+	for line in f:
+		line = line.rstrip()
+		data = line.split('\t')
+		genes.append(data[0].split('_')[1])
+	f.close()
+	genes = np.asarray(genes)
 	print(len(genes))
 	# Get mapping from genes to (chrom_num, position)
 	gene_mapping = get_mapping_from_gene_to_chromosome_position(gene_annotation_file, genes)
@@ -120,7 +128,7 @@ def extract_variant_gene_pairs_for_eqtl_testing(gene_file, gene_annotation_file,
 		# Otherwise is a list of gene names
 		chromosome = create_gene_chromsome(chrom_num, gene_mapping, distance)
 		# Now loop through variants on this chromosome
-		genotype_file = genotype_data_dir + 'chr' + str(chrom_num) + '.genotypes.matrix.eqtl.txt'
+		#genotype_file = genotype_data_dir + 'chr' + str(chrom_num) + '.genotypes.matrix.eqtl.txt'
 		f = open(genotype_file)
 		head_count = 0
 		for line in f:
@@ -130,10 +138,12 @@ def extract_variant_gene_pairs_for_eqtl_testing(gene_file, gene_annotation_file,
 			if head_count == 0:
 				head_count = head_count + 1
 				continue
-			if len(data) != 120:
+			if len(data) != 106:
 				print('assumption error!')
 			variant_id = data[0]
 			variant_chrom = int(variant_id.split(':')[0])
+			if variant_chrom != chrom_num:
+				continue
 			variant_pos = int(variant_id.split(':')[1])
 			# Simple error check
 			if variant_chrom != chrom_num:
@@ -145,7 +155,6 @@ def extract_variant_gene_pairs_for_eqtl_testing(gene_file, gene_annotation_file,
 			genotype = np.asarray(data[1:]).astype(float)
 			maf = get_maf(genotype)
 			if maf < .05:
-				print('skipped variant')
 				continue
 			# List of genes that variant maps to
 			mapping_genes = chromosome[variant_pos].split(':')
@@ -341,7 +350,7 @@ def create_mapping_from_gene_names_to_expression_vectors(sc_expression_file):
 		if head_count == 0:
 			head_count = head_count + 1
 			continue
-		gene_id = data[0].split('_')[0]
+		gene_id = data[0].split('_')[1]
 		gene_expression = np.asarray(data[1:])
 		mapping[gene_id] = gene_expression
 	f.close()
@@ -956,9 +965,9 @@ def prepare_eqtl_factorization_files_wrapper(output_root, gene_annotation_file, 
 	# Step 3b: center zeros at zero
 	########################
 	# Residual expression file
-	single_cell_uncorrected_zero_centered_expression_eqtl_traing_data_file = output_root + '_expression_training_data_uncorrected_zero_centered_r_squared_pruned.txt'
-	zero_center_expression_data(single_cell_expression_eqtl_traing_data_file, single_raw_cell_expression_eqtl_traing_data_file, single_cell_uncorrected_zero_centered_expression_eqtl_traing_data_file)
-	save_as_h5_file(single_cell_uncorrected_zero_centered_expression_eqtl_traing_data_file)
+	single_cell_corrected_centered_expression_eqtl_traing_data_file = output_root + '_expression_training_data_uncorrected_centered_r_squared_pruned.txt'
+	zero_center_expression_data(single_cell_centered_expression_eqtl_traing_data_file, single_raw_cell_expression_eqtl_traing_data_file, single_cell_corrected_centered_expression_eqtl_traing_data_file)
+	save_as_h5_file(single_cell_corrected_centered_expression_eqtl_traing_data_file)
 
 	########################
 	# Step 4: Generate residual expression
@@ -1088,12 +1097,19 @@ def prepare_eqtl_factorization_files_wrapper_v2(output_root, gene_annotation_fil
 	single_cell_individual_id_file = output_root + '_individual_id.txt'
 	generate_individual_id_file(cell_level_info_file, single_cell_individual_id_file)
 
-def prepare_eqtl_factorization_files_wrapper_v3(output_root, gene_annotation_file, distance, genotype_file, raw_expression_file, expression_file, num_pcs, covariate_file, cell_level_info_file, single_cell_eqtl_dir, random_seed):
+def prepare_eqtl_factorization_files_wrapper_v3(output_root, gene_annotation_file, distance, genotype_file, raw_expression_file, expression_file, r_squared_threshold, num_pcs, covariate_file, cell_level_info_file, single_cell_eqtl_dir, random_seed):
 	########################
-	# Step 1 and step 2: Extract variant gene pairs that reached nominal significance in cell type specific eqtl analyis (ignore hla genes)
+	# Step 1: Extract variant gene pairs that reached nominal significance in cell type specific eqtl analyis (ignore hla genes)
 	########################
-	ld_pruned_variant_gene_pair_file = output_root + '_variant_gene_pairs_in_known_days.txt'
-	extract_sig_variant_gene_pairs_from_known_cell_types(single_cell_eqtl_dir, ld_pruned_variant_gene_pair_file, expression_file, random_seed)
+	variant_gene_pair_file = output_root + '_all_variant_gene_pairs_' + str(distance) + '_bp.txt'
+	extract_variant_gene_pairs_for_eqtl_testing(expression_file, gene_annotation_file, distance, genotype_file, variant_gene_pair_file)
+
+	########################
+	# Step 2: LD prune the above file in each gene (ie limit to only independent snps per gene)
+	########################
+	# Output file containing list of (pruned) variant gene pairs
+	ld_pruned_variant_gene_pair_file = output_root + '_nominal_sig_variant_gene_pairs_in_known_cell_types_r_squared_pruned.txt'
+	ld_prune_variant_gene_pair_file(variant_gene_pair_file, ld_pruned_variant_gene_pair_file, r_squared_threshold, genotype_file, random_seed)
 
 	########################
 	# Step 3: Generate raw expression matrix
@@ -1113,19 +1129,27 @@ def prepare_eqtl_factorization_files_wrapper_v3(output_root, gene_annotation_fil
 
 	
 	########################
-	# Step 5: center zeros at zero
+	# Step 5: center Expression data
 	########################
-	# Residual expression file
-	single_cell_uncorrected_zero_centered_expression_eqtl_traing_data_file = output_root + '_expression_training_data_uncorrected_zero_centered_r_squared_pruned.txt'
-	zero_center_expression_data(single_cell_expression_eqtl_traing_data_file, single_raw_cell_expression_eqtl_traing_data_file, single_cell_uncorrected_zero_centered_expression_eqtl_traing_data_file)
-	save_as_h5_file(single_cell_uncorrected_zero_centered_expression_eqtl_traing_data_file)
 
-	
+	single_cell_centered_expression_eqtl_traing_data_file = output_root + '_expression_training_data_centered_uncorrected_r_squared_pruned.txt'
+	center_data(single_cell_expression_eqtl_traing_data_file, single_cell_centered_expression_eqtl_traing_data_file)
+	save_as_h5_file(single_cell_centered_expression_eqtl_traing_data_file)
+
 	########################
 	# Step 6: Get subset of covariates
 	########################
 	subset_covariate_file = output_root + '_covariate_subset_' + str(num_pcs) + '.txt'
 	subset_covariates(covariate_file, subset_covariate_file, num_pcs)	
+
+
+	########################
+	# Step 7: Generate residual expression
+	########################
+	# Residual expression file
+	single_cell_corrected_expression_eqtl_traing_data_file = output_root + '_expression_training_data_corrected_r_squared_pruned.txt'
+	regress_out_covariates(single_cell_centered_expression_eqtl_traing_data_file, covariate_file, single_cell_corrected_expression_eqtl_traing_data_file, num_pcs)
+	save_as_h5_file(single_cell_corrected_expression_eqtl_traing_data_file)
 
 	########################
 	# Step 7: Generate Genotype matrix
@@ -1139,9 +1163,17 @@ def prepare_eqtl_factorization_files_wrapper_v3(output_root, gene_annotation_fil
 	# Step 8: Generate standardized Genotype matrix
 	########################
 	# Output file
-	single_cell_genotype_eqtl_training_data_file = output_root + '_standardized_genotype_training_data_uncorrected_r_squared_pruned.txt'
-	construct_standardized_genotype_matrix(ld_pruned_variant_gene_pair_file, genotype_file, cell_level_info_file, single_cell_genotype_eqtl_training_data_file)
-	save_as_h5_file(single_cell_genotype_eqtl_training_data_file)
+	single_cell_centered_genotype_eqtl_training_data_file = output_root + '_standardized_genotype_training_data_uncorrected_r_squared_pruned.txt'
+	construct_standardized_genotype_matrix(ld_pruned_variant_gene_pair_file, genotype_file, cell_level_info_file, single_cell_centered_genotype_eqtl_training_data_file)
+	save_as_h5_file(single_cell_centered_genotype_eqtl_training_data_file)
+
+	########################
+	# Step 7: Generate residual genotype
+	########################
+	# Residual expression file
+	single_cell_corrected_genotype_eqtl_training_data_file = output_root + '_standardized_genotype_training_data_corrected_r_squared_pruned.txt'
+	regress_out_covariates(single_cell_centered_genotype_eqtl_training_data_file, covariate_file, single_cell_corrected_genotype_eqtl_training_data_file, num_pcs)
+	save_as_h5_file(single_cell_corrected_genotype_eqtl_training_data_file)
 
 	########################
 	# Step 9: Generate individual id file (z matrix in eqtl factorization)
@@ -1149,7 +1181,7 @@ def prepare_eqtl_factorization_files_wrapper_v3(output_root, gene_annotation_fil
 	# Output file
 	single_cell_individual_id_file = output_root + '_individual_id.txt'
 	generate_individual_id_file(cell_level_info_file, single_cell_individual_id_file)
-
+	
 
 def prepare_eqtl_factorization_files_wrapper_v4(output_root, gene_annotation_file, distance, genotype_file, raw_expression_file, expression_file, num_pcs, covariate_file, cell_level_info_file, single_cell_eqtl_dir, random_seed, nn):
 	########################
@@ -1228,15 +1260,15 @@ def prepare_eqtl_factorization_files_wrapper_v5(output_root, gene_annotation_fil
 	# Step 1 and step 2: Extract variant gene pairs that reached nominal significance in cell type specific eqtl analyis (ignore hla genes)
 	########################
 	ld_pruned_variant_gene_pair_file = output_root + '_sig_dynamic_eqtls.txt'
-	extract_sig_dynamic_eqtls(single_cell_eqtl_dir, ld_pruned_variant_gene_pair_file, expression_file, random_seed)
+	#extract_sig_dynamic_eqtls(single_cell_eqtl_dir, ld_pruned_variant_gene_pair_file, expression_file, random_seed)
 
 	########################
 	# Step 3: Generate raw expression matrix
 	########################
 	# Output file
 	single_raw_cell_expression_eqtl_traing_data_file = output_root + '_raw_expression_training_data_uncorrected_r_squared_pruned.txt'
-	generate_single_cell_expression_eqtl_training_data(ld_pruned_variant_gene_pair_file, raw_expression_file, single_raw_cell_expression_eqtl_traing_data_file)
-	save_as_h5_file(single_raw_cell_expression_eqtl_traing_data_file)
+	#generate_single_cell_expression_eqtl_training_data(ld_pruned_variant_gene_pair_file, raw_expression_file, single_raw_cell_expression_eqtl_traing_data_file)
+	#save_as_h5_file(single_raw_cell_expression_eqtl_traing_data_file)
 
 
 	########################
@@ -1244,7 +1276,7 @@ def prepare_eqtl_factorization_files_wrapper_v5(output_root, gene_annotation_fil
 	########################
 	# Output file
 	single_cell_expression_eqtl_traing_data_file = output_root + '_expression_training_data_uncorrected_r_squared_pruned.txt'
-	generate_single_cell_expression_eqtl_training_data(ld_pruned_variant_gene_pair_file, expression_file, single_cell_expression_eqtl_traing_data_file)
+	#generate_single_cell_expression_eqtl_training_data(ld_pruned_variant_gene_pair_file, expression_file, single_cell_expression_eqtl_traing_data_file)
 
 	
 	########################
@@ -1252,8 +1284,8 @@ def prepare_eqtl_factorization_files_wrapper_v5(output_root, gene_annotation_fil
 	########################
 	# Residual expression file
 	single_cell_uncorrected_zero_centered_expression_eqtl_traing_data_file = output_root + '_expression_training_data_uncorrected_zero_centered_r_squared_pruned.txt'
-	zero_center_expression_data(single_cell_expression_eqtl_traing_data_file, single_raw_cell_expression_eqtl_traing_data_file, single_cell_uncorrected_zero_centered_expression_eqtl_traing_data_file)
-	save_as_h5_file(single_cell_uncorrected_zero_centered_expression_eqtl_traing_data_file)
+	#zero_center_expression_data(single_cell_expression_eqtl_traing_data_file, single_raw_cell_expression_eqtl_traing_data_file, single_cell_uncorrected_zero_centered_expression_eqtl_traing_data_file)
+	#save_as_h5_file(single_cell_uncorrected_zero_centered_expression_eqtl_traing_data_file)
 
 	
 	########################
@@ -1267,30 +1299,30 @@ def prepare_eqtl_factorization_files_wrapper_v5(output_root, gene_annotation_fil
 	########################
 	# Output file
 	single_cell_genotype_eqtl_training_data_file = output_root + '_genotype_training_data_uncorrected_r_squared_pruned.txt'
-	construct_genotype_matrix(ld_pruned_variant_gene_pair_file, genotype_file, cell_level_info_file, single_cell_genotype_eqtl_training_data_file)
-	save_as_h5_file(single_cell_genotype_eqtl_training_data_file)
+	#construct_genotype_matrix(ld_pruned_variant_gene_pair_file, genotype_file, cell_level_info_file, single_cell_genotype_eqtl_training_data_file)
+	#save_as_h5_file(single_cell_genotype_eqtl_training_data_file)
 
 	########################
 	# Step 8: Generate standardized Genotype matrix
 	########################
 	# Output file
 	single_cell_genotype_eqtl_training_data_file = output_root + '_standardized_genotype_training_data_uncorrected_r_squared_pruned.txt'
-	construct_standardized_genotype_matrix(ld_pruned_variant_gene_pair_file, genotype_file, cell_level_info_file, single_cell_genotype_eqtl_training_data_file)
-	save_as_h5_file(single_cell_genotype_eqtl_training_data_file)
+	#construct_standardized_genotype_matrix(ld_pruned_variant_gene_pair_file, genotype_file, cell_level_info_file, single_cell_genotype_eqtl_training_data_file)
+	#save_as_h5_file(single_cell_genotype_eqtl_training_data_file)
 
 	########################
 	# Step 9: Generate individual id file (z matrix in eqtl factorization)
 	########################
 	# Output file
 	single_cell_individual_id_file = output_root + '_individual_id.txt'
-	generate_individual_id_file(cell_level_info_file, single_cell_individual_id_file)
+	#generate_individual_id_file(cell_level_info_file, single_cell_individual_id_file)
 
 	########################
 	# Step 9: Generate individual id file (z matrix in eqtl factorization)
 	########################
 	# Output file
 	single_cell_individual_id_and_plate_id_file = output_root + '_individual_id_and_plate_id.txt'
-	generate_individual_id_and_plate_id_file(cell_level_info_file, single_cell_individual_id_and_plate_id_file)
+	#generate_individual_id_and_plate_id_file(cell_level_info_file, single_cell_individual_id_and_plate_id_file)
 		
 
 ######################
@@ -1338,6 +1370,35 @@ output_root = eqtl_factorization_input_dir + 'single_cell_sig_tests_nominal_p_' 
 # single cell randm subset
 #############
 # Variant must be within $distance BP from TSS of gene
+distance = 10000
+# Input file containing expression
+raw_expression_file = pre_processed_data_dir + 'normalized_expression_all_cells.txt'
+# Input file containing expression
+expression_file = pre_processed_data_dir + 'standardized_normalized_expression_all_cells.txt'
+# Covariate file
+covariate_file = pre_processed_data_dir + 'standardized_normalized_expression_pca_loadings.txt'
+# File containing mapping from cell index to individual id
+cell_level_info_file = pre_processed_data_dir + 'cell_covariates.txt'
+# Genotype file
+genotype_file = pre_processed_data_dir + 'genotype_mean_inputed.txt'
+# Only allow snps with r_squared threshold less than this
+r_squared_threshold=0.01
+# Number of PCs to use
+num_pcs = 10
+# random seed used for ld pruning
+random_seed=1
+# Output root
+output_root = eqtl_factorization_input_dir + 'single_cell_r_squared_thresh_' + str(r_squared_threshold)
+
+
+#prepare_eqtl_factorization_files_wrapper_v3(output_root, gene_annotation_file, distance, genotype_file, raw_expression_file, expression_file, r_squared_threshold, num_pcs, covariate_file, cell_level_info_file, single_cell_eqtl_dir, random_seed)
+
+
+
+################
+# single cell randm subset
+#############
+# Variant must be within $distance BP from TSS of gene
 
 # Input file containing expression
 raw_expression_file = pre_processed_data_dir + 'normalized_expression_all_cells.txt'
@@ -1377,7 +1438,7 @@ cell_level_info_file = pre_processed_data_dir + 'cell_covariates.txt'
 # Genotype file
 genotype_file = pre_processed_data_dir + 'genotype_mean_inputed.txt'
 # Number of PCs to use
-num_pcs = 10
+num_pcs = 100
 # random seed used for ld pruning
 random_seed=1
 # Output root
